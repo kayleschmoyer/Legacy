@@ -366,6 +366,52 @@ describe('players resolver', () => {
     );
   });
 
+  // ── players (rosteredOnly — season-award recipients, LS-10821) ────────────
+
+  it('players: scopes a rosteredOnly search to the league sport and roster (LS-10821)', async () => {
+    mockContext.user = { id: 7, isAdmin: false };
+    mockDb.limit.mockResolvedValueOnce([
+      { minCareerGames: 0, minCareerSeasons: 0, sport: 'football' },
+    ]);
+    mockPlayersService.getPlayers.mockResolvedValueOnce([]);
+
+    await getQueryResolver('players')(
+      {},
+      {
+        limit: 8,
+        search: 'Babe Ruth',
+        excludeEmptyNames: false,
+        leagueId: 42,
+        rosteredOnly: true,
+      },
+      mockContext,
+      undefined as never,
+    );
+
+    expect(mockPlayersService.getPlayers).toHaveBeenCalledWith(
+      expect.objectContaining({
+        leagueId: 42,
+        filters: expect.objectContaining({
+          fullNameLike: 'Babe Ruth',
+          sport: 'football',
+          rosteredOnly: true,
+        }),
+      }),
+    );
+  });
+
+  it('players: rejects rosteredOnly without a leagueId (LS-10821)', async () => {
+    await expect(
+      getQueryResolver('players')(
+        {},
+        { excludeEmptyNames: false, leagueId: null, rosteredOnly: true },
+        mockContext,
+        undefined as never,
+      ),
+    ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+    expect(mockPlayersService.getPlayers).not.toHaveBeenCalled();
+  });
+
   // ── players (search — auth required, premium gate removed: LS-7019/LS-8212) ─
 
   it('players: throws AuthenticationError when search is provided but user is unauthenticated', async () => {

@@ -469,3 +469,60 @@ describe('SeasonAwardsControl — LS-10799 keyboard-selectable recipient search'
     expect(within(row).getByRole('listbox')).toBeTruthy();
   });
 });
+
+describe('SeasonAwardsControl — LS-10821 recipient search scoped to the league', () => {
+  const graphql = jest.requireMock<typeof import('@legacy-sports/graphql')>(
+    '@legacy-sports/graphql',
+  );
+
+  beforeEach(() => {
+    jest.mocked(graphql.useGetPlayersWithStatsQuery).mockClear();
+  });
+
+  function searchRow(awardKey: string, text: string) {
+    const row = screen.getByTestId(`award-row-${awardKey}`);
+    const input = within(row).getByLabelText('Search for award recipient');
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: text } });
+  }
+
+  /** Variables of every players search that actually ran (not skipped). */
+  function activeSearchVariables() {
+    return jest
+      .mocked(graphql.useGetPlayersWithStatsQuery)
+      .mock.calls.map(([options]) => options)
+      .filter((options) => options && !options.skip)
+      .map((options) => options?.variables);
+  }
+
+  it('passes leagueId to every recipient search so the league sport applies (AC1)', () => {
+    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    searchRow('gold_glove', 'Babe Ruth');
+
+    for (const [options] of jest.mocked(graphql.useGetPlayersWithStatsQuery)
+      .mock.calls) {
+      expect(options?.variables).toMatchObject({ leagueId: 42 });
+    }
+    expect(activeSearchVariables()).toContainEqual({
+      search: 'Babe Ruth',
+      limit: 8,
+      leagueId: 42,
+      rosteredOnly: false,
+    });
+  });
+
+  it.each(['mvp', 'rookie_of_the_year'])(
+    'limits %s recipients to league-rostered players (AC3)',
+    (awardKey) => {
+      render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+      searchRow(awardKey, 'Tom Brady');
+
+      expect(activeSearchVariables()).toContainEqual({
+        search: 'Tom Brady',
+        limit: 8,
+        leagueId: 42,
+        rosteredOnly: true,
+      });
+    },
+  );
+});

@@ -237,6 +237,32 @@ describe('PlayerService — scoring sort', () => {
     expect(sqlText).not.toContain('team_members');
   });
 
+  it('only includes rostered players when rosteredOnly + leagueId are set (LS-10821)', async () => {
+    await service.getPlayersWithScoring({
+      orderBy: 'avgPointsPerGame',
+      leagueId: 5670,
+      filters: { rosteredOnly: true },
+    });
+
+    const executeCalls = mockDb.execute.mock.calls as unknown[][];
+    const sqlText = JSON.stringify(executeCalls[0]?.[0]);
+    expect(sqlText).toContain('EXISTS (SELECT 1 FROM public.team_members tm');
+    expect(sqlText).not.toContain(
+      'NOT EXISTS (SELECT 1 FROM public.team_members',
+    );
+  });
+
+  it('does not filter by roster when rosteredOnly is set without a leagueId (LS-10821)', async () => {
+    await service.getPlayersWithScoring({
+      orderBy: 'avgPointsPerGame',
+      filters: { rosteredOnly: true },
+    });
+
+    const executeCalls = mockDb.execute.mock.calls as unknown[][];
+    const sqlText = JSON.stringify(executeCalls[0]?.[0]);
+    expect(sqlText).not.toContain('team_members');
+  });
+
   it('does not filter by roster when excludeRostered is false (LS-9118)', async () => {
     await service.getPlayersWithScoring({
       orderBy: 'avgPointsPerGame',

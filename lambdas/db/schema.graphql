@@ -5033,6 +5033,11 @@ type Query {
     orderBy: String
     orderDirection: String
     position: String
+
+    """
+    When true, only include players rostered on a team in leagueId (season-award recipients). Requires leagueId.
+    """
+    rosteredOnly: Boolean = false
     search: String
 
     """

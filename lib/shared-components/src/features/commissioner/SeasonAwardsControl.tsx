@@ -85,6 +85,15 @@ const SEASON_AWARD_TYPES: AwardMeta[] = [
   },
 ];
 
+/**
+ * Awards whose copy is about contribution to a fantasy team: recipients are
+ * limited to players rostered in the league (LS-10821 product decision).
+ */
+export const ROSTERED_ONLY_AWARD_TYPES: ReadonlySet<string> = new Set([
+  'mvp',
+  'rookie_of_the_year',
+]);
+
 // ─── Player search dropdown ────────────────────────────────────────────────────
 
 interface PlayerSearchResult {
@@ -103,10 +112,16 @@ const ListboxStack = YStack as React.ComponentType<
 >;
 
 function PlayerSearchInput({
+  leagueId,
+  rosteredOnly,
   value,
   onChange,
   disabled,
 }: {
+  /** Scopes results to the league's sport and player pool (LS-10821). */
+  leagueId: number;
+  /** Only players rostered in the league (MVP / Rookie of the Year). */
+  rosteredOnly: boolean;
   value: string;
   /** Called with the picked player, or `null` once the text is edited (LS-10825). */
   onChange: (player: PlayerSearchResult | null) => void;
@@ -124,7 +139,7 @@ function PlayerSearchInput({
   const getOptionId = (i: number) => `${baseId}-opt-${i}`;
 
   const { data, loading } = useGetPlayersWithStatsQuery({
-    variables: { search: query, limit: 8 },
+    variables: { search: query, limit: 8, leagueId, rosteredOnly },
     skip: query.trim().length < 2,
   });
 
@@ -481,6 +496,8 @@ function AwardRow({
             {existing ? 'Replace recipient' : 'Assign recipient'}
           </Text>
           <PlayerSearchInput
+            leagueId={leagueId}
+            rosteredOnly={ROSTERED_ONLY_AWARD_TYPES.has(meta.key)}
             value={recipientName}
             onChange={setSelectedPlayer}
           />

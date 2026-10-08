@@ -7,7 +7,7 @@
  * performance, NOT real MLB awards.
  */
 import { LOGGER } from '@legacy-sports/logging';
-import { PublicSchema } from '@legacy-sports/db-client';
+import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import { and, count, eq, sql } from 'drizzle-orm';
 import { builder } from './builder';
 import { AuthenticationError, UserInputError } from './graphql-errors';
@@ -32,6 +32,35 @@ export type SeasonAwardTypeKey = (typeof SEASON_AWARD_TYPES)[number]['key'];
 const VALID_SEASON_AWARD_TYPES = new Set<string>(
   SEASON_AWARD_TYPES.map((a) => a.key),
 );
+
+/**
+ * Rejects a recipient who doesn't exist or plays a different sport than the
+ * league (LS-10821) — an NFL league can't award Babe Ruth, nor MLB Tom Brady.
+ */
+async function assertPlayerMatchesLeagueSport(
+  db: PublicDb,
+  leagueId: number,
+  playerId: number,
+): Promise<void> {
+  const [row] = await db
+    .select({
+      playerSport: PublicSchema.players.sport,
+      leagueSport: PublicSchema.leagues.sport,
+    })
+    .from(PublicSchema.players)
+    .innerJoin(PublicSchema.leagues, eq(PublicSchema.leagues.id, leagueId))
+    .where(eq(PublicSchema.players.id, playerId))
+    .limit(1);
+
+  if (!row) {
+    throw UserInputError(`Player with id ${playerId} does not exist`);
+  }
+  if (row.playerSport !== row.leagueSport) {
+    throw UserInputError(
+      `Player ${playerId} plays ${row.playerSport}, but this is a ${row.leagueSport} league`,
+    );
+  }
+}
 
 // ─── GraphQL object type ───────────────────────────────────────────────────────
 
@@ -171,6 +200,7 @@ builder.mutationField('upsertLeagueSeasonAward', (t) =>
 
       // Verify commissioner / General Manager access
       await verifyCommissionerAccess(context.db, leagueId, context.user.id);
+      await assertPlayerMatchesLeagueSport(context.db, leagueId, playerId);
 
       const [row] = await context.db
         .insert(PublicSchema.leagueSeasonAwards)
@@ -708,16 +738,7 @@ builder.mutationField('castAwardVote', (t) =>
         );
       }
 
-      // Validate that the player exists
-      const [player] = await context.db
-        .select({ id: PublicSchema.players.id })
-        .from(PublicSchema.players)
-        .where(eq(PublicSchema.players.id, playerId))
-        .limit(1);
-
-      if (!player) {
-        throw UserInputError(`Player with id ${playerId} does not exist`);
-      }
+      await assertPlayerMatchesLeagueSport(context.db, leagueId, playerId);
 
       // Check voting is open
       const [period] = await context.db

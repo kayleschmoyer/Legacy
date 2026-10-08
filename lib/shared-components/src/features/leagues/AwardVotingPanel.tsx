@@ -30,6 +30,7 @@ import {
   GREEN,
   withAlpha,
 } from '../../utils/colors';
+import { ROSTERED_ONLY_AWARD_TYPES } from '../commissioner/SeasonAwardsControl';
 
 // ─── Award definitions (same as commissioner) ────────────────────────────────
 
@@ -82,8 +83,14 @@ interface PlayerSearchResult {
 }
 
 function VotePlayerSearch({
+  leagueId,
+  rosteredOnly,
   onSelect,
 }: {
+  /** Scopes results to the league's sport and player pool (LS-10821). */
+  leagueId: number;
+  /** Only players rostered in the league (MVP / Rookie of the Year). */
+  rosteredOnly: boolean;
   onSelect: (player: PlayerSearchResult) => void;
 }) {
   const [query, setQuery] = useState('');
@@ -97,7 +104,7 @@ function VotePlayerSearch({
   }, []);
 
   const { data, loading } = useGetPlayersWithStatsQuery({
-    variables: { search: query, limit: 8 },
+    variables: { search: query, limit: 8, leagueId, rosteredOnly },
     skip: query.trim().length < 2,
   });
 
@@ -301,7 +308,11 @@ function VoteRow({
               </Text>
             </XStack>
           ) : (
-            <VotePlayerSearch onSelect={(p) => void handleVote(p)} />
+            <VotePlayerSearch
+              leagueId={leagueId}
+              rosteredOnly={ROSTERED_ONLY_AWARD_TYPES.has(meta.key)}
+              onSelect={(p) => void handleVote(p)}
+            />
           )}
         </YStack>
       </YStack>

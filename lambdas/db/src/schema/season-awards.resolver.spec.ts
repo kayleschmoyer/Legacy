@@ -388,7 +388,8 @@ describe('season-awards resolver', () => {
         updatedAt: now.toISOString(),
       };
 
-      // sequence: 1) commissioner membership check, 2) player name fetch
+      // sequence: 1) commissioner membership check, 2) same-sport check,
+      // 3) player name fetch
       mockDb.limit
         .mockResolvedValueOnce([
           {
@@ -397,6 +398,9 @@ describe('season-awards resolver', () => {
             teamId: null,
             permissionLevel: 'commissioner',
           },
+        ])
+        .mockResolvedValueOnce([
+          { playerSport: 'baseball', leagueSport: 'baseball' },
         ])
         .mockResolvedValueOnce([{ firstName: 'Mike', lastName: 'Trout' }]);
 
@@ -442,7 +446,10 @@ describe('season-awards resolver', () => {
             permissionLevel: 'general_manager',
           },
         ])
-        .mockResolvedValueOnce([]); // Player not found
+        .mockResolvedValueOnce([
+          { playerSport: 'baseball', leagueSport: 'baseball' },
+        ])
+        .mockResolvedValueOnce([]); // Player name not found
 
       mockDb.returning.mockResolvedValueOnce([insertedRow]);
 
@@ -455,6 +462,57 @@ describe('season-awards resolver', () => {
 
       expect(result.playerFirstName).toBe('');
       expect(result.playerLastName).toBe('');
+    });
+
+    it('rejects a player from the other sport with BAD_USER_INPUT (LS-10821)', async () => {
+      mockDb.limit
+        .mockResolvedValueOnce([
+          {
+            leagueId: 1,
+            userId: 1,
+            teamId: null,
+            permissionLevel: 'commissioner',
+          },
+        ])
+        .mockResolvedValueOnce([
+          { playerSport: 'baseball', leagueSport: 'football' },
+        ]);
+
+      await expect(
+        getResolver()(
+          {},
+          { input: validInput },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({
+        message: expect.stringMatching(/football league/),
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+      expect(mockDb.insert).not.toHaveBeenCalled();
+    });
+
+    it('rejects a player that does not exist (LS-10821)', async () => {
+      mockDb.limit
+        .mockResolvedValueOnce([
+          {
+            leagueId: 1,
+            userId: 1,
+            teamId: null,
+            permissionLevel: 'commissioner',
+          },
+        ])
+        .mockResolvedValueOnce([]);
+
+      await expect(
+        getResolver()(
+          {},
+          { input: validInput },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+      expect(mockDb.insert).not.toHaveBeenCalled();
     });
   });
 
@@ -786,12 +844,37 @@ describe('season-awards resolver', () => {
       ).rejects.toThrow(/does not exist/);
     });
 
+    it('rejects a vote for a player from the other sport with BAD_USER_INPUT (LS-10821)', async () => {
+      mockDb.limit
+        .mockResolvedValueOnce([
+          { leagueId: 1, userId: 1, teamId: null, permissionLevel: 'member' },
+        ])
+        .mockResolvedValueOnce([
+          { playerSport: 'football', leagueSport: 'baseball' },
+        ]);
+
+      await expect(
+        getResolver()(
+          {},
+          { leagueId: 1, season: 2024, awardType: 'mvp', playerId: 12 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({
+        message: expect.stringMatching(/baseball league/),
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+      expect(mockDb.insert).not.toHaveBeenCalled();
+    });
+
     it('casts a vote successfully and returns true', async () => {
       mockDb.limit
         .mockResolvedValueOnce([
           { leagueId: 1, userId: 1, teamId: null, permissionLevel: 'member' },
         ])
-        .mockResolvedValueOnce([{ id: 42 }]) // player exists
+        .mockResolvedValueOnce([
+          { playerSport: 'baseball', leagueSport: 'baseball' },
+        ]) // player exists, same sport
         .mockResolvedValueOnce([
           { id: 5, status: 'open', awardTypes: ['mvp'] },
         ]); // voting period open
@@ -813,7 +896,9 @@ describe('season-awards resolver', () => {
         .mockResolvedValueOnce([
           { leagueId: 1, userId: 1, teamId: null, permissionLevel: 'member' },
         ])
-        .mockResolvedValueOnce([{ id: 7 }]) // new player exists
+        .mockResolvedValueOnce([
+          { playerSport: 'football', leagueSport: 'football' },
+        ]) // new player exists, same sport
         .mockResolvedValueOnce([
           { id: 5, status: 'open', awardTypes: ['mvp'] },
         ]);

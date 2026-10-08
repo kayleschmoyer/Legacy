@@ -134,6 +134,12 @@ export interface PlayerFilters {
    * are not thinned out by post-fetch client-side filtering.
    */
   excludeRostered?: boolean;
+  /**
+   * When true, only include players rostered on a team in the query's
+   * `leagueId` — the inverse of `excludeRostered` (LS-10821, season-award
+   * recipients). Requires `leagueId` to be set — a no-op otherwise.
+   */
+  rosteredOnly?: boolean;
 }
 
 /** Sort options that require a join to career_batting */
@@ -1070,6 +1076,11 @@ export class PlayerService {
         if (queryOptions.filters?.excludeRostered && leagueIdParam != null) {
           rawConditions.push(
             sql`NOT EXISTS (SELECT 1 FROM public.team_members tm WHERE tm.player_id = p.id AND tm.league_id = ${leagueIdParam})`,
+          );
+        }
+        if (queryOptions.filters?.rosteredOnly && leagueIdParam != null) {
+          rawConditions.push(
+            sql`EXISTS (SELECT 1 FROM public.team_members tm WHERE tm.player_id = p.id AND tm.league_id = ${leagueIdParam})`,
           );
         }
 

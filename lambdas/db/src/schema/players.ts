@@ -390,6 +390,12 @@ builder.queryField('players', (t) =>
         description:
           'When true, exclude players already rostered on any team in leagueId (free-agent pools). Requires leagueId.',
       }),
+      rosteredOnly: t.arg.boolean({
+        required: false,
+        defaultValue: false,
+        description:
+          'When true, only include players rostered on a team in leagueId (season-award recipients). Requires leagueId.',
+      }),
     },
     resolve: async (root, args, context) => {
       // Player-name search drives the Player Comparison feature. The comparison
@@ -404,6 +410,10 @@ builder.queryField('players', (t) =>
       // require authentication to search (LS-7019).
       if (args.search && !context.user) {
         throw AuthenticationError();
+      }
+      // Without a league the roster scope would silently widen to every player.
+      if (args.rosteredOnly && args.leagueId == null) {
+        throw UserInputError('rosteredOnly requires leagueId');
       }
 
       const orderBy = (args.orderBy || 'careerGames') as PlayerOrderBy;
@@ -463,6 +473,7 @@ builder.queryField('players', (t) =>
           customEraEndYear: leagueCustomEraEndYear,
           sport: sportFilter,
           excludeRostered: args.excludeRostered ?? false,
+          rosteredOnly: args.rosteredOnly ?? false,
         },
       });
     },
