@@ -7,7 +7,6 @@ import {
   gte,
   ilike,
   lte,
-  or,
   sql,
   SQL,
 } from 'drizzle-orm';
@@ -25,27 +24,24 @@ export function normalizeSearchTerm(searchTerm: string): string {
 }
 
 /**
- * Build a name-search OR condition that matches first name, last name, or the
- * full name expression used by the trigram index (idx_players_name_trgm).
+ * Build an accent-insensitive name-search condition against the full player
+ * name (LS-10728): "Rodriguez" matches Rodríguez, "Pena" matches Peña.
  *
- * The index is on `lower(first_name || ' ' || last_name)`, so the full-name
- * branch uses the identical expression with a lowercased pattern to allow
- * Postgres to use the index. The term is normalized with
- * {@link normalizeSearchTerm} first (LS-10657).
+ * Both sides go through `public.f_unaccent()` (the IMMUTABLE unaccent wrapper)
+ * and the column side uses the exact expression of the trigram index
+ * `idx_players_unaccent_name_trgm`, so Postgres can use the index. A single
+ * full-name branch covers first-name and last-name substring matches too
+ * (both columns are NOT NULL, so `first || ' ' || last` contains each), and
+ * avoids OR-ing in unindexed per-column arms that force a sequential scan.
+ * The term is normalized with {@link normalizeSearchTerm} first (LS-10657).
  */
 export function buildPlayerNameSearch(
   searchTerm: string,
 ): SQL<unknown> | undefined {
   const term = normalizeSearchTerm(searchTerm);
-  const searchPattern = `%${term}%`;
-  const fullNamePattern = `%${term.toLowerCase()}%`;
-  return or(
-    ilike(PublicSchema.players.firstName, searchPattern),
-    ilike(PublicSchema.players.lastName, searchPattern),
-    ilike(
-      sql`lower(${PublicSchema.players.firstName} || ' ' || ${PublicSchema.players.lastName})`,
-      fullNamePattern,
-    ),
+  return ilike(
+    sql`lower(public.f_unaccent(${PublicSchema.players.firstName} || ' ' || ${PublicSchema.players.lastName}))`,
+    sql`public.f_unaccent(${`%${term}%`})`,
   );
 }
 

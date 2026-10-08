@@ -81,7 +81,8 @@ export const players = pgTable(
   (table) => {
     return {
       playersUkBrefId: unique('players_uk_bref_id').on(table.brefId),
-      // GIN trigram index for LIKE '%name%' search: idx_players_name_trgm (LS-905)
+      // GIN trigram indexes for LIKE '%name%' search: idx_players_name_trgm (LS-905)
+      // and idx_players_unaccent_name_trgm (LS-10728, accent-insensitive)
       // Managed by migration — cannot be modeled in Drizzle (expression + pg_trgm ops class)
       // Partial unique index: one row per pfr_id when non-null (LS-246)
       playersPfrIdUnique: uniqueIndex('players_pfr_id_unique')

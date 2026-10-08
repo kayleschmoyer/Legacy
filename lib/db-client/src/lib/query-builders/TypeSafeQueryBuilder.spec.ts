@@ -179,26 +179,38 @@ describe('normalizeSearchTerm (LS-10657)', () => {
 });
 
 describe('buildPlayerNameSearch (shared by career batting + pitching search)', () => {
-  it('matches first name, last name, or the lowercased full name', () => {
+  it('matches the unaccented full name with the idx_players_unaccent_name_trgm expression (LS-10728)', () => {
     const condition = buildPlayerNameSearch('Babe Ruth');
     if (!condition) throw new Error('expected a name-search condition');
     const query = dialect.sqlToQuery(condition);
-    expect(query.sql).toMatch(/"players"\."first_name" ilike \$1/);
-    expect(query.sql).toMatch(/"players"\."last_name" ilike \$2/);
-    expect(query.sql).toMatch(
-      /lower\("players"\."first_name" \|\| ' ' \|\| "players"\."last_name"\) ilike \$3/,
+    // Column side must be byte-for-byte the index expression from migration
+    // 20261008_120000 so the planner can use the trigram index.
+    expect(query.sql).toBe(
+      `lower(public.f_unaccent("players"."first_name" || ' ' || "players"."last_name")) ilike public.f_unaccent($1)`,
     );
-    expect(query.params).toEqual(['%Babe Ruth%', '%Babe Ruth%', '%babe ruth%']);
+    expect(query.params).toEqual(['%Babe Ruth%']);
+  });
+
+  it('unaccents the term too, so accented input still matches (LS-10728)', () => {
+    const condition = buildPlayerNameSearch('Rodríguez');
+    if (!condition) throw new Error('expected a name-search condition');
+    const query = dialect.sqlToQuery(condition);
+    expect(query.sql).toMatch(/ilike public\.f_unaccent\(\$1\)$/);
+    expect(query.params).toEqual(['%Rodríguez%']);
+  });
+
+  it('does not OR in unindexed per-column arms (LS-10728)', () => {
+    const condition = buildPlayerNameSearch('Pena');
+    if (!condition) throw new Error('expected a name-search condition');
+    const { sql } = dialect.sqlToQuery(condition);
+    expect(sql).not.toMatch(/ or /i);
+    expect(sql).not.toMatch(/"players"\."last_name" ilike/);
   });
 
   it('trims and collapses whitespace in the term (LS-10657)', () => {
     const condition = buildPlayerNameSearch('  Babe   Ruth  ');
     if (!condition) throw new Error('expected a name-search condition');
-    expect(dialect.sqlToQuery(condition).params).toEqual([
-      '%Babe Ruth%',
-      '%Babe Ruth%',
-      '%babe ruth%',
-    ]);
+    expect(dialect.sqlToQuery(condition).params).toEqual(['%Babe Ruth%']);
   });
 });
 
