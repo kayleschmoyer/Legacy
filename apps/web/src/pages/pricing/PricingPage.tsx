@@ -445,6 +445,14 @@ export function trialFaqAnswer(trialPeriodDays: number): string {
     : 'We don’t offer a free trial right now, but you can upgrade to Premium whenever you’re ready and cancel at any time — there’s no long-term commitment, and your Premium access continues until the end of the billing period.';
 }
 
+// LS-7192: the Premium card CTA mirrors the FAQ — it names the trial only when
+// one is actually configured, so the button never over-promises.
+export function premiumCtaLabel(trialPeriodDays: number): string {
+  return trialPeriodDays > 0
+    ? `Start ${trialPeriodDays}-day free trial`
+    : 'Upgrade to Premium';
+}
+
 // FAQ entries shown after the trial question (index 0 stays the trial item so
 // existing test selectors and accordion ordering are preserved).
 const OTHER_FAQ_ITEMS = [
@@ -885,7 +893,7 @@ export default function PricingPage() {
 
               {showUpgradeCta && (
                 <ActionButton onPress={() => navigate('/profile/subscription')}>
-                  Upgrade to Premium
+                  {premiumCtaLabel(prices.trialPeriodDays)}
                 </ActionButton>
               )}
               {showManageCta && (

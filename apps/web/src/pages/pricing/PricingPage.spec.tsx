@@ -4,7 +4,11 @@ import userEvent from '@testing-library/user-event';
 
 import { ENTITLEMENT_LABELS, ENTITLEMENTS } from '@legacy-sports/utils';
 
-import PricingPage, { COMPARISON_ROWS, trialFaqAnswer } from './PricingPage';
+import PricingPage, {
+  COMPARISON_ROWS,
+  premiumCtaLabel,
+  trialFaqAnswer,
+} from './PricingPage';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -893,6 +897,16 @@ describe('PricingPage — annual option accessible name (LS-7168)', () => {
     expect(
       screen.getByRole('radio', { name: 'Annual billing' }),
     ).toBeInTheDocument();
+  });
+});
+
+describe('premiumCtaLabel (LS-7192)', () => {
+  it('keeps "Upgrade to Premium" when no trial is configured', () => {
+    expect(premiumCtaLabel(0)).toBe('Upgrade to Premium');
+  });
+
+  it('surfaces the trial length when a trial is configured', () => {
+    expect(premiumCtaLabel(14)).toBe('Start 14-day free trial');
   });
 });
 
