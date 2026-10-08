@@ -11,6 +11,7 @@ import { fireEvent, render, screen, waitFor } from '../../test-utils';
 // Capture the draftMode the test wants to inject
 let mockDraftMode = 'automated';
 const mockAutoAdvanceMatchups = jest.fn();
+const mockAutoSelectGames = jest.fn();
 let mockMatchups: Array<{ weekNumber: number; gamesPerMatchup: number }> = [];
 
 jest.mock('@legacy-sports/graphql', () => ({
@@ -25,7 +26,7 @@ jest.mock('@legacy-sports/graphql', () => ({
     mockAutoAdvanceMatchups,
     { loading: false },
   ],
-  useAutoSelectGamesMutation: () => [jest.fn(), { loading: false }],
+  useAutoSelectGamesMutation: () => [mockAutoSelectGames, { loading: false }],
   useGetLeagueDraftQuery: () => ({
     data: {
       getLeagueDraft: {
@@ -252,6 +253,90 @@ describe('NextStepControl — advance reports why nothing happened (LS-10804)', 
     confirmAdvance(onError, onSuccess);
 
     await waitFor(() => expect(onSuccess).toHaveBeenCalledWith('advance'));
+    expect(onError).not.toHaveBeenCalled();
+  });
+});
+
+describe('NextStepControl — Select Game reports why nothing was queued (LS-10780)', () => {
+  const week1Matchup = {
+    id: 117238,
+    weekNumber: 1,
+    status: 'IN_PROGRESS',
+    statsLoadingStatus: 'COMPLETED',
+    selectedGamesCount: 3,
+  } as unknown as React.ComponentProps<
+    typeof NextStepControl
+  >['currentMatchup'];
+
+  beforeEach(() => {
+    mockDraftMode = 'automated';
+    mockMatchups = [{ weekNumber: 1, gamesPerMatchup: 7 }];
+    mockAutoSelectGames.mockReset();
+  });
+
+  afterEach(() => {
+    mockMatchups = [];
+  });
+
+  function confirmSelectGame(onError: jest.Mock, onSuccess: jest.Mock) {
+    render(
+      <NextStepControl
+        {...defaultProps}
+        gamesPerMatchup={7}
+        draftStatus="completed"
+        totalMatchups={10}
+        currentMatchup={week1Matchup}
+        onError={onError}
+        onSuccess={onSuccess}
+      />,
+    );
+    expect(screen.getByTestId('start-draft-button').textContent).toContain(
+      'Select Game 4 of 7',
+    );
+    fireEvent.click(screen.getByTestId('start-draft-button'));
+    fireEvent.click(screen.getByTestId('confirm-next-step'));
+  }
+
+  it('surfaces the backend reason via onError instead of reporting success', async () => {
+    const reason =
+      'All 7 games are already selected for week 1. Advance the league to the next week.';
+    mockAutoSelectGames.mockResolvedValue({
+      data: {
+        autoSelectGames: {
+          leaguesProcessed: 1,
+          gamesTriggered: 0,
+          errors: [],
+          skipReason: reason,
+        },
+      },
+    });
+    const onError = jest.fn<void, [Error]>();
+    const onSuccess = jest.fn();
+
+    confirmSelectGame(onError, onSuccess);
+
+    await waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
+    expect(onError.mock.calls[0][0].message).toBe(reason);
+    expect(onSuccess).not.toHaveBeenCalled();
+  });
+
+  it('reports success when a game was queued', async () => {
+    mockAutoSelectGames.mockResolvedValue({
+      data: {
+        autoSelectGames: {
+          leaguesProcessed: 1,
+          gamesTriggered: 2,
+          errors: [],
+          skipReason: null,
+        },
+      },
+    });
+    const onError = jest.fn();
+    const onSuccess = jest.fn();
+
+    confirmSelectGame(onError, onSuccess);
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledWith('selectGame'));
     expect(onError).not.toHaveBeenCalled();
   });
 });

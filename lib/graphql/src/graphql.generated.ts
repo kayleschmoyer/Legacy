@@ -198,6 +198,8 @@ export type AutoSelectGamesResult = {
   errors?: Maybe<Array<Scalars['String']['output']>>;
   gamesTriggered?: Maybe<Scalars['Int']['output']>;
   leaguesProcessed?: Maybe<Scalars['Int']['output']>;
+  /** User-facing reason a single-league game selection (leagueId provided) queued nothing. Null when a game was queued or the call covered all leagues. */
+  skipReason?: Maybe<Scalars['String']['output']>;
 };
 
 /** Result of the scheduled draft auto-start job */
@@ -10587,6 +10589,7 @@ export type AutoSelectGamesMutation = {
     leaguesProcessed?: number | null;
     gamesTriggered?: number | null;
     errors?: Array<string> | null;
+    skipReason?: string | null;
   } | null;
 };
 
@@ -27127,6 +27130,7 @@ export const AutoSelectGames = gql`
       leaguesProcessed
       gamesTriggered
       errors
+      skipReason
     }
   }
 `;

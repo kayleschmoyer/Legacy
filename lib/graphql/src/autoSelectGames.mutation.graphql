@@ -3,5 +3,6 @@ mutation AutoSelectGames($leagueId: Int) {
     leaguesProcessed
     gamesTriggered
     errors
+    skipReason
   }
 }

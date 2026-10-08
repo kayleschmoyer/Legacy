@@ -264,9 +264,16 @@ export function NextStepControl({
         onSuccess?.('createWeek1');
       } else if (actionType === 'selectGame') {
         // Trigger game selection for this league via the scheduled mutation
-        await autoSelectGames({
+        const result = await autoSelectGames({
           variables: { leagueId },
         });
+
+        // LS-10780: the backend reports why a single-league game selection
+        // queued nothing; surface it instead of silently succeeding.
+        const skipReason = result.data?.autoSelectGames?.skipReason;
+        if (skipReason) {
+          throw new Error(skipReason);
+        }
 
         // Wait for refetch to complete (awaitRefetchQueries: true)
         // Then confirm status is updated before re-enabling button

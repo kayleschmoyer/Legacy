@@ -510,10 +510,11 @@ describe('season-game-selector', () => {
       expect(playersNeedingStatsLoading).toHaveLength(0);
     });
 
-    it('should skip players with no assigned season', async () => {
+    const buildSeasonlessPlayerDb = (
+      matchupSlotRows: Array<{ matchupPlayerId: number; gameNum: number }>,
+      insertValues: jest.Mock,
+    ) => {
       let selectIndex = 0;
-      const insertValues = jest.fn().mockResolvedValue(undefined);
-
       const selectResults = [
         // 1. get matchup
         [
@@ -522,7 +523,7 @@ describe('season-game-selector', () => {
             leagueId: 10,
             weekNumber: 1,
             pitcherStartsPerMatchup: 1,
-            gamesPerMatchup: 5,
+            gamesPerMatchup: 7,
           },
         ],
         // 2. get league sport (LS-4762)
@@ -533,11 +534,13 @@ describe('season-game-selector', () => {
         [],
         // 5. batch pitcher roles
         [],
-        // 6. existingGames check - no existing games
+        // 6. existingGames check - no existing games for this game number
         [],
+        // 7. slot rows already in the matchup (LS-10780)
+        matchupSlotRows,
       ];
 
-      const mockDb = {
+      return {
         select: jest.fn().mockImplementation(() => {
           const result = selectResults[selectIndex++] ?? [];
           return {
@@ -561,6 +564,20 @@ describe('season-game-selector', () => {
         }),
         insert: jest.fn().mockReturnValue({ values: insertValues }),
       } as unknown as PublicDb;
+    };
+
+    const noGameDataSlot = (gameNum: number) => ({
+      gameNum,
+      matchupPlayerId: 100,
+      gameIdentifier: null,
+      gamePosition: null,
+      statsLoadingStatus: 'completed',
+      noGameDataFound: true,
+    });
+
+    it('marks the slot noGameDataFound for a player with no assigned season (LS-10780)', async () => {
+      const insertValues = jest.fn().mockResolvedValue(undefined);
+      const mockDb = buildSeasonlessPlayerDb([], insertValues);
 
       const { playersNeedingStatsLoading } = await selectGamesForMatchup(
         mockDb,
@@ -568,9 +585,33 @@ describe('season-game-selector', () => {
         1,
       );
 
-      // Player was skipped - no season assigned
-      expect(insertValues).not.toHaveBeenCalled();
+      // No game is selected, but the slot is terminally resolved so the
+      // player cannot pin the matchup's min resolved count at 0.
+      expect(insertValues).toHaveBeenCalledTimes(1);
+      expect(insertValues).toHaveBeenCalledWith([noGameDataSlot(1)]);
       expect(playersNeedingStatsLoading).toHaveLength(0);
+    });
+
+    it('backfills every slot the matchup already played for a player with no season (LS-10780)', async () => {
+      const insertValues = jest.fn().mockResolvedValue(undefined);
+      // Teammate 200 already has games 1-3; seasonless player 100 has none —
+      // the stuck state from LS-10780, where the week re-queued game 1.
+      const mockDb = buildSeasonlessPlayerDb(
+        [
+          { matchupPlayerId: 200, gameNum: 1 },
+          { matchupPlayerId: 200, gameNum: 2 },
+          { matchupPlayerId: 200, gameNum: 3 },
+        ],
+        insertValues,
+      );
+
+      await selectGamesForMatchup(mockDb, 1, 1);
+
+      expect(insertValues).toHaveBeenCalledWith([
+        noGameDataSlot(1),
+        noGameDataSlot(2),
+        noGameDataSlot(3),
+      ]);
     });
 
     it('calculates and persists scores before marking completed when all stats are cached (regression: LS-4145)', async () => {

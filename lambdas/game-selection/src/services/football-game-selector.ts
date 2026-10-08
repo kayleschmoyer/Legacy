@@ -12,6 +12,7 @@ import {
   GAMES_PER_MATCHUP_BY_SPORT,
 } from '@legacy-sports/utils';
 import { and, eq, inArray, isNotNull, notInArray } from 'drizzle-orm';
+import { createNoGameDataSlotMarker } from './no-game-data-slots';
 import { UserInputError } from '../errors';
 
 /**
@@ -520,6 +521,12 @@ export async function selectGamesForMatchupFootball(
   const playerInfoMap = new Map(playerRows.map((p) => [p.id, p]));
 
   const playersNeedingStatsLoading: FootballPlayerNeedingStats[] = [];
+  const markNoGameDataSlots = createNoGameDataSlotMarker(
+    db,
+    matchupId,
+    gameNumber,
+    gamesPerMatchup,
+  );
 
   for (const matchupPlayer of matchupPlayers) {
     try {
@@ -552,9 +559,16 @@ export async function selectGamesForMatchupFootball(
         // can legitimately have no season (waiver add, no eligible season)
         // or, for football specifically, no corpus identity (neither pfr_id
         // nor pfa_id, ADR 0023) — skip rather than failing the whole matchup.
+        // It still gets terminal noGameDataFound slots, or the matchup can
+        // never progress past game 0 (LS-10780).
+        const missingGameNums = await markNoGameDataSlots(matchupPlayer.id);
         LOGGER.warn(
           `No season or pfr_id/pfa_id for football player ${matchupPlayer.playerId} in league ${matchup.leagueId}, week ${matchup.weekNumber} — skipping game selection`,
-          { matchupId, matchupPlayerId: matchupPlayer.id },
+          {
+            matchupId,
+            matchupPlayerId: matchupPlayer.id,
+            noGameDataFoundSlots: missingGameNums,
+          },
         );
         continue;
       }

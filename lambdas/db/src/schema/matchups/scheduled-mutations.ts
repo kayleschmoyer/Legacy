@@ -32,6 +32,7 @@ interface AutoSelectGamesResultShape {
   leaguesProcessed: number;
   gamesTriggered: number;
   errors: string[];
+  skipReason: string | null;
 }
 
 const AutoSelectGamesResult = builder.objectRef<AutoSelectGamesResultShape>(
@@ -45,6 +46,11 @@ builder.objectType(AutoSelectGamesResult, {
     leaguesProcessed: t.exposeInt('leaguesProcessed'),
     gamesTriggered: t.exposeInt('gamesTriggered'),
     errors: t.exposeStringList('errors'),
+    skipReason: t.exposeString('skipReason', {
+      nullable: true,
+      description:
+        'User-facing reason a single-league game selection (leagueId provided) queued nothing. Null when a game was queued or the call covered all leagues.',
+    }),
   }),
 });
 
@@ -84,6 +90,9 @@ export { assertAuthorized } from './system-auth';
 // getSelectedGamesCountBatch is imported from
 // @legacy-sports/db-client (matchup-queries-optimized).
 
+const GAME_SELECTION_FAILED_REASON =
+  'Game selection failed to start. Please try again in a few minutes.';
+
 // ── Mutation: autoSelectGames ────────────────────────────────────────────────
 // Triggered nightly at midnight EST by EventBridge.
 // First locks lineups for leagues whose first week has not yet started
@@ -115,6 +124,16 @@ builder.mutationField('autoSelectGames', (t) =>
         leaguesProcessed: 0,
         gamesTriggered: 0,
         errors: [],
+        skipReason: null,
+      };
+
+      // LS-10780: a commissioner's "Select Game N" must never silently do
+      // nothing. Only single-league calls get a reason; the nightly sweep
+      // keeps logging.
+      const recordSkip = (reason: string) => {
+        if (leagueId) {
+          result.skipReason = reason;
+        }
       };
 
       try {
@@ -139,6 +158,11 @@ builder.mutationField('autoSelectGames', (t) =>
         LOGGER.info(
           `[autoSelectGames] Found ${activeLeagues.length} active leagues`,
         );
+        if (activeLeagues.length === 0) {
+          recordSkip(
+            'No games to select: the league draft has not been completed yet.',
+          );
+        }
 
         // 2. Lock lineups for leagues that have not yet started their contest.
         //    Game selection must never run on 'scheduled' matchups — that would
@@ -258,13 +282,16 @@ builder.mutationField('autoSelectGames', (t) =>
           );
         }
 
-        // 3. Batch selectedGamesCount for all reference matchups in one query
-        const referenceMatchupIds = activeLeagueIds
-          .map((id) => matchupsByLeague.get(id)?.[0]?.id)
-          .filter((id): id is number => id !== undefined);
+        // 3. Batch selectedGamesCount for every current-week matchup in one
+        //    query. The week's next game is driven by its least-progressed
+        //    matchup — picking an arbitrary "reference" matchup made the
+        //    queued game number depend on row order (LS-10780).
+        const currentWeekMatchupIds = [...matchupsByLeague.values()].flatMap(
+          (matchups) => matchups.map((m) => m.id),
+        );
         const selectedCountByMatchup = await getSelectedGamesCountBatch(
           context.db,
-          referenceMatchupIds,
+          currentWeekMatchupIds,
         );
 
         for (const league of activeLeagues) {
@@ -276,23 +303,32 @@ builder.mutationField('autoSelectGames', (t) =>
               LOGGER.debug(
                 `[autoSelectGames] League ${league.id} (${league.name}) has no in_progress matchups, skipping`,
               );
+              recordSkip(
+                `No games to select: week ${league.currentWeek ?? '?'} has no matchups in progress. Advance the league to the next week first.`,
+              );
               continue;
             }
 
             result.leaguesProcessed++;
 
-            // Determine the next game number from the reference matchup
-            //    (all matchups in the same week share the same game progression)
-            const referenceMatchup = currentMatchups[0];
+            // All matchups in the same week share one game progression; the
+            // next game is one past the least-progressed matchup's count, so
+            // no matchup ever has a game number skipped.
             const gamesPerMatchup =
-              referenceMatchup.gamesPerMatchup ?? league.gamesPerMatchup ?? 5;
-            const selectedCount =
-              selectedCountByMatchup.get(referenceMatchup.id) ?? 0;
+              currentMatchups[0].gamesPerMatchup ?? league.gamesPerMatchup ?? 5;
+            const selectedCount = Math.min(
+              ...currentMatchups.map(
+                (m) => selectedCountByMatchup.get(m.id) ?? 0,
+              ),
+            );
             const nextGameNumber = selectedCount + 1;
 
             if (nextGameNumber > gamesPerMatchup) {
               LOGGER.info(
                 `[autoSelectGames] League ${league.id} (${league.name}) already has all ${gamesPerMatchup} games selected, skipping`,
+              );
+              recordSkip(
+                `All ${gamesPerMatchup} games are already selected for week ${currentMatchups[0].weekNumber}. Advance the league to the next week.`,
               );
               continue;
             }
@@ -308,6 +344,7 @@ builder.mutationField('autoSelectGames', (t) =>
                 'SQS_SELECT_GAME_URL not configured, cannot trigger game selection';
               LOGGER.error(`[autoSelectGames] ${errMsg}`);
               result.errors.push(errMsg);
+              recordSkip(GAME_SELECTION_FAILED_REASON);
               continue;
             }
 
@@ -350,12 +387,14 @@ builder.mutationField('autoSelectGames', (t) =>
               `[autoSelectGames] Error processing league: ${errMsg}`,
             );
             result.errors.push(errMsg);
+            recordSkip(GAME_SELECTION_FAILED_REASON);
           }
         }
       } catch (error) {
         const errMsg = `Fatal error: ${error instanceof Error ? error.message : String(error)}`;
         LOGGER.error(`[autoSelectGames] ${errMsg}`);
         result.errors.push(errMsg);
+        recordSkip(GAME_SELECTION_FAILED_REASON);
       }
 
       LOGGER.info('[autoSelectGames] Completed', {

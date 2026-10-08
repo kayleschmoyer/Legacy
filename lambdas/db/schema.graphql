@@ -193,6 +193,11 @@ type AutoSelectGamesResult {
   errors: [String!]
   gamesTriggered: Int
   leaguesProcessed: Int
+
+  """
+  User-facing reason a single-league game selection (leagueId provided) queued nothing. Null when a game was queued or the call covered all leagues.
+  """
+  skipReason: String
 }
 
 """

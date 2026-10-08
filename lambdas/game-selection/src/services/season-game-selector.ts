@@ -18,6 +18,7 @@ import {
   or,
   sql,
 } from 'drizzle-orm';
+import { createNoGameDataSlotMarker } from './no-game-data-slots';
 import { UserInputError } from '../errors';
 
 export interface GameSelectionResult {
@@ -688,6 +689,13 @@ export async function selectGamesForMatchup(
     gamePosition: string | null;
   }> = [];
 
+  const markNoGameDataSlots = createNoGameDataSlotMarker(
+    db,
+    matchupId,
+    gameNumber,
+    gamesPerMatchup,
+  );
+
   for (const matchupPlayer of matchupPlayers) {
     try {
       // Check if games have already been selected for this player and game number
@@ -722,6 +730,9 @@ export async function selectGamesForMatchup(
         // for this player rather than crashing the entire matchup. They simply
         // contribute no stats, and every other player in the matchup still gets
         // their games. Never throw here.
+        // It still gets terminal noGameDataFound slots, or the matchup can
+        // never progress past game 0 (LS-10780).
+        const missingGameNums = await markNoGameDataSlots(matchupPlayer.id);
         LOGGER.warn(
           `No season assigned for player ${matchupPlayer.playerId} in league ${matchup.leagueId}, week ${matchup.weekNumber} — skipping game selection`,
           {
@@ -729,6 +740,7 @@ export async function selectGamesForMatchup(
             matchupPlayerId: matchupPlayer.id,
             playerId: matchupPlayer.playerId,
             weekNumber: matchup.weekNumber,
+            noGameDataFoundSlots: missingGameNums,
           },
         );
         continue;
