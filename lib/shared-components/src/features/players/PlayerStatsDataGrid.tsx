@@ -13,6 +13,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Text } from 'tamagui';
+import type { CareerBattingSortField } from '@legacy-sports/utils';
 import {
   type CareerStatsQueryParams,
   DEFAULT_CAREER_STATS_PARAMS,
@@ -105,11 +106,16 @@ export interface PlayerStatsDataGridProps {
 /** Key of the always-visible player-name column (never hidden by the picker). */
 export const BATTING_NAME_COLUMN_KEY = 'displayName';
 
+/** Column key → sort field, constrained to the server contract (LS-10690). */
+type BattingSortFieldMap = Record<string, CareerBattingSortField>;
+
 /**
  * Mapping from UI column keys to GraphQL sort field names
- * Some columns use formatted display values but need to sort by raw values
+ * Some columns use formatted display values but need to sort by raw values.
+ * Values are typed against the shared `CAREER_BATTING_SORT_FIELDS` contract
+ * so a key with no server ORDER BY case cannot be mapped (LS-10690).
  */
-export const COLUMN_TO_SORT_FIELD_MAP: Record<string, string> = {
+export const COLUMN_TO_SORT_FIELD_MAP: BattingSortFieldMap = {
   // Player information
   displayName: 'lastName',
   firstName: 'lastName',

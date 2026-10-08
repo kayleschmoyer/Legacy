@@ -10,6 +10,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Text } from 'tamagui';
+import type { CareerPitchingSortField } from '@legacy-sports/utils';
 import {
   type CareerPitchingFragment,
   type GetCareerPitchingStatsQueryVariables,
@@ -54,6 +55,11 @@ export interface PitchingStatsDataGridProps {
   rosteredPlayerIds?: ReadonlySet<number>;
   /** Availability filter value — client-side applied after fetching. */
   availabilityFilter?: 'all' | 'free_agents' | 'rostered';
+  /**
+   * Fired when the user changes the sort via a column header, with the GraphQL
+   * sort field and direction, so the host can persist it to the URL (LS-10690).
+   */
+  onSortChange?: (sortBy: string, sortDir: 'asc' | 'desc') => void;
   /**
    * Fired with the rows currently displayed (after the availability filter is
    * applied) whenever they change. Lets a host surface the loaded result set —
@@ -279,7 +285,17 @@ export const PITCHING_STATS_COLUMNS: readonly PitchingGridColumn[] = [
   },
 ] as const;
 
-const COLUMN_TO_SORT_FIELD_MAP: Record<string, string> = {
+/**
+ * Mapping from pitching grid column keys to the GraphQL `orderBy` field sent
+ * to `careerPitchingStats`. Values are typed against the shared
+ * `CAREER_PITCHING_SORT_FIELDS` contract, whose every entry db-client's tests
+ * prove has an explicit ORDER BY case — an unmapped value falls through to
+ * wins DESC and the sort silently does nothing (LS-4005, LS-10690).
+ */
+export const PITCHING_COLUMN_TO_SORT_FIELD_MAP: Record<
+  string,
+  CareerPitchingSortField
+> = {
   playerName: 'lastName',
   games: 'games',
   gamesStarted: 'gamesStarted',
@@ -301,6 +317,21 @@ const COLUMN_TO_SORT_FIELD_MAP: Record<string, string> = {
   fantasyPoints: 'fantasyPoints',
   fantasyPointsPerGame: 'fantasyPointsPerGame',
 };
+
+/**
+ * The set of valid GraphQL sort fields the pitching grid can sort by — the
+ * deduped values of {@link PITCHING_COLUMN_TO_SORT_FIELD_MAP}. Lets URL hosts
+ * allow-list an untrusted `pitchingSortBy` param before it reaches GraphQL
+ * (mirrors `BATTING_SORT_FIELDS`, LS-10690).
+ */
+export const PITCHING_SORT_FIELDS: ReadonlySet<string> = new Set(
+  Object.values(PITCHING_COLUMN_TO_SORT_FIELD_MAP),
+);
+
+/** Type guard for a pitching sort field parsed from an untrusted source. */
+export function isValidPitchingSortField(field: string): boolean {
+  return PITCHING_SORT_FIELDS.has(field);
+}
 
 /** Resolves a cell's display value, including the special-cased columns. */
 function cellValueFor(
@@ -397,7 +428,7 @@ function toGridColumns(
       key: column.key,
       label: column.label,
       sortable: column.sortable,
-      sortKey: COLUMN_TO_SORT_FIELD_MAP[column.key] ?? column.key,
+      sortKey: PITCHING_COLUMN_TO_SORT_FIELD_MAP[column.key] ?? column.key,
       align: column.align,
       width: column.width,
       minWidth: column.minWidth,
@@ -434,6 +465,7 @@ export function PitchingStatsDataGrid({
   visibleColumns,
   rosteredPlayerIds,
   availabilityFilter,
+  onSortChange,
   onDataLoaded,
 }: PitchingStatsDataGridProps): React.ReactElement {
   const [queryParams, setQueryParams] =
@@ -517,8 +549,9 @@ export function PitchingStatsDataGrid({
         orderDirection,
         offset: 0,
       });
+      onSortChange?.(sortKey, orderDirection);
     },
-    [updateQueryParams],
+    [updateQueryParams, onSortChange],
   );
 
   const handlePageChange = useCallback(

@@ -152,6 +152,12 @@ jest.mock('@legacy-sports/shared-components/players', () => ({
   // `sortBy` param is present (the LS-8566 tests set one).
   isValidBattingSortField: (value: string) =>
     ['homeRuns', 'battingAvg', 'hits', 'rbi', 'name'].includes(value),
+  // Pitching sort-field guard (LS-10690) — only reached when a
+  // `pitchingSortBy` param is present.
+  isValidPitchingSortField: (value: string) =>
+    ['wins', 'outsRecorded', 'whip', 'strikeoutsPerNine', 'lastName'].includes(
+      value,
+    ),
   // Football stats-grid helpers (LS-8566) — lightweight mirrors of the shared
   // implementations, enough for the route's parse/guard paths.
   normalizeFootballView: (raw: string | null | undefined) =>
@@ -730,6 +736,62 @@ describe('PlayerStatsRoute NFL filter mirroring (LS-8566)', () => {
     expect(call[0].get('pageSize')).toBe('50');
     expect(call[0].get('position')).toBe('RB');
     expect(call[1]).toEqual({ replace: true });
+  });
+});
+
+// LS-10690: the pitching grid's sort was never lifted into the URL, so a
+// reload or shared link always reverted to the wins-desc default.
+describe('PlayerStatsRoute MLB pitching sort URL round-trip (LS-10690)', () => {
+  beforeEach(() => {
+    mockNavigate.mockClear();
+    mockSetSearchParams.mockClear();
+    mockFootballEnabled = true;
+  });
+
+  it('seeds the MLB page with the pitching sort from the URL', () => {
+    mockSearchParams = new URLSearchParams(
+      'sport=mlb&view=pitchers&pitchingSortBy=whip&pitchingSortDir=asc',
+    );
+    render(<PlayerStatsRoute />);
+    expect(mockStatsPageProps.initialFilters).toMatchObject({
+      pitchingSortBy: 'whip',
+      pitchingSortDir: 'asc',
+    });
+  });
+
+  it('drops an unknown pitchingSortBy from the URL', () => {
+    mockSearchParams = new URLSearchParams(
+      'sport=mlb&view=pitchers&pitchingSortBy=bogus',
+    );
+    render(<PlayerStatsRoute />);
+    const initialFilters = mockStatsPageProps.initialFilters as Record<
+      string,
+      unknown
+    >;
+    expect(initialFilters.pitchingSortBy).toBeUndefined();
+  });
+
+  it('mirrors a committed pitching sort to the URL', () => {
+    mockSearchParams = new URLSearchParams('sport=mlb&view=pitchers');
+    render(<PlayerStatsRoute />);
+    const onFiltersChange = mockStatsPageProps.onFiltersChange as (
+      state: unknown,
+    ) => void;
+    act(() =>
+      onFiltersChange({
+        viewMode: 'pitchers',
+        pageSize: 10,
+        filters: {
+          team: 'NYY',
+          pitchingSortBy: 'outsRecorded',
+          pitchingSortDir: 'asc',
+        },
+      }),
+    );
+    const call = mockSetSearchParams.mock.calls.at(-1) as [URLSearchParams];
+    expect(call[0].get('pitchingSortBy')).toBe('outsRecorded');
+    expect(call[0].get('pitchingSortDir')).toBe('asc');
+    expect(call[0].get('team')).toBe('NYY');
   });
 });
 

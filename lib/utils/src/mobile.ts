@@ -38,6 +38,7 @@ export * from './lib/mock-draft-limits';
 export * from './lib/season-draft-name';
 export * from './lib/username-validation';
 export * from './lib/access-level';
+export * from './lib/stats-sort-fields';
 export * from './lib/waiver-schedule';
 // Pure, Hermes-safe string helpers consumed by shared-components (OnThisDayFeed).
 // These must be re-exported here — Metro resolves '@legacy-sports/utils' to this

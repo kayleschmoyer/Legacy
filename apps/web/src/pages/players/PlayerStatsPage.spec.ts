@@ -16,6 +16,7 @@ import {
   migrateStatsSearchParams,
   parseClampedInt,
   parsePageSize,
+  parsePitchingSortParams,
   parseStatsSearchParams,
   parseStatsSortParams,
   readStatsFormat,
@@ -745,6 +746,70 @@ describe('parseStatsSortParams (LS-7115)', () => {
   it('returns null when sortBy is absent', () => {
     expect(
       parseStatsSortParams(new URLSearchParams('view=hitters')),
+    ).toBeNull();
+  });
+});
+
+describe('pitching sort URL persistence (LS-10690)', () => {
+  it('writes pitchingSortBy/pitchingSortDir alongside the batting sort', () => {
+    const out = buildStatsSearchParams({
+      viewMode: 'combined',
+      pageSize: 25,
+      filters: {
+        sortBy: 'ops',
+        sortDir: 'asc',
+        pitchingSortBy: 'whip',
+        pitchingSortDir: 'asc',
+      },
+    });
+    expect(out.get('sortBy')).toBe('ops');
+    expect(out.get('pitchingSortBy')).toBe('whip');
+    expect(out.get('pitchingSortDir')).toBe('asc');
+  });
+
+  it('omits pitching sort keys when no pitching sort is present', () => {
+    const out = buildStatsSearchParams({
+      viewMode: 'pitchers',
+      pageSize: 25,
+      filters: {},
+    });
+    expect(out.has('pitchingSortBy')).toBe(false);
+    expect(out.has('pitchingSortDir')).toBe(false);
+  });
+
+  it.each(['outsRecorded', 'whip', 'strikeoutsPerNine', 'lastName'])(
+    'round-trips a %s pitching sort through the URL',
+    (field) => {
+      const url = buildStatsSearchParams({
+        viewMode: 'pitchers',
+        pageSize: 10,
+        filters: { pitchingSortBy: field, pitchingSortDir: 'asc' },
+      });
+      const parsed = parseStatsSearchParams(url);
+      expect(parsed.viewMode).toBe('pitchers');
+      expect(parsed.filters).toMatchObject({
+        pitchingSortBy: field,
+        pitchingSortDir: 'asc',
+      });
+      expect(parsed.filters.sortBy).toBeUndefined();
+    },
+  );
+
+  it('parsePitchingSortParams defaults direction to desc', () => {
+    expect(
+      parsePitchingSortParams(new URLSearchParams('pitchingSortBy=whip')),
+    ).toEqual({ pitchingSortBy: 'whip', pitchingSortDir: 'desc' });
+  });
+
+  it('parsePitchingSortParams ignores unknown or batting-only fields', () => {
+    expect(
+      parsePitchingSortParams(new URLSearchParams('pitchingSortBy=evil')),
+    ).toBeNull();
+    expect(
+      parsePitchingSortParams(new URLSearchParams('pitchingSortBy=ops')),
+    ).toBeNull();
+    expect(
+      parsePitchingSortParams(new URLSearchParams('view=pitchers')),
     ).toBeNull();
   });
 });

@@ -196,6 +196,18 @@ export function getCareerPitchingOrderByClause(
       return sql`${PublicSchema.careerPitching.hr} ${sql.raw(dir)} NULLS LAST`;
     case 'pitchingWAR':
       return sql`${PublicSchema.careerPitching.pitchingWar} ${sql.raw(dir)} NULLS LAST`;
+    // IP / WHIP / K/9 / Player — the pitching grid's sort keys for these
+    // columns previously fell through to `default` (wins DESC), so both
+    // directions rendered in wins order (LS-10690).
+    case 'outsRecorded':
+      return sql`${PublicSchema.careerPitching.outsRecorded} ${sql.raw(dir)} NULLS LAST`;
+    case 'whip':
+      return sql`((COALESCE(${PublicSchema.careerPitching.h}, 0) + COALESCE(${PublicSchema.careerPitching.bb}, 0))::numeric / NULLIF(${PublicSchema.careerPitching.outsRecorded} / 3.0, 0)) ${sql.raw(dir)} NULLS LAST`;
+    case 'strikeoutsPerNine':
+      return sql`(COALESCE(${PublicSchema.careerPitching.so}, 0) * 27.0 / NULLIF(${PublicSchema.careerPitching.outsRecorded}, 0)) ${sql.raw(dir)} NULLS LAST`;
+    // Requires the caller to INNER JOIN `players` (getCareerPitchingStats does).
+    case 'lastName':
+      return sql`${PublicSchema.players.lastName} ${sql.raw(dir)} NULLS LAST, ${PublicSchema.players.firstName} ${sql.raw(dir)} NULLS LAST`;
     default:
       return sql`${PublicSchema.careerPitching.w} DESC NULLS LAST`;
   }
@@ -367,56 +379,6 @@ export class StatisticsService {
     return runWithPublicClient(
       this.options,
       async (db): Promise<CareerPitching[]> => {
-        // When sorting by player name, use a join-based query
-        if (queryOptions.orderBy === 'lastName') {
-          const conditions = queryOptions.filters
-            ? this.buildPitchingFilters(queryOptions.filters)
-            : [];
-          const orderDirection = queryOptions.orderDirection || 'desc';
-
-          const validConditions = conditions.filter(
-            (condition): condition is SQL => condition !== undefined,
-          );
-          const baseJoinQuery = db
-            .select()
-            .from(PublicSchema.careerPitching)
-            .innerJoin(
-              PublicSchema.players,
-              eq(PublicSchema.careerPitching.playerId, PublicSchema.players.id),
-            );
-
-          const withConditions =
-            validConditions.length > 0
-              ? baseJoinQuery.where(
-                  validConditions.length === 1
-                    ? validConditions[0]
-                    : and(...validConditions),
-                )
-              : baseJoinQuery;
-
-          const withOrder =
-            orderDirection === 'desc'
-              ? withConditions.orderBy(
-                  desc(PublicSchema.players.lastName),
-                  desc(PublicSchema.players.firstName),
-                )
-              : withConditions.orderBy(
-                  asc(PublicSchema.players.lastName),
-                  asc(PublicSchema.players.firstName),
-                );
-
-          const withLimit = queryOptions.limit
-            ? withOrder.limit(queryOptions.limit)
-            : withOrder;
-          const withOffset =
-            queryOptions.offset && queryOptions.limit
-              ? withLimit.offset(queryOptions.offset)
-              : withLimit;
-
-          const results = await withOffset.execute();
-          return results.map((r) => r.career_pitching);
-        }
-
         const conditions = queryOptions.filters
           ? this.buildPitchingFilters(queryOptions.filters)
           : [];
@@ -428,10 +390,15 @@ export class StatisticsService {
 
         const searchTerm = queryOptions.filters?.searchTerm;
 
-        if (searchTerm) {
+        // Name search and the `lastName` sort both reference `players`, so
+        // they share the joined query (LS-10690: the old lastName-only branch
+        // dropped the search term).
+        if (searchTerm || queryOptions.orderBy === 'lastName') {
           // JOIN with players table to enable name search (first, last, or
           // full name — same matcher as career batting)
-          const searchCondition = buildPlayerNameSearch(searchTerm);
+          const searchCondition = searchTerm
+            ? buildPlayerNameSearch(searchTerm)
+            : undefined;
           const allConditions = searchCondition
             ? [...conditions, searchCondition]
             : conditions;

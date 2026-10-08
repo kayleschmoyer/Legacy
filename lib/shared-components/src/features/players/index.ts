@@ -24,7 +24,11 @@ export {
   BATTING_SORT_FIELDS,
   isValidBattingSortField,
 } from './PlayerStatsDataGrid';
-export { PitchingStatsDataGrid } from './PitchingStatsDataGrid';
+export {
+  PitchingStatsDataGrid,
+  PITCHING_SORT_FIELDS,
+  isValidPitchingSortField,
+} from './PitchingStatsDataGrid';
 export {
   normalizeViewMode,
   PlayerStatsPage,

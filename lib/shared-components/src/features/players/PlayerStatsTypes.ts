@@ -30,6 +30,11 @@ export interface PlayerStatsFilters {
   // 'battingAverage'); `sortDir` is the order direction.
   sortBy?: string;
   sortDir?: 'asc' | 'desc';
+  // Pitching grid sort, persisted independently of the batting sort so the
+  // Combined view can carry both (LS-10690). `pitchingSortBy` is the GraphQL
+  // `careerPitchingStats` orderBy field (e.g. 'outsRecorded', 'whip').
+  pitchingSortBy?: string;
+  pitchingSortDir?: 'asc' | 'desc';
 
   // Pitching statistics filters
   minWins?: number;

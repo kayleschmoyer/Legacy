@@ -13,6 +13,7 @@ import {
   hasPendingFilterChanges,
   pageSizeOptionsForViewMode,
   parseSliderValue,
+  pitchingSortFilter,
   SLIDER_COMMIT_DEBOUNCE_MS,
   sliderFillPct,
   stepValue,
@@ -591,6 +592,44 @@ describe('buildShareUrl (LS-7131)', () => {
     expect(url).not.toContain('maxWins');
     expect(url).not.toContain('minStrikeouts');
     expect(url).not.toContain('maxStrikeouts');
+  });
+
+  it('persists a non-default pitching sort under its own keys (LS-10690)', () => {
+    const url = buildShareUrl(
+      'pitchers',
+      APPLIED_DEFAULTS,
+      undefined,
+      undefined,
+      'strikeoutsPerNine',
+      'asc',
+    );
+    const params = new URLSearchParams(url.split('?')[1]);
+    expect(params.get('pitchingSortBy')).toBe('strikeoutsPerNine');
+    expect(params.get('pitchingSortDir')).toBe('asc');
+    expect(params.has('sortBy')).toBe(false);
+  });
+
+  it('omits the pitching sort keys at the wins-desc default (LS-10690)', () => {
+    const url = buildShareUrl('pitchers', APPLIED_DEFAULTS);
+    expect(url).not.toContain('pitchingSortBy');
+    expect(url).not.toContain('pitchingSortDir');
+  });
+});
+
+describe('pitchingSortFilter (LS-10690)', () => {
+  it('returns an empty object for the wins-desc default', () => {
+    expect(pitchingSortFilter('wins', 'desc')).toEqual({});
+  });
+
+  it('returns the pair when the field or direction differs', () => {
+    expect(pitchingSortFilter('whip', 'asc')).toEqual({
+      pitchingSortBy: 'whip',
+      pitchingSortDir: 'asc',
+    });
+    expect(pitchingSortFilter('wins', 'asc')).toEqual({
+      pitchingSortBy: 'wins',
+      pitchingSortDir: 'asc',
+    });
   });
 });
 

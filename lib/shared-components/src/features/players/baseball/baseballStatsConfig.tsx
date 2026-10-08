@@ -11,6 +11,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { Text, YStack } from 'tamagui';
 import type { CareerPitchingFragment } from '@legacy-sports/graphql';
 import {
+  appendSortParams,
   type AppliedFilters,
   AVG_MAX,
   AVG_STEP,
@@ -21,6 +22,8 @@ import {
   createClearFiltersHandler,
   DEFAULT_BATTING_SORT_BY,
   DEFAULT_BATTING_SORT_DIR,
+  DEFAULT_PITCHING_SORT_BY,
+  DEFAULT_PITCHING_SORT_DIR,
   enforceSearchMinLength,
   ERA_MAX_OFF,
   hasPendingFilterChanges,
@@ -30,6 +33,7 @@ import {
   MLB_TEAMS,
   normalizeViewMode,
   pageSizeOptionsForViewMode,
+  pitchingSortFilter,
   POSITIONS,
   RBI_MAX,
   RBI_STEP,
@@ -70,6 +74,7 @@ import {
 } from '../PlayerStatsDataGrid';
 import {
   buildPitchingExportColumns,
+  isValidPitchingSortField,
   PITCHING_NAME_COLUMN_KEY,
   PITCHING_STATS_COLUMNS,
   PitchingStatsDataGrid,
@@ -270,6 +275,19 @@ export function useBaseballController(
     () => initialFilters.sortDir ?? DEFAULT_BATTING_SORT_DIR,
   );
 
+  // ── Pitching sort state (persisted to URL, LS-10690) ───────────
+  // Lifted out of the pitching grid so it survives grid remounts on filter
+  // commit and round-trips through the URL. Allow-listed like the batting sort.
+  const [pitchingSortBy, setPitchingSortBy] = useState(() => {
+    const initial = initialFilters.pitchingSortBy ?? DEFAULT_PITCHING_SORT_BY;
+    return isValidPitchingSortField(initial)
+      ? initial
+      : DEFAULT_PITCHING_SORT_BY;
+  });
+  const [pitchingSortDir, setPitchingSortDir] = useState<'asc' | 'desc'>(
+    () => initialFilters.pitchingSortDir ?? DEFAULT_PITCHING_SORT_DIR,
+  );
+
   // ── Toolbar draft state (not applied until applyFilters()) ─────
   const [search, setSearch] = useState(initialFilters.searchTerm ?? '');
   const [position, setPosition] = useState(
@@ -438,8 +456,8 @@ export function useBaseballController(
     () => ({
       limit: appliedFilters.pageSize,
       offset: 0,
-      orderBy: 'wins',
-      orderDirection: 'desc' as const,
+      orderBy: pitchingSortBy,
+      orderDirection: pitchingSortDir,
       minGames: 0,
       searchTerm: appliedFilters.search || undefined,
       position:
@@ -459,7 +477,15 @@ export function useBaseballController(
       maxERA:
         appliedFilters.maxERA < ERA_MAX_OFF ? appliedFilters.maxERA : undefined,
     }),
-    [appliedFilters],
+    [appliedFilters, pitchingSortBy, pitchingSortDir],
+  );
+
+  const handlePitchingSortChange = useCallback(
+    (nextSortBy: string, nextSortDir: 'asc' | 'desc') => {
+      setPitchingSortBy(nextSortBy);
+      setPitchingSortDir(nextSortDir);
+    },
+    [],
   );
 
   // ── Notify host of applied filter changes (URL round-trip) ───
@@ -495,12 +521,21 @@ export function useBaseballController(
     if (appliedFilters.maxSO < SO_MAX)
       filters.maxStrikeouts = appliedFilters.maxSO;
     Object.assign(filters, battingSortFilter(sortBy, sortDir));
+    Object.assign(filters, pitchingSortFilter(pitchingSortBy, pitchingSortDir));
     onFiltersChange({
       viewMode,
       pageSize: appliedFilters.pageSize,
       filters,
     });
-  }, [appliedFilters, viewMode, sortBy, sortDir, onFiltersChange]);
+  }, [
+    appliedFilters,
+    viewMode,
+    sortBy,
+    sortDir,
+    pitchingSortBy,
+    pitchingSortDir,
+    onFiltersChange,
+  ]);
 
   // ── Player click handlers ──────────────────────────────────────
   const handleBattingPlayerClick = useCallback(
@@ -688,8 +723,25 @@ export function useBaseballController(
 
   const handleShare = useCallback(() => {
     if (!onShare) return;
-    onShare(buildShareUrl(viewMode, appliedFilters, sortBy, sortDir));
-  }, [onShare, viewMode, appliedFilters, sortBy, sortDir]);
+    onShare(
+      buildShareUrl(
+        viewMode,
+        appliedFilters,
+        sortBy,
+        sortDir,
+        pitchingSortBy,
+        pitchingSortDir,
+      ),
+    );
+  }, [
+    onShare,
+    viewMode,
+    appliedFilters,
+    sortBy,
+    sortDir,
+    pitchingSortBy,
+    pitchingSortDir,
+  ]);
 
   // ── Visibility flags ───────────────────────────────────────────
   const showBatting = viewMode === 'combined' || viewMode === 'hitters';
@@ -787,11 +839,7 @@ export function useBaseballController(
     if (maxWins < WINS_MAX) params.set('maxWins', String(maxWins));
     if (minSO > 0) params.set('minStrikeouts', String(minSO));
     if (maxSO < SO_MAX) params.set('maxStrikeouts', String(maxSO));
-    const sortFilter = battingSortFilter(sortBy, sortDir);
-    if (sortFilter.sortBy) {
-      params.set('sortBy', sortFilter.sortBy);
-      params.set('sortDir', sortFilter.sortDir ?? DEFAULT_BATTING_SORT_DIR);
-    }
+    appendSortParams(params, sortBy, sortDir, pitchingSortBy, pitchingSortDir);
     // LS-9076: /players is the canonical stats route (formerly /players/stats).
     return `/players?${params.toString()}`;
   }, [
@@ -814,6 +862,8 @@ export function useBaseballController(
     maxSO,
     sortBy,
     sortDir,
+    pitchingSortBy,
+    pitchingSortDir,
   ]);
 
   // ── Render: toolbar controls (search + Position/Team/Rows) ─────
@@ -1177,6 +1227,7 @@ export function useBaseballController(
               title="MLB Career Pitching Leaders"
               initialParams={pitchingParams}
               onPlayerSelect={handlePitchingPlayerClick}
+              onSortChange={handlePitchingSortChange}
               showPagination={true}
               statsFormat={statsFormat}
               visibleColumns={gridVisibleColumns}
@@ -1202,6 +1253,7 @@ export function useBaseballController(
     handleBattingPlayerClick,
     handlePitchingPlayerClick,
     handleBattingSortChange,
+    handlePitchingSortChange,
     statsFormat,
     gridVisibleColumns,
     showAvailabilityFilter,

@@ -58,6 +58,8 @@ export const COMBINED_MAX_PAGE_SIZE = 50;
 // Default batting sort — mirrors DEFAULT_CAREER_STATS_PARAMS in CareerStatsService.
 export const DEFAULT_BATTING_SORT_BY = 'homeRuns';
 export const DEFAULT_BATTING_SORT_DIR: 'asc' | 'desc' = 'desc';
+export const DEFAULT_PITCHING_SORT_BY = 'wins';
+export const DEFAULT_PITCHING_SORT_DIR: 'asc' | 'desc' = 'desc';
 
 export const POSITIONS = [
   'All Positions',
@@ -292,6 +294,50 @@ export function battingSortFilter(
 }
 
 /**
+ * Pitching counterpart of {@link battingSortFilter}: the
+ * `pitchingSortBy`/`pitchingSortDir` pair when it differs from the wins-desc
+ * default, or an empty object when it matches. Pure (LS-10690).
+ */
+export function pitchingSortFilter(
+  sortBy: string,
+  sortDir: 'asc' | 'desc',
+): Pick<PlayerStatsFilters, 'pitchingSortBy' | 'pitchingSortDir'> {
+  if (
+    sortBy === DEFAULT_PITCHING_SORT_BY &&
+    sortDir === DEFAULT_PITCHING_SORT_DIR
+  ) {
+    return {};
+  }
+  return { pitchingSortBy: sortBy, pitchingSortDir: sortDir };
+}
+
+/**
+ * Write the batting and pitching sort keys onto `params`, omitting either pair
+ * when it matches its default so default views keep clean URLs.
+ */
+export function appendSortParams(
+  params: URLSearchParams,
+  sortBy: string,
+  sortDir: 'asc' | 'desc',
+  pitchingSortBy: string,
+  pitchingSortDir: 'asc' | 'desc',
+): void {
+  const sortFilter = battingSortFilter(sortBy, sortDir);
+  if (sortFilter.sortBy) {
+    params.set('sortBy', sortFilter.sortBy);
+    params.set('sortDir', sortFilter.sortDir ?? DEFAULT_BATTING_SORT_DIR);
+  }
+  const pitchingFilter = pitchingSortFilter(pitchingSortBy, pitchingSortDir);
+  if (pitchingFilter.pitchingSortBy) {
+    params.set('pitchingSortBy', pitchingFilter.pitchingSortBy);
+    params.set(
+      'pitchingSortDir',
+      pitchingFilter.pitchingSortDir ?? DEFAULT_PITCHING_SORT_DIR,
+    );
+  }
+}
+
+/**
  * Serialize a committed filter snapshot into the shareable relative URL. Reads
  * the *applied* snapshot (never the uncommitted toolbar draft) so a shared link
  * always reflects what the sender sees on screen (LS-7131 / PST-071). Free of
@@ -302,6 +348,8 @@ export function buildShareUrl(
   filters: AppliedFilters,
   sortBy: string = DEFAULT_BATTING_SORT_BY,
   sortDir: 'asc' | 'desc' = DEFAULT_BATTING_SORT_DIR,
+  pitchingSortBy: string = DEFAULT_PITCHING_SORT_BY,
+  pitchingSortDir: 'asc' | 'desc' = DEFAULT_PITCHING_SORT_DIR,
 ): string {
   const params = new URLSearchParams({
     view: viewMode,
@@ -332,11 +380,7 @@ export function buildShareUrl(
   if (filters.minSO > 0) params.set('minStrikeouts', String(filters.minSO));
   if (filters.maxSO < SO_MAX)
     params.set('maxStrikeouts', String(filters.maxSO));
-  const sortFilter = battingSortFilter(sortBy, sortDir);
-  if (sortFilter.sortBy) {
-    params.set('sortBy', sortFilter.sortBy);
-    params.set('sortDir', sortFilter.sortDir ?? DEFAULT_BATTING_SORT_DIR);
-  }
+  appendSortParams(params, sortBy, sortDir, pitchingSortBy, pitchingSortDir);
   // LS-9076: /players is the canonical stats route (formerly /players/stats).
   return `/players?${params.toString()}`;
 }

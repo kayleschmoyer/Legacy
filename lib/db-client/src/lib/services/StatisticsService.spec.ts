@@ -2,6 +2,10 @@ import type { SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import type { DbOptions } from '@legacy-sports/utils/node';
 import {
+  CAREER_BATTING_SORT_FIELDS,
+  CAREER_PITCHING_SORT_FIELDS,
+} from '@legacy-sports/utils';
+import {
   getCareerBattingFantasyScoreSql,
   getCareerPitchingFantasyScoreSql,
   getCareerPitchingOrderByClause,
@@ -9,6 +13,7 @@ import {
   getGamePitchingFantasyScoreSql,
   StatisticsService,
 } from './StatisticsService';
+import { getCareerBattingOrderByClause } from '../query-builders/TypeSafeQueryBuilder';
 
 jest.mock('../client/Helpers', () => ({
   runWithPublicClient: jest.fn(),
@@ -40,6 +45,36 @@ describe('getCareerPitchingOrderByClause', () => {
     expect(renderOrderBy('mystery')).toMatch(
       /"career_pitching"\."w" DESC NULLS LAST/,
     );
+  });
+
+  describe('IP / WHIP / K/9 / Player — LS-10690 regression', () => {
+    it.each([
+      [
+        'outsRecorded',
+        /"career_pitching"\."outs_recorded" (ASC|DESC) NULLS LAST/,
+      ],
+      [
+        'whip',
+        /\(\(COALESCE\("career_pitching"\."h", 0\) \+ COALESCE\("career_pitching"\."bb", 0\)\)::numeric \/ NULLIF\("career_pitching"\."outs_recorded" \/ 3\.0, 0\)\) (ASC|DESC) NULLS LAST/,
+      ],
+      [
+        'strikeoutsPerNine',
+        /\(COALESCE\("career_pitching"\."so", 0\) \* 27\.0 \/ NULLIF\("career_pitching"\."outs_recorded", 0\)\) (ASC|DESC) NULLS LAST/,
+      ],
+      [
+        'lastName',
+        /"players"\."last_name" (ASC|DESC) NULLS LAST, "players"\."first_name" (ASC|DESC) NULLS LAST/,
+      ],
+    ])('%s honours both directions', (orderBy, pattern) => {
+      const descSql = renderOrderBy(orderBy, 'desc');
+      const ascSql = renderOrderBy(orderBy, 'asc');
+      expect(descSql).toMatch(pattern);
+      expect(ascSql).toMatch(pattern);
+      expect(descSql).toContain('DESC');
+      expect(ascSql).toContain('ASC');
+      expect(ascSql).not.toContain('DESC');
+      expect(descSql).not.toMatch(/"career_pitching"\."w"/);
+    });
   });
 
   describe('pitchingWAR — LS-4005 regression', () => {
@@ -112,6 +147,47 @@ describe('getCareerPitchingOrderByClause', () => {
       expect(sql).toMatch(/\* 5/); // w/sv weight still present in numerator
       expect(sql).toMatch(/DESC NULLS LAST$/);
     });
+  });
+});
+
+/**
+ * Mapping-coverage guard (LS-10690). The stats grids type their column → sort
+ * field maps against CAREER_*_SORT_FIELDS, so every field they can send is in
+ * these lists. Each must have an explicit ORDER BY case: one that falls through
+ * to the default renders identically to an unmatchable key in both directions.
+ * (`wins` DESC equals the pitching default byte-for-byte, but `wins` ASC does
+ * not — hence comparing both directions.)
+ */
+describe('sort-field contract has explicit ORDER BY cases — LS-10690', () => {
+  const UNMATCHABLE = '__no_such_sort_field__';
+  const DIRECTIONS = ['asc', 'desc'] as const;
+  const renderBatting = (orderBy: string, dir: 'asc' | 'desc') =>
+    dialect.sqlToQuery(
+      getCareerBattingOrderByClause({ orderBy, orderDirection: dir }),
+    ).sql;
+  const isHandled = (
+    render: (orderBy: string, dir: 'asc' | 'desc') => string,
+    field: string,
+  ) =>
+    DIRECTIONS.some((dir) => render(field, dir) !== render(UNMATCHABLE, dir));
+
+  it.each([...CAREER_PITCHING_SORT_FIELDS])(
+    'pitching field "%s" has an explicit case',
+    (field) => {
+      expect(isHandled(renderOrderBy, field)).toBe(true);
+    },
+  );
+
+  it.each([...CAREER_BATTING_SORT_FIELDS])(
+    'batting field "%s" has an explicit case',
+    (field) => {
+      expect(isHandled(renderBatting, field)).toBe(true);
+    },
+  );
+
+  it('detects a field with no case (guards the guard)', () => {
+    expect(isHandled(renderOrderBy, 'notAField')).toBe(false);
+    expect(isHandled(renderBatting, 'notAField')).toBe(false);
   });
 });
 

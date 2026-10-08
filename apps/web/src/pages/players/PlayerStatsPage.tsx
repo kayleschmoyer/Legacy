@@ -10,6 +10,7 @@ import {
   FootballStatsPage,
   isFootballSortField,
   isValidBattingSortField,
+  isValidPitchingSortField,
   normalizeFootballView,
   normalizeViewMode,
   parseFootballPositions,
@@ -262,6 +263,25 @@ export function parseStatsSortParams(
 }
 
 /**
+ * Parse the pitching sort from URL params (LS-10690). Mirrors
+ * {@link parseStatsSortParams} on the `pitchingSortBy`/`pitchingSortDir` keys:
+ * only an allow-listed pitching sort field is accepted, and `pitchingSortDir`
+ * defaults to `desc` unless an explicit `asc` is supplied. Exported for unit
+ * testing.
+ */
+export function parsePitchingSortParams(
+  params: URLSearchParams,
+): { pitchingSortBy: string; pitchingSortDir: 'asc' | 'desc' } | null {
+  const pitchingSortBy = sanitizeSearchParam(params.get('pitchingSortBy'));
+  if (!pitchingSortBy || !isValidPitchingSortField(pitchingSortBy)) {
+    return null;
+  }
+  const pitchingSortDir =
+    params.get('pitchingSortDir') === 'asc' ? 'asc' : 'desc';
+  return { pitchingSortBy, pitchingSortDir };
+}
+
+/**
  * Sanitize a string before interpolating it into a download filename segment
  * (`link.download`). Strips everything outside `[a-z0-9-]` so an arbitrary
  * value can never inject slashes or dot-segments into the download path
@@ -366,6 +386,12 @@ export function buildStatsSearchParams(state: {
   if (state.filters.sortBy) {
     next.set('sortBy', state.filters.sortBy);
     next.set('sortDir', state.filters.sortDir ?? 'desc');
+  }
+  // Pitching sort, persisted the same way under its own keys so the Combined
+  // view can carry both grids' sorts (LS-10690).
+  if (state.filters.pitchingSortBy) {
+    next.set('pitchingSortBy', state.filters.pitchingSortBy);
+    next.set('pitchingSortDir', state.filters.pitchingSortDir ?? 'desc');
   }
 
   // Serialize keys in a deterministic alphabetical order (PST-104). URLSearchParams
@@ -474,6 +500,11 @@ export function parseStatsSearchParams(searchParams: URLSearchParams): {
   if (sort) {
     filters.sortBy = sort.sortBy;
     filters.sortDir = sort.sortDir;
+  }
+  const pitchingSort = parsePitchingSortParams(params);
+  if (pitchingSort) {
+    filters.pitchingSortBy = pitchingSort.pitchingSortBy;
+    filters.pitchingSortDir = pitchingSort.pitchingSortDir;
   }
 
   return {

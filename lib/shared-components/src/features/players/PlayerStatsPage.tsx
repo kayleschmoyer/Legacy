@@ -53,6 +53,7 @@ export {
   hasPendingFilterChanges,
   normalizeViewMode,
   pageSizeOptionsForViewMode,
+  pitchingSortFilter,
   STATS_COLUMN_GROUPS,
   STATS_TOGGLEABLE_COLUMN_KEYS,
 } from './baseball/baseballStatsHelpers';

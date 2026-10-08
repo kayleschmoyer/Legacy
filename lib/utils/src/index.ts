@@ -27,5 +27,6 @@ export * from './lib/season-constants';
 export * from './lib/mock-draft-limits';
 export * from './lib/username-validation';
 export * from './lib/access-level';
+export * from './lib/stats-sort-fields';
 export * from './lib/waiver-schedule';
 // Node.js-only exports (DbCredentials, DbOptions, LambdaHelpers, version) are in '@legacy-sports/utils/node'
