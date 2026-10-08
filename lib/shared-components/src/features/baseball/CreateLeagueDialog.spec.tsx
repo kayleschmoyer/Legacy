@@ -24,6 +24,7 @@ jest.mock('@tamagui/lucide-icons', () => ({
 }));
 
 jest.mock('tamagui', () => {
+  const { cloneElement } = jest.requireActual<typeof React>('react');
   const PassThrough = ({ children }: Children) => <div>{children}</div>;
   const Stack = ({ children, role }: StackProps) => (
     <div role={role}>{children}</div>
@@ -71,7 +72,13 @@ jest.mock('tamagui', () => {
     Portal: PassThrough,
     Overlay: () => null,
     Content: ({ children }: Children) => <div role="dialog">{children}</div>,
-    Close: PassThrough,
+    // Mirrors Tamagui's DialogClose: it injects accessibilityLabel "Dialog
+    // Close" into its asChild child, and the child's own label wins.
+    Close: ({ children }: { children: React.ReactElement<ButtonProps> }) =>
+      cloneElement(children, {
+        'aria-label': 'Dialog Close',
+        ...children.props,
+      }),
   });
   return {
     createTokens: (tokens: unknown) => tokens,
@@ -196,5 +203,47 @@ describe('CreateLeagueDialog', () => {
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({ leagueName: 'Test League' }),
     );
+  });
+
+  it('names the Cancel button "Cancel", not Tamagui\'s "Dialog Close" (LS-10668)', () => {
+    const onOpenChange = jest.fn();
+    render(<CreateLeagueDialog {...baseProps} onOpenChange={onOpenChange} />);
+    expect(
+      screen.queryByRole('button', { name: 'Dialog Close' }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onOpenChange).not.toHaveBeenCalledWith(true);
+  });
+
+  // LS-10668: react-native-web's TextInput swallows keydown and Tamagui's
+  // Dismissable ignores Escape unless it owns the topmost layer, so the dialog
+  // listens for Escape itself.
+  it('closes when Escape is pressed with focus inside the dialog', () => {
+    const onOpenChange = jest.fn();
+    render(<CreateLeagueDialog {...baseProps} onOpenChange={onOpenChange} />);
+    fireEvent.keyDown(screen.getByPlaceholderText(/Saturday Sluggers/i), {
+      key: 'Escape',
+      code: 'Escape',
+    });
+    expect(onOpenChange).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('ignores Escape while a create request is in flight', () => {
+    const onOpenChange = jest.fn();
+    const onSubmit = jest.fn().mockReturnValue(new Promise(() => undefined));
+    render(
+      <CreateLeagueDialog
+        {...baseProps}
+        onSubmit={onSubmit}
+        onOpenChange={onOpenChange}
+      />,
+    );
+    fireEvent.change(screen.getByPlaceholderText(/Saturday Sluggers/i), {
+      target: { value: 'My League' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create League' }));
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    expect(onOpenChange).not.toHaveBeenCalled();
   });
 });

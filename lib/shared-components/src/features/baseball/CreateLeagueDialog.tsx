@@ -228,6 +228,26 @@ export function CreateLeagueDialog({
     }
   };
 
+  // Escape never closed this dialog on web (LS-10668): react-native-web's
+  // TextInput stops keydown propagation, and Tamagui's Dismissable only honours
+  // Escape for the topmost layer in a module-global set, which a stale layer
+  // elsewhere on the page can hold. A document capture listener sees Escape
+  // before either; preventDefault stops Tamagui from dismissing a second time.
+  const closeOnEscapeRef = React.useRef<((e: KeyboardEvent) => void) | null>(
+    null,
+  );
+  closeOnEscapeRef.current = (e) => {
+    if (e.key !== 'Escape' || e.defaultPrevented || busy) return;
+    e.preventDefault();
+    handleOpenChange(false);
+  };
+  React.useEffect(() => {
+    if (!open || typeof document === 'undefined') return undefined;
+    const listener = (e: KeyboardEvent) => closeOnEscapeRef.current?.(e);
+    document.addEventListener('keydown', listener, true);
+    return () => document.removeEventListener('keydown', listener, true);
+  }, [open]);
+
   const handleSubmit = () => {
     if (busy || !nameValid) return;
     setCreateError(null);
@@ -627,7 +647,11 @@ export function CreateLeagueDialog({
             )}
             <XStack gap="$3">
               <Dialog.Close asChild>
+                {/* Explicit label: Dialog.Close otherwise injects "Dialog
+                    Close" as the accessible name, hiding "Cancel" (LS-10668). */}
                 <Button
+                  accessibilityLabel="Cancel"
+                  aria-label="Cancel"
                   disabled={busy}
                   backgroundColor={withAlpha(BRAND_NAVY, 0.12)}
                   borderColor={withAlpha(BRAND_NAVY, 0.42)}
