@@ -392,6 +392,36 @@ describe('RosterBoard', () => {
     expect(screen.queryByText(/^Total:/)).toBeNull();
   });
 
+  it('renders a near-zero float score as "0.0", never "-0.0" (LS-10685)', () => {
+    render(
+      <RosterBoard
+        positions={POSITIONS}
+        teamPlayers={[mk(101, 'Ketel', 'Marte', ['C'], 1)]}
+        onPlayerAssign={noop}
+        onPlayerRemove={noop}
+        // 1 H − 4×0.25 SO summed in floating point nets to a tiny negative.
+        getPlayerStats={() => ({ actual: -1e-16, projected: -0.04 })}
+      />,
+    );
+    expect(screen.queryByText(/-0\.0/)).toBeNull();
+    // Starter row actual + card-head total.
+    expect(screen.getAllByText('0.0').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText('0.0 proj')).toBeTruthy();
+  });
+
+  it('keeps the minus sign on a genuinely negative score (LS-10685)', () => {
+    render(
+      <RosterBoard
+        positions={POSITIONS}
+        teamPlayers={[mk(101, 'Ketel', 'Marte', ['C'], 1)]}
+        onPlayerAssign={noop}
+        onPlayerRemove={noop}
+        getPlayerStats={() => ({ actual: -1.5, projected: 2 })}
+      />,
+    );
+    expect(screen.getAllByText('-1.5')).toHaveLength(2);
+  });
+
   it('quick-swap menu assigns an eligible bench player to an empty slot', () => {
     const onPlayerAssign = jest.fn<
       void,

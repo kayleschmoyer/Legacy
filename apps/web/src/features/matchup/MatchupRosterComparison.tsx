@@ -11,6 +11,7 @@ import {
   isStatsLoading,
   POSITION_SLOT_ORDER,
 } from '@legacy-sports/shared-components/roster';
+import { formatFantasyPoints } from '@legacy-sports/shared-components/utils';
 import {
   FootballStatsDataQuality,
   type MatchupFragment,
@@ -1250,7 +1251,7 @@ export function MatchupRosterComparison({
         <div className="mrc-pscore">
           <div className="mrc-sc mrc-proj">
             <span className="mrc-lab">Proj</span>
-            <span className="mrc-num">{proj.toFixed(1)}</span>
+            <span className="mrc-num">{formatFantasyPoints(proj)}</span>
           </div>
           <button
             type="button"
@@ -1263,7 +1264,7 @@ export function MatchupRosterComparison({
           >
             <span className="mrc-lab">Actual</span>
             <span className={`mrc-num ${actualCls}`}>
-              {hasPlayed ? actual.toFixed(1) : '—'}
+              {hasPlayed ? formatFantasyPoints(actual) : '—'}
             </span>
           </button>
         </div>
@@ -1348,11 +1349,13 @@ export function MatchupRosterComparison({
       <div className="mrc-totals">
         <div className="mrc-tot-cell mrc-t1">
           <div className="mrc-sc mrc-proj">
-            <span className="mrc-num">{team1Totals.projected.toFixed(1)}</span>
+            <span className="mrc-num">
+              {formatFantasyPoints(team1Totals.projected)}
+            </span>
           </div>
           <div className="mrc-sc mrc-actual">
             <span className={`mrc-num ${team1Cls}`}>
-              {team1Totals.actual.toFixed(1)}
+              {formatFantasyPoints(team1Totals.actual)}
             </span>
           </div>
           <div className="mrc-filler" />
@@ -1360,11 +1363,13 @@ export function MatchupRosterComparison({
         <div className="mrc-tot-lab">{label}</div>
         <div className="mrc-tot-cell mrc-t2">
           <div className="mrc-sc mrc-proj">
-            <span className="mrc-num">{team2Totals.projected.toFixed(1)}</span>
+            <span className="mrc-num">
+              {formatFantasyPoints(team2Totals.projected)}
+            </span>
           </div>
           <div className="mrc-sc mrc-actual">
             <span className={`mrc-num ${team2Cls}`}>
-              {team2Totals.actual.toFixed(1)}
+              {formatFantasyPoints(team2Totals.actual)}
             </span>
           </div>
           <div className="mrc-filler" />

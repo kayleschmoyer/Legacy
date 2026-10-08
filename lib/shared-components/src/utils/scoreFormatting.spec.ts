@@ -1,4 +1,5 @@
 import {
+  formatFantasyPoints,
   formatPoints,
   formatRecord,
   formatScore,
@@ -6,6 +7,37 @@ import {
   getLeadingTeam,
   getScoreDeltaColor,
 } from './scoreFormatting';
+
+describe('formatFantasyPoints (LS-10685)', () => {
+  it.each([
+    [-1e-16, '0.0'],
+    [-0, '0.0'],
+    [-0.04, '0.0'],
+    [0, '0.0'],
+    [1 - 4 * 0.25 - 1e-16, '0.0'],
+  ])('normalises near-zero %p to "0.0"', (value, expected) => {
+    expect(formatFantasyPoints(value)).toBe(expected);
+  });
+
+  it.each([
+    [-0.06, '-0.1'],
+    [-1.5, '-1.5'],
+    [-0.25, '-0.3'],
+  ])('keeps the minus sign on genuine negative %p', (value, expected) => {
+    expect(formatFantasyPoints(value)).toBe(expected);
+  });
+
+  it('formats positives with one decimal by default', () => {
+    expect(formatFantasyPoints(12.5)).toBe('12.5');
+    expect(formatFantasyPoints(0.25)).toBe('0.3');
+    expect(formatFantasyPoints(32)).toBe('32.0');
+  });
+
+  it('honours a custom digit count', () => {
+    expect(formatFantasyPoints(-0.004, 2)).toBe('0.00');
+    expect(formatFantasyPoints(3.14159, 2)).toBe('3.14');
+  });
+});
 
 describe('formatPoints', () => {
   it('formats a typical point total with comma separator and one decimal', () => {
@@ -44,6 +76,7 @@ describe('formatPoints', () => {
 
   it('handles zero', () => {
     expect(formatPoints(0)).toBe('0.0');
+    expect(formatPoints(-1e-16)).toBe('0.0');
   });
 });
 

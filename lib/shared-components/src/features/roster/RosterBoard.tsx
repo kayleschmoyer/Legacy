@@ -26,6 +26,7 @@ import {
 } from './rosterEligibility';
 import { PACE_TINT_THRESHOLDS } from '../matchup/paceThresholds';
 import { getPlayerName } from '../../utils/playerFormatting';
+import { formatFantasyPoints } from '../../utils/scoreFormatting';
 import {
   ACCENT_INK,
   BRAND_GOLD,
@@ -295,11 +296,11 @@ function ScoreCell({
         {...TABULAR_NUMS}
       >
         {compact
-          ? (stats.projected ?? 0).toFixed(1)
-          : (stats.actual ?? 0).toFixed(1)}
+          ? formatFantasyPoints(stats.projected ?? 0)
+          : formatFantasyPoints(stats.actual ?? 0)}
       </Text>
       <Text fontFamily={FONT_MONO} fontSize={11} color={TEXT_TERTIARY}>
-        {compact ? 'proj' : `${(stats.projected ?? 0).toFixed(1)} proj`}
+        {compact ? 'proj' : `${formatFantasyPoints(stats.projected ?? 0)} proj`}
       </Text>
     </YStack>
   );
@@ -1311,7 +1312,7 @@ export function RosterBoard<
                     }
                     right={
                       bStats?.projected != null
-                        ? `${bStats.projected.toFixed(1)} proj`
+                        ? `${formatFantasyPoints(bStats.projected)} proj`
                         : null
                     }
                     onPress={() => {
@@ -1470,9 +1471,9 @@ export function RosterBoard<
                 card's hitters — so name it for what it sums (LS-10681). */}
             {isFootball ? 'Total' : 'Starters total'}:{' '}
             <Text color={WHITE} fontWeight="700" fontSize="$4">
-              {starterStats.total.toFixed(1)}
+              {formatFantasyPoints(starterStats.total)}
             </Text>{' '}
-            · Proj {starterStats.proj.toFixed(1)}
+            · Proj {formatFantasyPoints(starterStats.proj)}
           </Text>
         ) : (
           <Text fontSize="$2" color="$gray10">
@@ -1519,7 +1520,7 @@ export function RosterBoard<
       testId="roster-section-bench"
       sub={
         benchProj != null
-          ? `${benchPlayers.length} players · Proj ${benchProj.toFixed(1)}`
+          ? `${benchPlayers.length} players · Proj ${formatFantasyPoints(benchProj)}`
           : null
       }
       right={

@@ -54,6 +54,22 @@ export function getScoreDeltaColor(delta: number): string {
 }
 
 /**
+ * Format a per-player or per-team fantasy points value (e.g. "12.5").
+ *
+ * Points are summed in floating point, so a line that nets to zero can land
+ * on a tiny negative like -1e-16, which raw `toFixed(1)` renders as "-0.0".
+ * Round first, then normalise -0 to 0 so near-zero values read "0.0" while
+ * genuine negatives keep their sign (LS-10685). Rounds the magnitude so
+ * halves round away from zero symmetrically (-0.25 → "-0.3", like 0.25).
+ */
+export function formatFantasyPoints(value: number, digits = 1): string {
+  const factor = 10 ** digits;
+  const rounded =
+    (Math.sign(value) * Math.round(Math.abs(value) * factor)) / factor;
+  return (Object.is(rounded, -0) ? 0 : rounded).toFixed(digits);
+}
+
+/**
  * Format a fantasy points total for display in a standings table.
  * Applies comma thousands-separators and one decimal place (e.g. 1548.2 → "1,548.2").
  * Returns "—" for null/undefined/non-finite values.
@@ -66,7 +82,7 @@ export function formatPoints(
     return placeholder;
   }
 
-  const parts = value.toFixed(1).split('.');
+  const parts = formatFantasyPoints(value).split('.');
   const whole = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return `${whole}.${parts[1] ?? '0'}`;
 }
