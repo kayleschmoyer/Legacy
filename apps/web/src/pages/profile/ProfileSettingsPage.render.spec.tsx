@@ -34,7 +34,9 @@ jest.mock('react-router-dom', () => ({
 }));
 
 jest.mock('@legacy-sports/shared-components/ui', () => {
-  const Passthrough = ({ children }: ChildrenProps) => <div>{children}</div>;
+  const Passthrough = ({ children, id }: ChildrenProps & { id?: string }) => (
+    <div id={id}>{children}</div>
+  );
   return {
     AvatarPicker: () => null,
     Dialog: ({
@@ -95,7 +97,27 @@ jest.mock('@legacy-sports/shared-components/icons', () => ({
 jest.mock('tamagui', () => ({
   createTokens: (tokens: unknown) => tokens,
   styled: <T,>(Component: T) => Component,
-  Input: () => <input />,
+  Input: ({
+    value,
+    onChangeText,
+    maxLength,
+    'aria-label': ariaLabel,
+    'aria-describedby': ariaDescribedBy,
+  }: {
+    value?: string;
+    onChangeText?: (text: string) => void;
+    maxLength?: number;
+    'aria-label'?: string;
+    'aria-describedby'?: string;
+  }) => (
+    <input
+      value={value}
+      maxLength={maxLength}
+      aria-label={ariaLabel}
+      aria-describedby={ariaDescribedBy}
+      onChange={(e) => onChangeText?.(e.target.value)}
+    />
+  ),
   ScrollView: ({ children }: ChildrenProps) => <div>{children}</div>,
   Spinner: () => null,
 }));
@@ -263,5 +285,44 @@ describe('ProfileSettingsPage access level (LS-10650)', () => {
 
     expect(screen.getAllByText('Administrator')).toHaveLength(2);
     expect(screen.queryByText('Member')).toBeNull();
+  });
+});
+
+describe('ProfileSettingsPage username length counter (LS-10781)', () => {
+  function startEditing() {
+    renderPage(null);
+    fireEvent.click(screen.getByText('Edit'));
+    return screen.getByRole('textbox', { name: 'Username' });
+  }
+
+  it('shows the 50-character limit while editing, linked via aria-describedby', () => {
+    const input = startEditing();
+
+    expect(input).toHaveAttribute('maxlength', '50');
+    expect(input).toHaveAccessibleDescription('5/50');
+  });
+
+  it('updates the count as the user types', () => {
+    const input = startEditing();
+
+    fireEvent.change(input, { target: { value: 'casey_qa' } });
+
+    expect(input).toHaveAccessibleDescription('8/50');
+  });
+
+  it('says the limit was reached instead of truncating silently', () => {
+    const input = startEditing();
+
+    fireEvent.change(input, { target: { value: 'a'.repeat(50) } });
+
+    expect(input).toHaveAccessibleDescription(
+      '50/50 · Maximum 50 characters reached',
+    );
+  });
+
+  it('hides the counter when not editing', () => {
+    renderPage(null);
+
+    expect(screen.queryByText('5/50')).toBeNull();
   });
 });

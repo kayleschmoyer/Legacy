@@ -23,7 +23,11 @@ import {
   useUpdateUserAvatarMutation,
   useUpdateUsernameMutation,
 } from '@legacy-sports/graphql';
-import { getAccessLevelLabel, validateUsername } from '@legacy-sports/utils';
+import {
+  getAccessLevelLabel,
+  USERNAME_MAX_LENGTH,
+  validateUsername,
+} from '@legacy-sports/utils';
 import { getSessionStatus } from './sessionStatus';
 import { signOut } from './signOut';
 import TwoFactorSection from '../../components/profile/TwoFactorSection';
@@ -585,9 +589,10 @@ const ProfileSettingsPage: React.FC = () => {
                           id="profile-username-input"
                           aria-labelledby="profile-username-label"
                           aria-label="Username"
+                          aria-describedby="profile-username-counter"
                           value={editedUsername}
                           onChangeText={setEditedUsername}
-                          maxLength={50}
+                          maxLength={USERNAME_MAX_LENGTH}
                           autoFocus
                           flex={1}
                           size="$4"
@@ -626,6 +631,19 @@ const ProfileSettingsPage: React.FC = () => {
                           </Paragraph>
                         </EditButton>
                       </XStack>
+                      {/* LS-10781: the input hard-caps at the server's limit, so
+                        show the count (and say so at the cap) instead of
+                        silently dropping pasted characters. */}
+                      <Paragraph
+                        id="profile-username-counter"
+                        size="$1"
+                        color="$colorPress"
+                      >
+                        {editedUsername.length}/{USERNAME_MAX_LENGTH}
+                        {editedUsername.length >= USERNAME_MAX_LENGTH
+                          ? ` · Maximum ${USERNAME_MAX_LENGTH} characters reached`
+                          : null}
+                      </Paragraph>
                       {usernameError && (
                         <Paragraph
                           size="$2"
