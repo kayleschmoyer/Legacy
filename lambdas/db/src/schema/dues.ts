@@ -6,6 +6,10 @@
  * All league members can view who has and hasn't paid.
  */
 import { LOGGER } from '@legacy-sports/logging';
+import {
+  DUES_AMOUNT_TOO_HIGH_MESSAGE,
+  MAX_DUES_CENTS,
+} from '@legacy-sports/utils';
 import { PublicSchema } from '@legacy-sports/db-client';
 import { and, eq, sql } from 'drizzle-orm';
 import { builder, type Context } from './builder';
@@ -240,6 +244,11 @@ builder.mutationField('updateDuesSettings', (t) =>
 
       if (amountCents < 0) {
         throw UserInputError('Dues amount cannot be negative');
+      }
+
+      // LS-10735: shared product cap — mirrors LeagueDuesControl's inline check.
+      if (amountCents > MAX_DUES_CENTS) {
+        throw UserInputError(DUES_AMOUNT_TOO_HIGH_MESSAGE);
       }
 
       if (

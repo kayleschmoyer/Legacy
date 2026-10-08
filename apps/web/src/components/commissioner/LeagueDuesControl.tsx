@@ -10,6 +10,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
+import { CombinedGraphQLErrors } from '@apollo/client';
 import { AlertTriangle } from '@tamagui/lucide-icons/icons/AlertTriangle';
 import { Check } from '@tamagui/lucide-icons/icons/Check';
 import { DollarSign } from '@tamagui/lucide-icons/icons/DollarSign';
@@ -17,6 +18,7 @@ import {
   useGetLeagueDuesSettingsQuery,
   useUpdateDuesSettingsMutation,
 } from '@legacy-sports/graphql';
+import { getDuesAmountError } from '@legacy-sports/utils';
 import { BRAND_NAVY_LIGHT, withAlpha } from '../../constants/colors';
 
 export interface LeagueDuesControlProps {
@@ -34,6 +36,36 @@ const DAY_OF_WEEK_OPTIONS = [
   { label: 'Friday', value: 5 },
   { label: 'Saturday', value: 6 },
 ] as const;
+
+const AMOUNT_ERROR_ID = 'league-dues-amount-error';
+
+const GENERIC_SAVE_ERROR =
+  "Couldn't save dues settings. Please check the amount and try again.";
+
+/** Resolver error codes whose message is written for end users. */
+const USER_FACING_ERROR_CODES = new Set(['BAD_USER_INPUT', 'FORBIDDEN']);
+
+/**
+ * Maps a failed save to toast copy (LS-10735). Only errors raised by the
+ * resolver itself (they carry a `path`) with a user-facing code pass their
+ * message through; request-level failures such as GraphQL variable coercion
+ * ("Int cannot represent non 32-bit signed integer value") have no `path`
+ * and fall back to generic copy so raw transport text never reaches the user.
+ */
+function getDuesSaveErrorMessage(err: unknown): string {
+  if (CombinedGraphQLErrors.is(err)) {
+    const userFacing = err.errors.find((e) => {
+      const code = e.extensions?.code;
+      return (
+        e.path != null &&
+        typeof code === 'string' &&
+        USER_FACING_ERROR_CODES.has(code)
+      );
+    });
+    if (userFacing) return userFacing.message;
+  }
+  return GENERIC_SAVE_ERROR;
+}
 
 /** Enter/Space activation for the custom `role="switch"` toggle rows (LS-10797). */
 const activateOnEnterOrSpace = (fn: () => void) => (e: React.KeyboardEvent) => {
@@ -82,10 +114,7 @@ export function LeagueDuesControl({
     useUpdateDuesSettingsMutation();
 
   const amountCents = Math.round(parseFloat(amountDollars || '0') * 100);
-  const validationError =
-    enabled && (isNaN(amountCents) || amountCents <= 0)
-      ? 'Please enter a valid dues amount greater than $0'
-      : null;
+  const validationError = enabled ? getDuesAmountError(amountCents) : null;
 
   const handleEnabledToggle = useCallback(() => {
     setEnabled((prev) => !prev);
@@ -135,9 +164,7 @@ export function LeagueDuesControl({
       setHasChanges(false);
       onSuccess?.('Dues settings saved successfully!');
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Unknown error occurred';
-      onError?.(new Error(errorMessage));
+      onError?.(new Error(getDuesSaveErrorMessage(err)));
     }
   };
 
@@ -262,11 +289,38 @@ export function LeagueDuesControl({
                   placeholder="e.g. 50.00"
                   keyboardType="decimal-pad"
                   disabled={saving}
+                  aria-label="Dues Amount"
+                  aria-invalid={!!validationError}
+                  aria-describedby={
+                    validationError ? AMOUNT_ERROR_ID : undefined
+                  }
                 />
               </XStack>
               <Text fontSize="$2" color="$gray10">
                 Amount each member owes for the season
               </Text>
+              {/* Inline amount validation (LS-10735: also enforces the max) */}
+              {validationError && (
+                <Card
+                  backgroundColor="$yellow2"
+                  borderColor="$yellow6"
+                  padding="$3"
+                  borderRadius="$4"
+                >
+                  <XStack alignItems="center" gap="$2">
+                    <AlertTriangle size={16} color="var(--yellow11)" />
+                    <Text
+                      id={AMOUNT_ERROR_ID}
+                      role="alert"
+                      fontSize="$3"
+                      color="$yellow11"
+                      fontWeight="600"
+                    >
+                      {validationError}
+                    </Text>
+                  </XStack>
+                </Card>
+              )}
             </YStack>
 
             <Separator />
@@ -382,23 +436,6 @@ export function LeagueDuesControl({
               )}
             </YStack>
           </>
-        )}
-
-        {/* Validation warning */}
-        {validationError && (
-          <Card
-            backgroundColor="$yellow2"
-            borderColor="$yellow6"
-            padding="$3"
-            borderRadius="$4"
-          >
-            <XStack alignItems="center" gap="$2">
-              <AlertTriangle size={16} color="var(--yellow11)" />
-              <Text fontSize="$3" color="$yellow11" fontWeight="600">
-                {validationError}
-              </Text>
-            </XStack>
-          </Card>
         )}
       </YStack>
 

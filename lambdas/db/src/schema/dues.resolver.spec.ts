@@ -291,6 +291,38 @@ describe('Dues Resolver — Commissioner/GM Permission Guards', () => {
       ).rejects.toThrow('Dues amount cannot be negative');
     });
 
+    it('rejects a dues amount above the $10,000 max with a friendly error (LS-10735)', async () => {
+      const resolver = getMutation('updateDuesSettings');
+      await expect(
+        resolver(
+          {},
+          { input: { ...validInput, amountCents: 1_000_001 } },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({
+        message: 'Dues amount cannot exceed $10,000',
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+      expect(mockDb.insert).not.toHaveBeenCalled();
+    });
+
+    it('accepts a dues amount exactly at the $10,000 max (LS-10735)', async () => {
+      mockDb.returning.mockResolvedValueOnce([
+        { ...duesSettingsRow, amountCents: 1_000_000 },
+      ]);
+
+      const resolver = getMutation('updateDuesSettings');
+      const result = (await resolver(
+        {},
+        { input: { ...validInput, amountCents: 1_000_000 } },
+        mockContext,
+        undefined as never,
+      )) as Record<string, unknown>;
+
+      expect(result.amountCents).toBe(1_000_000);
+    });
+
     it('rejects invalid reminderDayOfWeek', async () => {
       const resolver = getMutation('updateDuesSettings');
       await expect(
