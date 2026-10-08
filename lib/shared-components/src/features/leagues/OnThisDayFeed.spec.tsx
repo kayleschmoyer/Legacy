@@ -4,6 +4,7 @@ import {
   useGetOnThisDayEventsQuery,
   useGetOnThisDayQuery,
 } from '@legacy-sports/graphql';
+import { useThemeName } from 'tamagui';
 import { OnThisDayFeed, parseGameIdentifierDate } from './OnThisDayFeed';
 import { render } from '../../test-utils';
 
@@ -155,6 +156,39 @@ describe('OnThisDayFeed', () => {
         expect.objectContaining({ playerId: 1, gameDate: null }),
       );
     });
+  });
+});
+
+describe('OnThisDayFeed theming (LS-10697)', () => {
+  // BG_DARK (#0A0F1A) as jsdom serialises it, solid or alpha-blended.
+  const BG_DARK_RGB = /rgba?\(10, 15, 26/;
+  // goldTextLight.goldText (#7A6220).
+  const LIGHT_GOLD_TEXT_RGB = 'rgb(122, 98, 32)';
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setupMocks();
+  });
+
+  afterEach(() => {
+    jest.mocked(useThemeName).mockReturnValue('dark');
+  });
+
+  it('keeps the dark-navy card in the dark theme (unchanged)', () => {
+    jest.mocked(useThemeName).mockReturnValue('dark');
+    const { container } = render(<OnThisDayFeed />);
+    expect(container.innerHTML).toMatch(BG_DARK_RGB);
+    expect(container.innerHTML).not.toContain(LIGHT_GOLD_TEXT_RGB);
+  });
+
+  it('drops every fixed BG_DARK fill and uses AA gold text in the light theme', () => {
+    jest.mocked(useThemeName).mockReturnValue('light');
+    const { container, getByText } = render(<OnThisDayFeed />);
+    expect(container.innerHTML).not.toMatch(BG_DARK_RGB);
+    expect(getByText('1927').style.color).toBe(LIGHT_GOLD_TEXT_RGB);
+    expect(getByText('Transactions & Signings').style.color).toBe(
+      LIGHT_GOLD_TEXT_RGB,
+    );
   });
 });
 

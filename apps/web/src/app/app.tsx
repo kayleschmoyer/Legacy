@@ -17,6 +17,7 @@ import {
 import { NavBar, type NavLink } from '@legacy-sports/shared-components';
 import { styled, Text } from 'tamagui';
 import { Menu } from '@tamagui/lucide-icons/icons/Menu';
+import { useThemeContext } from '../context/ThemeContext';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
 import { prefetchHomePage } from '../utils/prefetchHomePage';
 import { PlayersStatsRedirectPage } from '../pages/players/PlayersStatsRedirectPage';
@@ -317,8 +318,10 @@ const TradeCenterPage = lazyWithRetry(() =>
  * Nav – styled components
  * ──────────────────────────────────────────────────────── */
 
+// Follows the active theme (LS-10697): `$background075` is the dark glass
+// navy in dark (unchanged) and translucent white in light.
 const NavContainer = styled(YStack, {
-  backgroundColor: 'rgba(10,15,26,0.78)',
+  backgroundColor: '$background075',
   borderBottomWidth: 1,
   borderBottomColor: '$borderColor',
 });
@@ -383,6 +386,7 @@ function Navigation() {
     setBugDialogOpen(true);
   };
   const [compact, setCompact] = useState(false);
+  const isDarkTheme = useThemeContext().resolvedTheme === 'dark';
 
   // Condense nav when user scrolls down
   useEffect(() => {
@@ -430,9 +434,13 @@ function Navigation() {
           style={{
             backdropFilter: 'blur(16px) saturate(140%)',
             WebkitBackdropFilter: 'blur(16px) saturate(140%)',
-            borderBottomColor: compact
-              ? 'rgba(31,45,72,0.6)'
-              : 'rgba(31,45,72,1)',
+            // Dark keeps its panel-border hairline; light uses the subtler
+            // outline (LS-10697 design spec).
+            borderBottomColor: isDarkTheme
+              ? compact
+                ? 'rgba(31,45,72,0.6)'
+                : 'rgba(31,45,72,1)'
+              : 'var(--outlineSubtle)',
           }}
         >
           {/* ── Desktop layout (hidden on mobile) ──
@@ -490,13 +498,16 @@ function Navigation() {
                       }}
                     >
                       <Text
-                        color="$brandGoldLight"
+                        color="$wordmarkGold"
                         style={{
                           fontFamily: FONT_DISPLAY,
                           fontWeight: '800',
                           fontSize: 14,
                           letterSpacing: '0.04em',
-                          lineHeight: 1,
+                          // Pixel value, not unitless: Tamagui's Text style
+                          // treats a bare `1` as 1px, which clipped the
+                          // wordmark to a 1px sliver (LS-10697).
+                          lineHeight: '14px',
                         }}
                       >
                         LEGACY
@@ -508,7 +519,7 @@ function Navigation() {
                           fontWeight: '700',
                           fontSize: 11,
                           letterSpacing: '0.16em',
-                          lineHeight: 1,
+                          lineHeight: '11px',
                         }}
                       >
                         SPORTS
@@ -547,7 +558,7 @@ function Navigation() {
               style={{
                 background: 'transparent',
                 border: 0,
-                color: '#DEE6FF',
+                color: 'var(--color11)',
                 width: 36,
                 height: 36,
                 borderRadius: 9999,

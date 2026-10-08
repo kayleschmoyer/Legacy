@@ -10,6 +10,8 @@ import {
   colors as designTokenColors,
   glassDark,
   glassLight,
+  goldTextDark,
+  goldTextLight,
   leading,
   lightSurface,
   lightText,
@@ -124,6 +126,9 @@ const brandDark = {
   brandGold: brand.gold, // aged gold — trophies, pennants, vintage borders
   brandGoldLight: brand.goldLight, // lighter gold for hover
   brandGoldDark: brand.goldDark, // darker gold for press states
+  // Gold as text (LS-10697) — the header wordmark and small gold labels.
+  wordmarkGold: goldTextDark.wordmarkGold,
+  goldText: goldTextDark.goldText,
 
   // Text
   color: darkText.fg1,
@@ -261,6 +266,8 @@ const brandLight = {
   brandGold: lightGold.gold,
   brandGoldLight: lightGold.goldLight,
   brandGoldDark: lightGold.goldDark,
+  wordmarkGold: goldTextLight.wordmarkGold,
+  goldText: goldTextLight.goldText,
 
   // Text
   color: lightText.fg1,

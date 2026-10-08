@@ -129,6 +129,22 @@ export const semanticLight = {
   accentBorder: 'rgba(150, 120, 40, 0.45)',
 } as const;
 
+// Gold used as text (LS-10697). `brand.gold`/`goldLight` are tuned for dark
+// surfaces — the light-theme `$brandGoldLight` (#D4B24A) is only ~2:1 on
+// white — so the gold wordmark and small gold text get their own per-theme
+// values. `wordmarkGold` is a logotype (exempt from WCAG 1.4.3, but kept
+// ≥3:1); `goldText` is readable small text and clears AA (4.5:1) on every
+// light text surface — enforced in colors.spec.ts.
+export const goldTextDark = {
+  wordmarkGold: brand.goldLight,
+  goldText: brand.gold,
+} as const;
+
+export const goldTextLight = {
+  wordmarkGold: '#967828',
+  goldText: '#7A6220',
+} as const;
+
 // Accents introduced by the mobile design-handoff batch (LS-8794/8795/8800/
 // 8809) that have no equivalent in `semantic`: a muted ledger green for the
 // completed-step check, a softer rose for inline field errors, and a dimmed

@@ -22,7 +22,7 @@ exports[`App FootballHubPage should match complete football page layout snapshot
       aria-label="Primary"
     >
       <div
-        style="border-bottom-color: rgb(31, 45, 72);"
+        style="border-bottom-color: var(--outlineSubtle);"
       >
         <div
           display="none"
@@ -68,14 +68,14 @@ exports[`App FootballHubPage should match complete football page layout snapshot
                     style="display: flex; flex-direction: column; user-select: none; line-height: 1; overflow: hidden; white-space: nowrap; margin-left: 8px; max-width: 140px; opacity: 1; transition: max-width 200ms ease, margin-left 200ms ease, opacity 150ms ease;"
                   >
                     <span
-                      color="$brandGoldLight"
-                      style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 0.04em; line-height: 1;"
+                      color="$wordmarkGold"
+                      style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 0.04em; line-height: 14px;"
                     >
                       LEGACY
                     </span>
                     <span
                       color="$color12"
-                      style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.16em; line-height: 1;"
+                      style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.16em; line-height: 11px;"
                     >
                       SPORTS
                     </span>
@@ -239,7 +239,7 @@ exports[`App FootballHubPage should match complete football page layout snapshot
           <button
             aria-expanded="false"
             aria-label="Open menu"
-            style="background: transparent; border: 0px; color: rgb(222, 230, 255); width: 36px; height: 36px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;"
+            style="background: transparent; border: 0px; color: var(--color11); width: 36px; height: 36px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;"
           >
             Menu
           </button>
@@ -305,7 +305,7 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
       aria-label="Primary"
     >
       <div
-        style="border-bottom-color: rgb(31, 45, 72);"
+        style="border-bottom-color: var(--outlineSubtle);"
       >
         <div
           display="none"
@@ -351,14 +351,14 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
                     style="display: flex; flex-direction: column; user-select: none; line-height: 1; overflow: hidden; white-space: nowrap; margin-left: 8px; max-width: 140px; opacity: 1; transition: max-width 200ms ease, margin-left 200ms ease, opacity 150ms ease;"
                   >
                     <span
-                      color="$brandGoldLight"
-                      style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 0.04em; line-height: 1;"
+                      color="$wordmarkGold"
+                      style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 0.04em; line-height: 14px;"
                     >
                       LEGACY
                     </span>
                     <span
                       color="$color12"
-                      style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.16em; line-height: 1;"
+                      style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.16em; line-height: 11px;"
                     >
                       SPORTS
                     </span>
@@ -522,7 +522,7 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
           <button
             aria-expanded="false"
             aria-label="Open menu"
-            style="background: transparent; border: 0px; color: rgb(222, 230, 255); width: 36px; height: 36px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;"
+            style="background: transparent; border: 0px; color: var(--color11); width: 36px; height: 36px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;"
           >
             Menu
           </button>
@@ -567,7 +567,7 @@ exports[`App Navigation should match navigation snapshot 1`] = `
   aria-label="Primary"
 >
   <div
-    style="border-bottom-color: rgb(31, 45, 72);"
+    style="border-bottom-color: var(--outlineSubtle);"
   >
     <div
       display="none"
@@ -613,14 +613,14 @@ exports[`App Navigation should match navigation snapshot 1`] = `
                 style="display: flex; flex-direction: column; user-select: none; line-height: 1; overflow: hidden; white-space: nowrap; margin-left: 8px; max-width: 140px; opacity: 1; transition: max-width 200ms ease, margin-left 200ms ease, opacity 150ms ease;"
               >
                 <span
-                  color="$brandGoldLight"
-                  style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 0.04em; line-height: 1;"
+                  color="$wordmarkGold"
+                  style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 0.04em; line-height: 14px;"
                 >
                   LEGACY
                 </span>
                 <span
                   color="$color12"
-                  style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.16em; line-height: 1;"
+                  style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.16em; line-height: 11px;"
                 >
                   SPORTS
                 </span>
@@ -784,7 +784,7 @@ exports[`App Navigation should match navigation snapshot 1`] = `
       <button
         aria-expanded="false"
         aria-label="Open menu"
-        style="background: transparent; border: 0px; color: rgb(222, 230, 255); width: 36px; height: 36px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;"
+        style="background: transparent; border: 0px; color: var(--color11); width: 36px; height: 36px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;"
       >
         Menu
       </button>
@@ -810,7 +810,7 @@ exports[`App Navigation should render navigation with correct links 1`] = `
   aria-label="Primary"
 >
   <div
-    style="border-bottom-color: rgb(31, 45, 72);"
+    style="border-bottom-color: var(--outlineSubtle);"
   >
     <div
       display="none"
@@ -856,14 +856,14 @@ exports[`App Navigation should render navigation with correct links 1`] = `
                 style="display: flex; flex-direction: column; user-select: none; line-height: 1; overflow: hidden; white-space: nowrap; margin-left: 8px; max-width: 140px; opacity: 1; transition: max-width 200ms ease, margin-left 200ms ease, opacity 150ms ease;"
               >
                 <span
-                  color="$brandGoldLight"
-                  style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 0.04em; line-height: 1;"
+                  color="$wordmarkGold"
+                  style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 0.04em; line-height: 14px;"
                 >
                   LEGACY
                 </span>
                 <span
                   color="$color12"
-                  style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.16em; line-height: 1;"
+                  style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.16em; line-height: 11px;"
                 >
                   SPORTS
                 </span>
@@ -1027,7 +1027,7 @@ exports[`App Navigation should render navigation with correct links 1`] = `
       <button
         aria-expanded="false"
         aria-label="Open menu"
-        style="background: transparent; border: 0px; color: rgb(222, 230, 255); width: 36px; height: 36px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;"
+        style="background: transparent; border: 0px; color: var(--color11); width: 36px; height: 36px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;"
       >
         Menu
       </button>

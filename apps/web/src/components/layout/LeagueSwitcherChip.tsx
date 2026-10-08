@@ -24,6 +24,7 @@ import {
   withAlpha,
 } from '../../constants/colors';
 import { NAV_DROPDOWN_Z_INDEX } from '../../constants/dimensions';
+import { useThemeContext } from '../../context/ThemeContext';
 import { BaseballIcon, FootballIcon } from '../icons/SportIcons';
 
 const CHIP_STYLES: React.CSSProperties = {
@@ -31,16 +32,37 @@ const CHIP_STYLES: React.CSSProperties = {
   alignItems: 'center',
   gap: 10,
   padding: '7px 10px 7px 8px',
-  border: `1px solid ${OUTLINE_SUBTLE}`,
   borderRadius: 12,
-  background: withAlpha(WHITE, 0.02),
   cursor: 'pointer',
   transition: 'all 150ms cubic-bezier(0.2, 0.8, 0.2, 1)',
-  color: TEXT_PRIMARY,
   textAlign: 'left' as const,
   maxWidth: 240,
   flexShrink: 0,
 };
+
+/**
+ * Chip colours per theme (LS-10697). Dark keeps its original raw values so
+ * the dark header is unchanged; light reads the Tamagui theme CSS variables
+ * so the chip sits on the light header instead of staying navy.
+ */
+const CHIP_PALETTE = {
+  dark: {
+    border: OUTLINE_SUBTLE,
+    background: withAlpha(WHITE, 0.02),
+    openBorder: withAlpha(BRAND_GOLD, 0.4),
+    openBackground: withAlpha(BRAND_GOLD, 0.08),
+    text: TEXT_PRIMARY,
+    muted: TEXT_MUTED,
+  },
+  light: {
+    border: 'var(--outlineDefault)',
+    background: 'var(--surfaceInteractive)',
+    openBorder: 'var(--brandNavy)',
+    openBackground: 'var(--accentMuted)',
+    text: 'var(--color12)',
+    muted: 'var(--textMuted)',
+  },
+} as const;
 
 /** Width of the dropdown panel on viewports wide enough to fit it. */
 const PANEL_WIDTH_PX = 340;
@@ -137,6 +159,10 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
   const [sport, setSport] = useState<'baseball' | 'football'>('baseball');
   const ref = useRef<HTMLDivElement>(null);
   const [panelLayout, setPanelLayout] = useState<PanelLayout | null>(null);
+  const chipPalette =
+    useThemeContext().resolvedTheme === 'dark'
+      ? CHIP_PALETTE.dark
+      : CHIP_PALETTE.light;
 
   const isLoggedIn = Boolean(auth?.user);
   const { data } = useGetUserLeaguesQuery({ skip: !isLoggedIn });
@@ -196,10 +222,13 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
 
   const chipStyle: React.CSSProperties = {
     ...CHIP_STYLES,
+    border: `1px solid ${chipPalette.border}`,
+    background: chipPalette.background,
+    color: chipPalette.text,
     ...(isOpen
       ? {
-          borderColor: withAlpha(BRAND_GOLD, 0.4),
-          background: withAlpha(BRAND_GOLD, 0.08),
+          borderColor: chipPalette.openBorder,
+          background: chipPalette.openBackground,
         }
       : {}),
     ...(draftLive
@@ -270,7 +299,7 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
               fontSize: 9,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
-              color: draftLive ? BRAND_SEAM_RED : TEXT_MUTED,
+              color: draftLive ? BRAND_SEAM_RED : chipPalette.muted,
               lineHeight: 1,
               display: 'flex',
               alignItems: 'center',
@@ -300,7 +329,7 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
               fontFamily: FONT_DISPLAY,
               fontWeight: 700,
               fontSize: 13,
-              color: TEXT_PRIMARY,
+              color: chipPalette.text,
               letterSpacing: '0.02em',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
@@ -312,7 +341,7 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
           </span>
         </span>
 
-        <ChevronDown size={11} color={TEXT_MUTED} />
+        <ChevronDown size={11} color={chipPalette.muted} />
       </button>
 
       {/* Dropdown */}

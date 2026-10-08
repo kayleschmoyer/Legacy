@@ -6,7 +6,15 @@
  * plus off-season events (signings, trades) from the on_this_day_events table.
  */
 import React, { useMemo, useState } from 'react';
-import { Separator, Spinner, styled, Text, XStack, YStack } from 'tamagui';
+import {
+  Separator,
+  Spinner,
+  styled,
+  Text,
+  useThemeName,
+  XStack,
+  YStack,
+} from 'tamagui';
 import { ArrowLeftRight } from '@tamagui/lucide-icons/icons/ArrowLeftRight';
 import { Calendar } from '@tamagui/lucide-icons/icons/Calendar';
 import { ChevronRight } from '@tamagui/lucide-icons/icons/ChevronRight';
@@ -21,6 +29,11 @@ import {
   useGetOnThisDayEventsQuery,
   useGetOnThisDayQuery,
 } from '@legacy-sports/graphql';
+import {
+  colors,
+  goldTextLight,
+  lightSurface,
+} from '@legacy-sports/design-tokens';
 import {
   BG_DARK,
   BRAND_GOLD,
@@ -78,6 +91,76 @@ const StatBadge = styled(XStack, {
   borderWidth: 1,
   borderColor: '$glassBorder',
 });
+
+// ─── Theme palette ───────────────────────────────────────────────────────────
+
+/**
+ * Per-theme colours for the hand-built gradients and accent strings below
+ * (LS-10697). Dark keeps the original values verbatim so the dark card is
+ * unchanged; light swaps the fixed dark-navy surfaces for the light panel
+ * tokens and moves gold/red text onto shades that clear AA on them.
+ */
+interface FeedPalette {
+  /** Raw container fill; null uses the `$surfacePanel` token instead. */
+  containerBackground: string | null;
+  /** Border token override; undefined keeps FeedContainer's `$glassBorder`. */
+  containerBorder: string | undefined;
+  iconBase: string;
+  headerTile: string;
+  headerIcon: string;
+  goldIcon: string;
+  goldText: string;
+  redText: string;
+  chevron: string;
+  bandIcon: string;
+  bandText: string;
+  bandBackground: string;
+  bandBorder: string;
+  separator: string;
+}
+
+const LIGHT_GOLD_ICON = colors.light.brandGoldOverride.goldDark;
+
+const FEED_PALETTE: Record<'dark' | 'light', FeedPalette> = {
+  dark: {
+    containerBackground: BG_DARK,
+    containerBorder: undefined,
+    iconBase: withAlpha(BG_DARK, 0.6),
+    headerTile: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY_LIGHT, 0.5)}, ${withAlpha(BRAND_GOLD, 0.2)})`,
+    headerIcon: BRAND_GOLD_LIGHT,
+    goldIcon: BRAND_GOLD,
+    goldText: BRAND_GOLD_LIGHT,
+    redText: BRAND_SEAM_RED_LIGHT,
+    chevron: withAlpha(BRAND_GOLD, 0.5),
+    bandIcon: withAlpha(BRAND_GOLD, 0.7),
+    bandText: withAlpha(BRAND_GOLD_LIGHT, 0.8),
+    bandBackground: withAlpha(BRAND_NAVY, 0.3),
+    bandBorder: withAlpha(BRAND_NAVY, 0.5),
+    separator: withAlpha(BRAND_NAVY, 0.4),
+  },
+  light: {
+    containerBackground: null,
+    containerBorder: '$surfacePanelBorder',
+    iconBase: lightSurface.surfaceCard,
+    headerTile: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY, 0.1)}, ${withAlpha(BRAND_GOLD, 0.2)})`,
+    headerIcon: LIGHT_GOLD_ICON,
+    goldIcon: LIGHT_GOLD_ICON,
+    goldText: goldTextLight.goldText,
+    redText: BRAND_SEAM_RED,
+    chevron: LIGHT_GOLD_ICON,
+    bandIcon: LIGHT_GOLD_ICON,
+    bandText: goldTextLight.goldText,
+    bandBackground: withAlpha(BRAND_NAVY, 0.06),
+    bandBorder: '$outlineSubtle',
+    separator: '$outlineSubtle',
+  },
+};
+
+function useFeedPalette(): FeedPalette {
+  return useThemeName().includes('dark')
+    ? FEED_PALETTE.dark
+    : FEED_PALETTE.light;
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -231,8 +314,9 @@ interface EntryIconProps {
 }
 
 function EntryIcon({ type }: EntryIconProps) {
+  const palette = useFeedPalette();
   const isBatting = type === 'batting';
-  const color = isBatting ? BRAND_GOLD : BRAND_SEAM_RED_LIGHT;
+  const color = isBatting ? palette.goldIcon : palette.redText;
   return (
     <YStack
       width={36}
@@ -243,8 +327,8 @@ function EntryIcon({ type }: EntryIconProps) {
       flexShrink={0}
       style={{
         background: isBatting
-          ? `radial-gradient(circle, ${withAlpha(BRAND_GOLD, 0.18)}, ${withAlpha(BG_DARK, 0.6)})`
-          : `radial-gradient(circle, ${withAlpha(BRAND_SEAM_RED, 0.2)}, ${withAlpha(BG_DARK, 0.6)})`,
+          ? `radial-gradient(circle, ${withAlpha(BRAND_GOLD, 0.18)}, ${palette.iconBase})`
+          : `radial-gradient(circle, ${withAlpha(BRAND_SEAM_RED, 0.2)}, ${palette.iconBase})`,
         border: `1px solid ${withAlpha(color, 0.35)}`,
       }}
     >
@@ -279,6 +363,7 @@ export function OnThisDayFeed({
   condensed = false,
 }: OnThisDayFeedProps = {}): React.JSX.Element {
   const [expanded, setExpanded] = useState(false);
+  const palette = useFeedPalette();
   const isCondensed = condensed && !expanded;
   const today = useMemo(() => new Date(), []);
   const month = today.getMonth() + 1; // 1-indexed
@@ -327,12 +412,21 @@ export function OnThisDayFeed({
   const dateLabel = `${MONTH_NAMES[month - 1]} ${ordinal(day)}`;
 
   const containerStyle: React.CSSProperties = {
-    background: BG_DARK,
+    ...(palette.containerBackground
+      ? { background: palette.containerBackground }
+      : {}),
     borderTop: `2px solid ${withAlpha(BRAND_GOLD, 0.55)}`,
   };
 
   return (
-    <FeedContainer style={containerStyle}>
+    <FeedContainer
+      testID="on-this-day-feed"
+      style={containerStyle}
+      backgroundColor={
+        palette.containerBackground ? undefined : '$surfacePanel'
+      }
+      borderColor={palette.containerBorder}
+    >
       {/* Header */}
       <FeedHeader>
         <YStack
@@ -342,11 +436,11 @@ export function OnThisDayFeed({
           alignItems="center"
           justifyContent="center"
           style={{
-            background: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY_LIGHT, 0.5)}, ${withAlpha(BRAND_GOLD, 0.2)})`,
+            background: palette.headerTile,
             border: `1px solid ${withAlpha(BRAND_GOLD, 0.3)}`,
           }}
         >
-          <Calendar size={20} color={BRAND_GOLD_LIGHT} />
+          <Calendar size={20} color={palette.headerIcon} />
         </YStack>
 
         <YStack flex={1} gap="$0.5">
@@ -409,9 +503,7 @@ export function OnThisDayFeed({
             const summary = isBatting
               ? battingSummary(entry)
               : pitchingSummary(entry);
-            const accentColor = isBatting
-              ? BRAND_GOLD_LIGHT
-              : BRAND_SEAM_RED_LIGHT;
+            const accentColor = isBatting ? palette.goldText : palette.redText;
             const playerName =
               `${entry.firstName ?? ''} ${entry.lastName ?? ''}`.trim();
             const season = entry.season ?? '';
@@ -422,7 +514,7 @@ export function OnThisDayFeed({
               >
                 {idx > 0 && (
                   <Separator
-                    backgroundColor={withAlpha(BRAND_NAVY, 0.4)}
+                    backgroundColor={palette.separator}
                     marginHorizontal="$4"
                   />
                 )}
@@ -474,7 +566,7 @@ export function OnThisDayFeed({
 
                   <ChevronRight
                     size={16}
-                    color={withAlpha(BRAND_GOLD, 0.5)}
+                    color={palette.chevron}
                     flexShrink={0}
                   />
                 </EntryRow>
@@ -493,15 +585,11 @@ export function OnThisDayFeed({
             paddingHorizontal="$5"
             paddingVertical="$2"
             borderTopWidth={displayedEntries.length > 0 ? 1 : 0}
-            borderTopColor={withAlpha(BRAND_NAVY, 0.5)}
-            style={{ background: withAlpha(BRAND_NAVY, 0.3) }}
+            borderTopColor={palette.bandBorder}
+            style={{ background: palette.bandBackground }}
           >
-            <ArrowLeftRight size={12} color={withAlpha(BRAND_GOLD, 0.7)} />
-            <Text
-              fontSize="$2"
-              fontWeight="600"
-              color={withAlpha(BRAND_GOLD_LIGHT, 0.8)}
-            >
+            <ArrowLeftRight size={12} color={palette.bandIcon} />
+            <Text fontSize="$2" fontWeight="600" color={palette.bandText}>
               Transactions &amp; Signings
             </Text>
           </XStack>
@@ -509,9 +597,7 @@ export function OnThisDayFeed({
           {displayedEvents.map((event, idx) => {
             const label = eventTypeLabel(event.eventType ?? '');
             const accentColor =
-              event.eventType === 'TR'
-                ? BRAND_SEAM_RED_LIGHT
-                : BRAND_GOLD_LIGHT;
+              event.eventType === 'TR' ? palette.redText : palette.goldText;
             const displayName =
               event.playerName ||
               extractPlayerNameFromDescription(event.description ?? '');
@@ -535,7 +621,7 @@ export function OnThisDayFeed({
               <React.Fragment key={event.id ?? idx}>
                 {idx > 0 && (
                   <Separator
-                    backgroundColor={withAlpha(BRAND_NAVY, 0.4)}
+                    backgroundColor={palette.separator}
                     marginHorizontal="$4"
                   />
                 )}
@@ -553,7 +639,7 @@ export function OnThisDayFeed({
                     justifyContent="center"
                     flexShrink={0}
                     style={{
-                      background: `radial-gradient(circle, ${withAlpha(accentColor, 0.18)}, ${withAlpha(BG_DARK, 0.6)})`,
+                      background: `radial-gradient(circle, ${withAlpha(accentColor, 0.18)}, ${palette.iconBase})`,
                       border: `1px solid ${withAlpha(accentColor, 0.35)}`,
                     }}
                   >

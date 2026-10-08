@@ -4,6 +4,8 @@ import {
   darkSurface,
   darkText,
   DERIVED_TEXT_CONTRAST_TARGET,
+  goldTextDark,
+  goldTextLight,
   ledger,
   lightenForContrast,
   lightSurface,
@@ -190,4 +192,42 @@ describe('light-theme status colours (LS-10852)', () => {
       ).toBeGreaterThanOrEqual(AA);
     },
   );
+});
+
+describe('gold text tokens (LS-10697)', () => {
+  const textSurfaces = [
+    'bg',
+    'surfaceSubtle',
+    'surfacePanel',
+    'surfaceCard',
+    'surfaceRaised',
+  ] as const;
+  const themes = [
+    { theme: 'dark', gold: goldTextDark, surface: darkSurface },
+    { theme: 'light', gold: goldTextLight, surface: lightSurface },
+  ] as const;
+
+  const cases = themes.flatMap(({ theme, gold, surface }) =>
+    textSurfaces.map((key) => [theme, key, gold, surface[key]] as const),
+  );
+
+  it.each(cases)(
+    '%s goldText clears AA on %s',
+    (_theme, _key, gold, surface) => {
+      expect(contrastRatio(gold.goldText, surface)).toBeGreaterThanOrEqual(4.5);
+    },
+  );
+
+  it.each(themes)(
+    '$theme wordmarkGold clears the 3:1 large-text bar on the page background',
+    ({ gold, surface }) => {
+      expect(
+        contrastRatio(gold.wordmarkGold, surface.bg),
+      ).toBeGreaterThanOrEqual(3);
+    },
+  );
+
+  it('keeps the dark-theme wordmark on the existing $brandGoldLight value', () => {
+    expect(goldTextDark.wordmarkGold).toBe('#D4BB78');
+  });
 });
