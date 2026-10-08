@@ -754,6 +754,7 @@ export async function getMatchupPlayerGameStats(
       playerId: Schema.matchupPlayers.playerId,
       season: Schema.leagueWeekPlayerSeasons.season,
       matchupId: Schema.matchupPlayers.matchupId,
+      positionId: Schema.matchupPlayers.positionId,
     })
     .from(Schema.matchupPlayers)
     .leftJoin(
@@ -802,6 +803,11 @@ export async function getMatchupPlayerGameStats(
 
   for (const mp of matchupPlayersResult) {
     if (mp.season === null) continue; // Skip if no season selected
+    // Bench players do not score (LS-10681). matchup_players holds the whole
+    // roster and game selection picks games for bench rows too, so without
+    // this skip the persisted score summed starters AND bench while every
+    // client view (and the roster's "Starters total") counts starters only.
+    if (mp.positionId == null) continue;
     matchupPlayerMap.set(mp.matchupPlayerId, {
       playerId: mp.playerId,
       season: mp.season,

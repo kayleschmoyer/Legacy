@@ -34,6 +34,8 @@ const PLAYER_ID = 100;
 const MATCHUP_PLAYER_ID = 7;
 const SEASON = 2021;
 const GAME_IDENTIFIER = 'ANA202104150';
+/** The player starts; bench rows (null positionId) score on neither path (LS-10681). */
+const STARTER_POSITION_ID = 3;
 
 /** The same real game, selected into three of the matchup's slots. */
 const SLOT_COUNT = 3;
@@ -184,6 +186,7 @@ function createPersistedScoreDb() {
         playerId: PLAYER_ID,
         season: SEASON,
         matchupId: MATCHUP_ID,
+        positionId: STARTER_POSITION_ID,
       },
     ],
     SLOT_ROWS,
@@ -234,6 +237,7 @@ function createStandingsDb() {
           matchupId: MATCHUP_ID,
           teamId: TEAM1_ID,
           playerId: PLAYER_ID,
+          positionId: STARTER_POSITION_ID,
         },
       ],
       SLOT_ROWS,

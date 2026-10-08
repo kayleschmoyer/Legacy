@@ -1466,7 +1466,9 @@ export function RosterBoard<
       right={
         starterStats != null ? (
           <Text fontFamily={FONT_MONO} fontSize="$2" color={TEXT_TERTIARY}>
-            Total:{' '}
+            {/* Sums every starter, pitchers included — not just this
+                card's hitters — so name it for what it sums (LS-10681). */}
+            {isFootball ? 'Total' : 'Starters total'}:{' '}
             <Text color={WHITE} fontWeight="700" fontSize="$4">
               {starterStats.total.toFixed(1)}
             </Text>{' '}

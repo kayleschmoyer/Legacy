@@ -145,7 +145,12 @@ interface MockMatchupPlayer {
   matchupId: number;
   playerId: number;
   teamId: number;
+  /** Lineup slot; null for a bench player, who does not score (LS-10681). */
+  positionId: number | null;
 }
+
+/** Any lineup slot — the fixtures only need "a starter", not a specific one. */
+const STARTER_POSITION_ID = 1;
 
 interface MockMatchupPlayerGame {
   id: number;
@@ -198,6 +203,7 @@ function buildStandingsGameData(matchups: SimpleMatchup[]) {
       matchupId: m.id,
       playerId: t1PlayerId,
       teamId: m.team1Id,
+      positionId: STARTER_POSITION_ID,
     });
     const t1GameId = `G${String(m.id).padStart(3, '0')}_T1`;
     matchupPlayerGames.push({
@@ -227,6 +233,7 @@ function buildStandingsGameData(matchups: SimpleMatchup[]) {
       matchupId: m.id,
       playerId: t2PlayerId,
       teamId: m.team2Id,
+      positionId: STARTER_POSITION_ID,
     });
     const t2GameId = `G${String(m.id).padStart(3, '0')}_T2`;
     matchupPlayerGames.push({
@@ -586,6 +593,73 @@ describe('Matchup History', () => {
   });
 
   describe('calculateStandings', () => {
+    it('does not count bench players toward points or the result (LS-10681)', async () => {
+      const weekedMatchups = [
+        {
+          id: 1,
+          leagueId: 1,
+          weekNumber: 1,
+          team1Id: 1,
+          team2Id: 2,
+          team1Score: 50,
+          team2Score: 60,
+          status: 'completed',
+        },
+      ];
+      const data = buildStandingsGameData(weekedMatchups);
+      // A bench player on team 1 whose selected game would flip the result
+      // if it counted (50 + 40 > 60).
+      data.matchupPlayers.push({
+        id: 99,
+        matchupId: 1,
+        playerId: 199,
+        teamId: 1,
+        positionId: null,
+      });
+      data.matchupPlayerGames.push({
+        id: 99,
+        matchupPlayerId: 99,
+        gameNum: 1,
+        gameIdentifier: 'BENCH_GAME',
+      });
+      data.gameBatting.push({
+        playerId: 199,
+        season: MOCK_SEASON,
+        gameNum: 1,
+        gameIdentifier: 'BENCH_GAME',
+        h: 40,
+      });
+      data.playerSeasons.push({
+        weekNumber: 1,
+        playerId: 199,
+        season: MOCK_SEASON,
+      });
+
+      mockDb = createMockDbWithMultipleQueries(
+        [
+          [
+            { id: 1, name: 'Team A' },
+            { id: 2, name: 'Team B' },
+          ],
+          [{ medianGameEnabled: false }],
+          weekedMatchups,
+          data.matchupPlayers,
+          data.matchupPlayerGames,
+          data.playerSeasons,
+        ],
+        [data.gameBatting, [], []],
+      );
+
+      const standings = await calculateStandings(mockDb, 1);
+      const teamA = standings.find((s) => s.teamId === 1);
+      const teamB = standings.find((s) => s.teamId === 2);
+
+      expect(teamA?.pointsFor).toBe(50);
+      expect(teamB?.pointsAgainst).toBe(50);
+      expect(teamA?.losses).toBe(1);
+      expect(teamB?.wins).toBe(1);
+    });
+
     it('should calculate standings correctly for multiple teams', async () => {
       const mockTeams = [
         { id: 1, name: 'Team A' },
@@ -1465,8 +1539,20 @@ describe('Matchup History', () => {
       },
     ];
     const twoPlayers: MockMatchupPlayer[] = [
-      { id: 1, matchupId: 1, playerId: 100, teamId: 1 },
-      { id: 2, matchupId: 1, playerId: 200, teamId: 2 },
+      {
+        id: 1,
+        matchupId: 1,
+        playerId: 100,
+        teamId: 1,
+        positionId: STARTER_POSITION_ID,
+      },
+      {
+        id: 2,
+        matchupId: 1,
+        playerId: 200,
+        teamId: 2,
+        positionId: STARTER_POSITION_ID,
+      },
     ];
 
     it("scores the matchup's own season when one game_identifier spans two seasons", async () => {
@@ -1542,10 +1628,34 @@ describe('Matchup History', () => {
           },
         ],
         [
-          { id: 1, matchupId: 1, playerId: 100, teamId: 1 },
-          { id: 2, matchupId: 1, playerId: 200, teamId: 2 },
-          { id: 3, matchupId: 2, playerId: 100, teamId: 1 },
-          { id: 4, matchupId: 2, playerId: 200, teamId: 2 },
+          {
+            id: 1,
+            matchupId: 1,
+            playerId: 100,
+            teamId: 1,
+            positionId: STARTER_POSITION_ID,
+          },
+          {
+            id: 2,
+            matchupId: 1,
+            playerId: 200,
+            teamId: 2,
+            positionId: STARTER_POSITION_ID,
+          },
+          {
+            id: 3,
+            matchupId: 2,
+            playerId: 100,
+            teamId: 1,
+            positionId: STARTER_POSITION_ID,
+          },
+          {
+            id: 4,
+            matchupId: 2,
+            playerId: 200,
+            teamId: 2,
+            positionId: STARTER_POSITION_ID,
+          },
         ],
         [
           { id: 1, matchupPlayerId: 1, gameIdentifier: 'DUP1' },

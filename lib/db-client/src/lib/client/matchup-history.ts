@@ -711,6 +711,9 @@ async function _computeStandings(
     for (const mpId of teamMpIds) {
       const mp = mpLookup.get(mpId);
       if (!mp) continue;
+      // Bench players do not score — same rule as getMatchupPlayerGameStats,
+      // the persisted-score path this must agree with (LS-10681).
+      if (mp.positionId == null) continue;
 
       // No league_week_player_seasons row means no season was selected for
       // this player in this week, so none of their stat rows can be attributed

@@ -58,6 +58,8 @@ const TEAM1_ID = 1;
 const MATCHUP_PLAYER_ID = 7;
 const GAME_IDENTIFIER = 'ANA202104150';
 const SEASON = 2021;
+/** A lineup slot (league_positions.id); bench rows carry null. */
+const STARTER_POSITION_ID = 3;
 
 const matchupInfoResult = [{ leagueId: LEAGUE_ID, weekNumber: WEEK_NUMBER }];
 const matchupPlayersResult = [
@@ -66,6 +68,7 @@ const matchupPlayersResult = [
     playerId: PLAYER_ID,
     season: SEASON,
     matchupId: MATCHUP_ID,
+    positionId: STARTER_POSITION_ID,
   },
 ];
 const gamesResult = [
@@ -351,12 +354,14 @@ describe('getMatchupPlayerGameStats — repeated game selections (LS-9602)', () 
           playerId: PLAYER_ID,
           season: SEASON,
           matchupId: MATCHUP_ID,
+          positionId: STARTER_POSITION_ID,
         },
         {
           matchupPlayerId: secondMatchupPlayerId,
           playerId: PLAYER_ID,
           season: secondSeason,
           matchupId: MATCHUP_ID,
+          positionId: STARTER_POSITION_ID,
         },
       ],
       [
@@ -386,5 +391,54 @@ describe('getMatchupPlayerGameStats — repeated game selections (LS-9602)', () 
     expect(result).toHaveLength(2);
     // Each matchup_player row keeps its own resolved season.
     expect(result.map((r) => r.season).sort()).toEqual([secondSeason, SEASON]);
+  });
+});
+
+/**
+ * LS-10681: matchup_players holds the whole roster (bench rows have a null
+ * positionId) and game selection picks games for every row, so the persisted
+ * score summed starters AND bench — roughly doubling it against every client
+ * view, which counts starters only.
+ */
+describe('getMatchupPlayerGameStats — bench players do not score (LS-10681)', () => {
+  const BENCH_MATCHUP_PLAYER_ID = MATCHUP_PLAYER_ID + 1;
+  const BENCH_PLAYER_ID = PLAYER_ID + 1;
+  const BENCH_GAME_ID = 'BOS202105200';
+
+  it('returns stat rows for starters only, skipping a bench player with selected games', async () => {
+    const db = createMockDb([
+      matchupInfoResult,
+      [
+        ...matchupPlayersResult,
+        {
+          matchupPlayerId: BENCH_MATCHUP_PLAYER_ID,
+          playerId: BENCH_PLAYER_ID,
+          season: SEASON,
+          matchupId: MATCHUP_ID,
+          positionId: null,
+        },
+      ],
+      [
+        ...gamesResult,
+        {
+          matchupPlayerId: BENCH_MATCHUP_PLAYER_ID,
+          gameIdentifier: BENCH_GAME_ID,
+        },
+      ],
+      matchupResult,
+      [
+        ...teamMembersResult,
+        { teamId: TEAM1_ID, playerId: BENCH_PLAYER_ID, leagueId: LEAGUE_ID },
+      ],
+      [battingRow], // starter's game only — the bench game is never fetched
+      [],
+      [],
+    ]);
+
+    const result = await getMatchupPlayerGameStats(db, MATCHUP_ID);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].playerId).toBe(PLAYER_ID);
+    expect(result.some((r) => r.playerId === BENCH_PLAYER_ID)).toBe(false);
   });
 });

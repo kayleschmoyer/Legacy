@@ -363,7 +363,33 @@ describe('RosterBoard', () => {
     // Bench row shows the projection with a bare "proj" label.
     expect(screen.getByText('23.8')).toBeTruthy();
     // Starters card head shows computed totals.
-    expect(screen.getByText(/Total:/)).toBeTruthy();
+    expect(screen.getByText(/Starters total:/)).toBeTruthy();
+  });
+
+  it('labels the baseball card-head total as a starters total because it includes starting pitchers (LS-10681)', () => {
+    render(
+      <RosterBoard
+        positions={POSITIONS}
+        teamPlayers={[
+          mk(101, 'Mike', 'Johnson', ['C'], 1), // starting hitter
+          mk(103, 'Nolan', 'Ryan', ['SP'], 3), // starting pitcher
+          mk(102, 'Wade', 'Boggs', ['1B'], null), // bench — not counted
+        ]}
+        onPlayerAssign={noop}
+        onPlayerRemove={noop}
+        getPlayerStats={(p) =>
+          p.id === 101
+            ? { actual: 10, projected: 12 }
+            : p.id === 103
+              ? { actual: 5.5, projected: 7 }
+              : { actual: 100, projected: 100 }
+        }
+      />,
+    );
+    // Hitter (10) + starting pitcher (5.5); the bench player's 100 is excluded.
+    expect(screen.getByText('15.5')).toBeTruthy();
+    expect(screen.getByText(/Starters total:/)).toBeTruthy();
+    expect(screen.queryByText(/^Total:/)).toBeNull();
   });
 
   it('quick-swap menu assigns an eligible bench player to an empty slot', () => {
