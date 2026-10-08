@@ -59,6 +59,10 @@ jest.mock('@legacy-sports/db-client', () =>
 );
 
 // Stub out the Stripe client loader (subscriptions.ts imports it at the top).
+jest.mock('@legacy-sports/rollbar', () => ({
+  captureWarning: jest.fn(),
+}));
+
 jest.mock('../server/stripe', () => ({
   getStripeClient: jest.fn(),
 }));
@@ -84,6 +88,7 @@ jest.mock('drizzle-orm', () =>
 );
 
 import { isObjectType } from 'graphql';
+import { captureWarning } from '@legacy-sports/rollbar';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import type { SQL } from 'drizzle-orm';
 
@@ -570,28 +575,47 @@ describe('fetchStripePrices', () => {
     expect(retrieve).toHaveBeenCalledTimes(2);
   });
 
-  it('clears cache on failure so the next call retries', async () => {
-    // Promise.all calls retrieve for both price IDs simultaneously on each attempt,
-    // so 4 Once values are needed: [monthly-fail, annual-fail, monthly-ok, annual-ok].
-    const retrieve = jest
-      .fn()
-      .mockRejectedValueOnce(new Error('Stripe timeout')) // monthly, attempt 1 → rejects Promise.all
-      .mockResolvedValueOnce({ unit_amount: 0 }) // annual, attempt 1 → consumed but discarded
-      .mockResolvedValueOnce({ unit_amount: 999 }) // monthly, attempt 2
-      .mockResolvedValueOnce({ unit_amount: 8999 }); // annual, attempt 2
-    const client = {
-      prices: { retrieve },
-    } as unknown as import('stripe').default;
-    (getStripeClient as jest.Mock).mockResolvedValue(client);
+  describe('negative cache on failure (LS-7197)', () => {
+    const failingClient = (retrieve: jest.Mock) =>
+      (getStripeClient as jest.Mock).mockResolvedValue({
+        prices: { retrieve },
+      });
 
-    await expect(fetchStripePrices()).rejects.toThrow('Stripe timeout');
+    afterEach(() => {
+      jest.useRealTimers();
+    });
 
-    // Allow the .catch handler to clear the cache.
-    await Promise.resolve();
+    it('does not re-hit Stripe within the 30s failure window and warns once', async () => {
+      jest.useFakeTimers({ now: 1_000_000 });
+      const retrieve = jest.fn().mockRejectedValue(new Error('Stripe timeout'));
+      failingClient(retrieve);
 
-    const result = await fetchStripePrices();
-    expect(result.monthlyPriceCents).toBe(999);
-    expect(result.annualTotalCents).toBe(8999);
+      await expect(fetchStripePrices()).rejects.toThrow('Stripe timeout');
+      jest.setSystemTime(1_000_000 + 29_000);
+      await expect(fetchStripePrices()).rejects.toThrow('Stripe timeout');
+
+      // monthly + annual retrieve on the single attempt only
+      expect(retrieve).toHaveBeenCalledTimes(2);
+      expect(captureWarning).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries after the failure window elapses', async () => {
+      jest.useFakeTimers({ now: 1_000_000 });
+      const retrieve = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('Stripe timeout')) // monthly, attempt 1
+        .mockResolvedValueOnce({ unit_amount: 0 }) // annual, attempt 1 (discarded)
+        .mockResolvedValueOnce({ unit_amount: 999, currency: 'usd' })
+        .mockResolvedValueOnce({ unit_amount: 8999, currency: 'usd' });
+      failingClient(retrieve);
+
+      await expect(fetchStripePrices()).rejects.toThrow('Stripe timeout');
+      jest.setSystemTime(1_000_000 + 31_000);
+
+      const result = await fetchStripePrices();
+      expect(result.monthlyPriceCents).toBe(999);
+      expect(result.annualTotalCents).toBe(8999);
+    });
   });
 
   it('throws when price IDs are not configured', async () => {

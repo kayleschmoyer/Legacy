@@ -479,6 +479,12 @@ type StripePriceResult = {
 let cachedPrices: Promise<StripePriceResult> | null = null;
 let cachedPricesExpiresAt = 0;
 const PRICE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+/**
+ * Negative-cache window (LS-7197): after a failed fetch the rejected promise is
+ * kept for this long so a Stripe outage doesn't make every cold lambda call
+ * wait out the SDK timeout again.
+ */
+const PRICE_FAILURE_CACHE_TTL_MS = 30 * 1000; // 30 seconds
 
 export async function fetchStripePrices(): Promise<StripePriceResult> {
   const now = Date.now();
@@ -491,9 +497,15 @@ export async function fetchStripePrices(): Promise<StripePriceResult> {
   cachedPricesExpiresAt = now + PRICE_CACHE_TTL_MS;
   const promise = doFetchStripePrices();
   cachedPrices = promise;
-  promise.catch(() => {
-    cachedPrices = null;
-    cachedPricesExpiresAt = 0;
+  promise.catch((err: unknown) => {
+    // Only the fetch that is still the cached one shortens the window, so a
+    // stale failure can't clobber a newer in-flight/successful fetch.
+    if (cachedPrices === promise) {
+      cachedPricesExpiresAt = Date.now() + PRICE_FAILURE_CACHE_TTL_MS;
+    }
+    captureWarning(err instanceof Error ? err : new Error(String(err)), {
+      context: 'fetchStripePrices',
+    });
   });
   return promise;
 }
