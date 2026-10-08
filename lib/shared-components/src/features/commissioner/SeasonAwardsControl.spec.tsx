@@ -49,10 +49,13 @@ describe('SeasonAwardsControl — LS-8789 native-safe season picker', () => {
     render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
 
     // The season picker is the only <select> in the tree (award recipients
-    // use a text search input, not a dropdown) — it comes from the shared
+    // use a text search combobox, not a dropdown) — it comes from the shared
     // Select component's Tamagui-backed mock, not a literal <select> in
     // this component's source.
-    const seasonSelect = screen.getByRole('combobox');
+    const seasonSelect = screen.getByRole('combobox', {
+      name: /select season/i,
+    });
+    expect(seasonSelect.tagName).toBe('SELECT');
     expect(seasonSelect).toBeTruthy();
     expect(screen.getByRole('option', { name: '2024 Season' })).toBeTruthy();
   });
@@ -64,7 +67,7 @@ describe('SeasonAwardsControl — LS-8789 native-safe season picker', () => {
 
     render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
 
-    fireEvent.change(screen.getByRole('combobox'), {
+    fireEvent.change(screen.getByRole('combobox', { name: /select season/i }), {
       target: { value: '2023' },
     });
 
@@ -274,5 +277,195 @@ describe('SeasonAwardsControl — LS-10825 clearing the recipient', () => {
       },
     });
     expect(await within(row).findByText('Saved!')).toBeTruthy();
+  });
+});
+
+describe('SeasonAwardsControl — LS-10799 keyboard-selectable recipient search', () => {
+  const graphql = jest.requireMock<typeof import('@legacy-sports/graphql')>(
+    '@legacy-sports/graphql',
+  );
+
+  beforeEach(() => {
+    jest.mocked(graphql.useGetPlayersWithStatsQuery).mockImplementation(
+      () =>
+        ({
+          data: {
+            players: [
+              { id: 21, firstName: 'Clayton', lastName: 'Kershaw' },
+              { id: 22, firstName: 'Clay', lastName: 'Holmes' },
+            ],
+          },
+          loading: false,
+        }) as unknown as ReturnType<typeof graphql.useGetPlayersWithStatsQuery>,
+    );
+  });
+
+  afterEach(() => {
+    jest.mocked(graphql.useGetPlayersWithStatsQuery).mockImplementation(
+      () =>
+        ({
+          data: { playersWithStats: [] },
+          loading: false,
+        }) as unknown as ReturnType<typeof graphql.useGetPlayersWithStatsQuery>,
+    );
+  });
+
+  function cyYoungRow() {
+    const row = screen.getByTestId('award-row-cy_young');
+    const input = within(row).getByRole('combobox', {
+      name: 'Search for award recipient',
+    });
+    const assign = () =>
+      within(row).getByRole('button', { name: /assign award/i });
+    return { row, input, assign };
+  }
+
+  // react-native-web's TextInput delivers every key (arrows included) to
+  // onKeyPress from its keydown listener. The jest Tamagui Input mock forwards
+  // onKeyPress as a DOM keypress handler, which React only dispatches for a
+  // printable charCode (>= 32) — so give every key one.
+  function press(input: HTMLElement, key: string) {
+    fireEvent.keyPress(input, { key, charCode: 32 });
+  }
+
+  function search(input: HTMLElement, text: string) {
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: text } });
+  }
+
+  it('selects the recipient with ArrowDown then Enter and enables Assign Award (AC1)', () => {
+    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    const { row, input, assign } = cyYoungRow();
+
+    search(input, 'Clay');
+    expect(assign()).toBeDisabled();
+
+    press(input, 'ArrowDown');
+    press(input, 'Enter');
+
+    expect(assign()).toBeEnabled();
+    expect(input).toHaveValue('Clayton Kershaw');
+    expect(within(row).queryByRole('listbox')).toBeNull();
+    expect(input).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('moves the active option with ArrowDown/ArrowUp before Enter', () => {
+    const upsert = jest.fn<Promise<object>, [unknown]>(() =>
+      Promise.resolve({}),
+    );
+    jest
+      .mocked(graphql.useUpsertLeagueSeasonAwardMutation)
+      .mockImplementation(
+        () =>
+          [upsert] as unknown as ReturnType<
+            typeof graphql.useUpsertLeagueSeasonAwardMutation
+          >,
+      );
+    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    const { input, assign } = cyYoungRow();
+
+    search(input, 'Clay');
+    press(input, 'ArrowDown');
+    press(input, 'ArrowDown');
+    press(input, 'ArrowDown'); // clamps at the last option
+    press(input, 'ArrowUp');
+    press(input, 'ArrowDown');
+    press(input, 'Enter');
+
+    expect(input).toHaveValue('Clay Holmes');
+    fireEvent.click(assign());
+    expect(upsert).toHaveBeenCalledWith({
+      variables: {
+        input: {
+          leagueId: 42,
+          season: 2024,
+          playerId: 22,
+          awardType: 'cy_young',
+          notes: undefined,
+        },
+      },
+    });
+  });
+
+  it('exposes combobox/listbox/option semantics and the active option (AC2)', () => {
+    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    const { row, input } = cyYoungRow();
+
+    expect(input).toHaveAttribute('aria-expanded', 'false');
+    expect(input).toHaveAttribute('aria-autocomplete', 'list');
+    expect(input).not.toHaveAttribute('aria-activedescendant');
+
+    search(input, 'Clay');
+
+    const listbox = within(row).getByRole('listbox', {
+      name: 'Player suggestions',
+    });
+    expect(input).toHaveAttribute('aria-expanded', 'true');
+    expect(input).toHaveAttribute('aria-controls', listbox.id);
+
+    const options = within(listbox).getAllByRole('option');
+    expect(options.map((o) => o.getAttribute('aria-label'))).toEqual([
+      'Clayton Kershaw',
+      'Clay Holmes',
+    ]);
+    expect(
+      options.every((o) => o.getAttribute('aria-selected') === 'false'),
+    ).toBe(true);
+
+    press(input, 'ArrowDown');
+
+    const kershaw = within(listbox).getByRole('option', {
+      name: 'Clayton Kershaw',
+    });
+    expect(kershaw).toHaveAttribute('aria-selected', 'true');
+    expect(input).toHaveAttribute('aria-activedescendant', kershaw.id);
+  });
+
+  it('gives each award row its own listbox and option ids', () => {
+    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    const cy = cyYoungRow().input;
+    const mvp = within(screen.getByTestId('award-row-mvp')).getByRole(
+      'combobox',
+      { name: 'Search for award recipient' },
+    );
+
+    expect(cy.getAttribute('aria-controls')).toBeTruthy();
+    expect(cy.getAttribute('aria-controls')).not.toBe(
+      mvp.getAttribute('aria-controls'),
+    );
+  });
+
+  it('closes the suggestions on Escape and reopens them with ArrowDown', () => {
+    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    const { row, input, assign } = cyYoungRow();
+
+    search(input, 'Clay');
+    press(input, 'ArrowDown');
+    press(input, 'Escape');
+
+    expect(within(row).queryByRole('listbox')).toBeNull();
+    expect(input).toHaveAttribute('aria-expanded', 'false');
+    expect(input).not.toHaveAttribute('aria-activedescendant');
+
+    // Enter with the list closed must not pick the previously active option.
+    press(input, 'Enter');
+    expect(assign()).toBeDisabled();
+
+    press(input, 'ArrowDown');
+    expect(within(row).getByRole('listbox')).toBeTruthy();
+    expect(
+      within(row).getByRole('option', { name: 'Clayton Kershaw' }),
+    ).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('ignores Enter when no option is active', () => {
+    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    const { row, input, assign } = cyYoungRow();
+
+    search(input, 'Clay');
+    press(input, 'Enter');
+
+    expect(assign()).toBeDisabled();
+    expect(within(row).getByRole('listbox')).toBeTruthy();
   });
 });

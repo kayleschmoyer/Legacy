@@ -1,10 +1,12 @@
 import React, {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
 } from 'react';
+import type { ViewProps } from 'react-native';
 import {
   Button,
   Card,
@@ -91,6 +93,15 @@ interface PlayerSearchResult {
   lastName?: string | null;
 }
 
+// RN's Role type omits 'listbox' (a valid WAI-ARIA 1.2 role), so widen the
+// role prop for the suggestions list (same approach as PlayerComparison).
+const ListboxStack = YStack as React.ComponentType<
+  Omit<React.ComponentProps<typeof YStack>, 'role'> & {
+    role?: string;
+    nativeID?: ViewProps['nativeID'];
+  }
+>;
+
 function PlayerSearchInput({
   value,
   onChange,
@@ -103,14 +114,34 @@ function PlayerSearchInput({
 }) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const blurTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Every award row renders its own search, so ids must be unique per
+  // instance. `useId` returns colon-delimited ids; strip them so the value is
+  // also a valid CSS selector.
+  const baseId = `season-award-search-${useId().replace(/:/g, '')}`;
+  const listboxId = `${baseId}-listbox`;
+  const getOptionId = (i: number) => `${baseId}-opt-${i}`;
 
   const { data, loading } = useGetPlayersWithStatsQuery({
     variables: { search: query, limit: 8 },
     skip: query.trim().length < 2,
   });
 
-  const results = useMemo(() => data?.players ?? [], [data]);
+  const results = useMemo(
+    () =>
+      (data?.players ?? []).filter(
+        (p): p is typeof p & { id: number } => p.id != null,
+      ),
+    [data],
+  );
+
+  const showList = open && results.length > 0;
+
+  // A new search invalidates the highlighted option.
+  useEffect(() => {
+    setActiveIndex(-1);
+  }, [query]);
 
   const handleBlur = useCallback(() => {
     blurTimeout.current = setTimeout(() => setOpen(false), 150);
@@ -124,8 +155,53 @@ function PlayerSearchInput({
       // empty input while a recipient is still selected (LS-10825).
       setQuery(`${p.firstName ?? ''} ${p.lastName ?? ''}`.trim());
       setOpen(false);
+      setActiveIndex(-1);
     },
     [onChange],
+  );
+
+  // ARIA combobox keyboard support (LS-10799). react-native-web's TextInput
+  // stops keydown propagation but forwards every key to onKeyPress, with the
+  // DOM KeyboardEvent as nativeEvent, so the handler lives on the input itself
+  // (same convention as PlayerComparison's search). Focus never leaves the
+  // input, so the blur-close timer doesn't fire while navigating.
+  const handleKeyPress = useCallback(
+    (e: { nativeEvent: { key: string }; preventDefault: () => void }) => {
+      const { key } = e.nativeEvent;
+      if (key === 'Escape') {
+        if (!open) return;
+        e.preventDefault();
+        setOpen(false);
+        setActiveIndex(-1);
+        return;
+      }
+      if (key === 'ArrowDown' || key === 'ArrowUp') {
+        if (results.length === 0) return;
+        e.preventDefault();
+        if (!open) {
+          setOpen(true);
+          setActiveIndex(key === 'ArrowDown' ? 0 : results.length - 1);
+          return;
+        }
+        setActiveIndex((prev) =>
+          key === 'ArrowDown'
+            ? Math.min(prev + 1, results.length - 1)
+            : Math.max(prev - 1, -1),
+        );
+        return;
+      }
+      if (key === 'Enter') {
+        const p = showList && activeIndex >= 0 ? results[activeIndex] : null;
+        if (!p) return;
+        e.preventDefault();
+        handleSelect({
+          id: p.id,
+          firstName: p.firstName,
+          lastName: p.lastName,
+        });
+      }
+    },
+    [open, showList, results, activeIndex, handleSelect],
   );
 
   return (
@@ -155,8 +231,16 @@ function PlayerSearchInput({
           }}
           onFocus={() => setOpen(true)}
           onBlur={handleBlur}
+          onKeyPress={handleKeyPress}
           placeholder="Search for a player…"
+          role="combobox"
+          aria-haspopup="listbox"
+          aria-expanded={showList}
+          aria-controls={listboxId}
           aria-autocomplete="list"
+          aria-activedescendant={
+            showList && activeIndex >= 0 ? getOptionId(activeIndex) : undefined
+          }
           backgroundColor="transparent"
           borderWidth={0}
           color="$color"
@@ -168,8 +252,12 @@ function PlayerSearchInput({
         {loading && <Spinner size="small" color={BRAND_NAVY_LIGHT} />}
       </XStack>
 
-      {open && results.length > 0 && (
-        <YStack
+      {showList && (
+        <ListboxStack
+          role="listbox"
+          id={listboxId}
+          nativeID={listboxId}
+          aria-label="Player suggestions"
           position="absolute"
           top="105%"
           left={0}
@@ -181,14 +269,22 @@ function PlayerSearchInput({
           overflow="hidden"
           elevation={20}
         >
-          {results.map((p) => {
+          {results.map((p, idx) => {
             const id = p.id;
-            if (id == null) return null;
             const name = `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim();
             const pos = (p.eligiblePositions ?? []).join(', ') || '—';
+            const isActive = idx === activeIndex;
             return (
               <XStack
                 key={id}
+                id={getOptionId(idx)}
+                nativeID={getOptionId(idx)}
+                role="option"
+                aria-label={name}
+                aria-selected={isActive}
+                backgroundColor={
+                  isActive ? withAlpha(BRAND_NAVY_LIGHT, 0.12) : undefined
+                }
                 paddingHorizontal="$3"
                 paddingVertical="$2"
                 borderBottomWidth={1}
@@ -214,7 +310,7 @@ function PlayerSearchInput({
               </XStack>
             );
           })}
-        </YStack>
+        </ListboxStack>
       )}
     </YStack>
   );
