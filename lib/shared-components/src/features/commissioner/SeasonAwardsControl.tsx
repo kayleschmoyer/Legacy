@@ -570,6 +570,7 @@ function AwardRow({
 
 export interface SeasonAwardsControlProps {
   leagueId: number;
+  /** The league's current 1-based `seasonNumber` (not a calendar year). Defaults to 1. */
   currentSeason?: number;
   /** League sport — football leagues are offered MVP + ROY only (LS-10694). */
   sport?: SportKind;
@@ -596,8 +597,13 @@ export function SeasonAwardsControl({
   onError,
 }: SeasonAwardsControlProps) {
   const awardTypes = useMemo(() => awardTypesForSport(sport), [sport]);
-  const thisYear = new Date().getFullYear();
-  const [season, setSeason] = useState(currentSeason ?? thisYear);
+  // Awards are keyed by the league's 1-based seasonNumber, not the calendar
+  // year (LS-10693), so the picker offers Season 1 … current, never a future one.
+  const latestSeason = Math.max(1, currentSeason ?? 1);
+  const [season, setSeason] = useState(latestSeason);
+  useEffect(() => {
+    setSeason(latestSeason);
+  }, [latestSeason]);
 
   const { data, loading } = useGetLeagueSeasonAwardsQuery({
     variables: { leagueId, season },
@@ -733,11 +739,14 @@ export function SeasonAwardsControl({
     return map;
   }, [data]);
 
-  // Season selector: current year ± 5
-  const seasonOptions: number[] = [];
-  for (let y = thisYear + 1; y >= thisYear - 4; y--) {
-    seasonOptions.push(y);
-  }
+  const seasonOptions = useMemo(
+    () =>
+      Array.from({ length: latestSeason }, (_, i) => {
+        const n = latestSeason - i;
+        return { value: String(n), label: `Season ${n}` };
+      }),
+    [latestSeason],
+  );
 
   return (
     <Card
@@ -766,10 +775,7 @@ export function SeasonAwardsControl({
             label="Season"
             value={String(season)}
             onValueChange={(v) => setSeason(Number(v))}
-            options={seasonOptions.map((y) => ({
-              value: String(y),
-              label: `${y} Season`,
-            }))}
+            options={seasonOptions}
             placeholder="Select season"
             aria-label="Select season"
           />

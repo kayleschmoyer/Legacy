@@ -1837,7 +1837,7 @@ export function LeagueDetailPage(): React.JSX.Element {
       {/* Award Voting (LS-3126) — shown when voting is open */}
       <AwardVotingPanel
         leagueId={leagueId}
-        season={new Date().getFullYear()}
+        season={league.seasonNumber ?? 1}
         onSuccess={showMatchupSuccess}
         onError={(err) => {
           setMatchupErrorMessage(err.message);
@@ -3635,6 +3635,7 @@ export function LeagueDetailPage(): React.JSX.Element {
         content: (
           <SeasonAwardsControl
             leagueId={leagueId}
+            currentSeason={league.seasonNumber ?? undefined}
             sport={
               data?.league?.sport === Sport.Football ? 'football' : 'baseball'
             }

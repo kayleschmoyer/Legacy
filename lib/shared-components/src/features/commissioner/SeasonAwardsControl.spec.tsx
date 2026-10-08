@@ -41,12 +41,12 @@ jest.mock('@legacy-sports/logging', () => ({
 describe('SeasonAwardsControl — LS-8789 native-safe season picker', () => {
   it('renders without throwing', () => {
     expect(() =>
-      render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />),
+      render(<SeasonAwardsControl leagueId={42} currentSeason={3} />),
     ).not.toThrow();
   });
 
   it('uses the shared cross-platform Select, not a raw <option> list', () => {
-    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    render(<SeasonAwardsControl leagueId={42} currentSeason={3} />);
 
     // The season picker is the only <select> in the tree (award recipients
     // use a text search combobox, not a dropdown) — it comes from the shared
@@ -57,7 +57,7 @@ describe('SeasonAwardsControl — LS-8789 native-safe season picker', () => {
     });
     expect(seasonSelect.tagName).toBe('SELECT');
     expect(seasonSelect).toBeTruthy();
-    expect(screen.getByRole('option', { name: '2024 Season' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'Season 3' })).toBeTruthy();
   });
 
   it('re-queries season-scoped data when a different season is picked', () => {
@@ -65,14 +65,14 @@ describe('SeasonAwardsControl — LS-8789 native-safe season picker', () => {
       '@legacy-sports/graphql',
     );
 
-    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    render(<SeasonAwardsControl leagueId={42} currentSeason={3} />);
 
     fireEvent.change(screen.getByRole('combobox', { name: /select season/i }), {
-      target: { value: '2023' },
+      target: { value: '2' },
     });
 
     expect(graphql.useGetLeagueSeasonAwardsQuery).toHaveBeenLastCalledWith({
-      variables: { leagueId: 42, season: 2023 },
+      variables: { leagueId: 42, season: 2 },
     });
   });
 });
@@ -103,7 +103,7 @@ describe('SeasonAwardsControl — LS-10847 consolidated web behaviour', () => {
   });
 
   it('exposes the panel and per-award row testids used by web e2e', () => {
-    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    render(<SeasonAwardsControl leagueId={42} currentSeason={3} />);
 
     expect(screen.getByTestId('season-awards-panel')).toBeTruthy();
     for (const key of [
@@ -118,7 +118,7 @@ describe('SeasonAwardsControl — LS-10847 consolidated web behaviour', () => {
   });
 
   it('labels the season picker "Select season" for assistive tech', () => {
-    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    render(<SeasonAwardsControl leagueId={42} currentSeason={3} />);
 
     expect(
       screen.getByRole('combobox', { name: /select season/i }),
@@ -151,7 +151,7 @@ describe('SeasonAwardsControl — LS-10847 consolidated web behaviour', () => {
         >,
     );
 
-    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    render(<SeasonAwardsControl leagueId={42} currentSeason={3} />);
 
     const closeButton = screen.getByText(/close voting & tally results/i);
     // Both clicks land before React re-renders with `disabled`, so only the
@@ -210,12 +210,12 @@ describe('SeasonAwardsControl — LS-10825 clearing the recipient', () => {
   }
 
   it('starts with Assign Award disabled', () => {
-    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    render(<SeasonAwardsControl leagueId={42} currentSeason={3} />);
     expect(mvpRow().assign()).toBeDisabled();
   });
 
   it('disables Assign Award after the selected recipient is cleared (AC1)', () => {
-    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    render(<SeasonAwardsControl leagueId={42} currentSeason={3} />);
     const { row, input, assign } = mvpRow();
 
     selectPlayer(input, row, 'Babe Ruth');
@@ -230,7 +230,7 @@ describe('SeasonAwardsControl — LS-10825 clearing the recipient', () => {
   });
 
   it('disables Assign Award after the text is edited without picking a suggestion (AC2)', () => {
-    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    render(<SeasonAwardsControl leagueId={42} currentSeason={3} />);
     const { row, input, assign } = mvpRow();
 
     selectPlayer(input, row, 'Babe Ruth');
@@ -252,7 +252,7 @@ describe('SeasonAwardsControl — LS-10825 clearing the recipient', () => {
             typeof graphql.useUpsertLeagueSeasonAwardMutation
           >,
       );
-    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    render(<SeasonAwardsControl leagueId={42} currentSeason={3} />);
     const { row, input, assign } = mvpRow();
 
     selectPlayer(input, row, 'Babe Ruth');
@@ -269,7 +269,7 @@ describe('SeasonAwardsControl — LS-10825 clearing the recipient', () => {
       variables: {
         input: {
           leagueId: 42,
-          season: 2024,
+          season: 3,
           playerId: 8,
           awardType: 'mvp',
           notes: undefined,
@@ -334,7 +334,7 @@ describe('SeasonAwardsControl — LS-10799 keyboard-selectable recipient search'
   }
 
   it('selects the recipient with ArrowDown then Enter and enables Assign Award (AC1)', () => {
-    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    render(<SeasonAwardsControl leagueId={42} currentSeason={3} />);
     const { row, input, assign } = cyYoungRow();
 
     search(input, 'Clay');
@@ -361,7 +361,7 @@ describe('SeasonAwardsControl — LS-10799 keyboard-selectable recipient search'
             typeof graphql.useUpsertLeagueSeasonAwardMutation
           >,
       );
-    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    render(<SeasonAwardsControl leagueId={42} currentSeason={3} />);
     const { input, assign } = cyYoungRow();
 
     search(input, 'Clay');
@@ -378,7 +378,7 @@ describe('SeasonAwardsControl — LS-10799 keyboard-selectable recipient search'
       variables: {
         input: {
           leagueId: 42,
-          season: 2024,
+          season: 3,
           playerId: 22,
           awardType: 'cy_young',
           notes: undefined,
@@ -388,7 +388,7 @@ describe('SeasonAwardsControl — LS-10799 keyboard-selectable recipient search'
   });
 
   it('exposes combobox/listbox/option semantics and the active option (AC2)', () => {
-    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    render(<SeasonAwardsControl leagueId={42} currentSeason={3} />);
     const { row, input } = cyYoungRow();
 
     expect(input).toHaveAttribute('aria-expanded', 'false');
@@ -422,7 +422,7 @@ describe('SeasonAwardsControl — LS-10799 keyboard-selectable recipient search'
   });
 
   it('gives each award row its own listbox and option ids', () => {
-    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    render(<SeasonAwardsControl leagueId={42} currentSeason={3} />);
     const cy = cyYoungRow().input;
     const mvp = within(screen.getByTestId('award-row-mvp')).getByRole(
       'combobox',
@@ -436,7 +436,7 @@ describe('SeasonAwardsControl — LS-10799 keyboard-selectable recipient search'
   });
 
   it('closes the suggestions on Escape and reopens them with ArrowDown', () => {
-    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    render(<SeasonAwardsControl leagueId={42} currentSeason={3} />);
     const { row, input, assign } = cyYoungRow();
 
     search(input, 'Clay');
@@ -459,7 +459,7 @@ describe('SeasonAwardsControl — LS-10799 keyboard-selectable recipient search'
   });
 
   it('ignores Enter when no option is active', () => {
-    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    render(<SeasonAwardsControl leagueId={42} currentSeason={3} />);
     const { row, input, assign } = cyYoungRow();
 
     search(input, 'Clay');
@@ -496,7 +496,7 @@ describe('SeasonAwardsControl — LS-10821 recipient search scoped to the league
   }
 
   it('passes leagueId to every recipient search so the league sport applies (AC1)', () => {
-    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    render(<SeasonAwardsControl leagueId={42} currentSeason={3} />);
     searchRow('gold_glove', 'Babe Ruth');
 
     for (const [options] of jest.mocked(graphql.useGetPlayersWithStatsQuery)
@@ -514,7 +514,7 @@ describe('SeasonAwardsControl — LS-10821 recipient search scoped to the league
   it.each(['mvp', 'rookie_of_the_year'])(
     'limits %s recipients to league-rostered players (AC3)',
     (awardKey) => {
-      render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+      render(<SeasonAwardsControl leagueId={42} currentSeason={3} />);
       searchRow(awardKey, 'Tom Brady');
 
       expect(activeSearchVariables()).toContainEqual({
@@ -532,11 +532,7 @@ describe('SeasonAwardsControl — LS-10694 football award set', () => {
 
   it('offers football leagues MVP and Rookie of the Year only', () => {
     render(
-      <SeasonAwardsControl
-        leagueId={42}
-        currentSeason={2024}
-        sport="football"
-      />,
+      <SeasonAwardsControl leagueId={42} currentSeason={3} sport="football" />,
     );
 
     expect(screen.getByTestId('award-row-mvp')).toBeTruthy();
@@ -564,11 +560,7 @@ describe('SeasonAwardsControl — LS-10694 football award set', () => {
       );
 
     render(
-      <SeasonAwardsControl
-        leagueId={42}
-        currentSeason={2024}
-        sport="football"
-      />,
+      <SeasonAwardsControl leagueId={42} currentSeason={3} sport="football" />,
     );
     fireEvent.click(screen.getByText('Open Voting'));
 
@@ -576,7 +568,7 @@ describe('SeasonAwardsControl — LS-10694 football award set', () => {
       expect.objectContaining({
         variables: {
           leagueId: 42,
-          season: 2024,
+          season: 3,
           awardTypes: ['mvp', 'rookie_of_the_year'],
         },
       }),
@@ -606,14 +598,10 @@ describe('SeasonAwardsControl — LS-10694 football award set', () => {
       );
 
     const { rerender } = render(
-      <SeasonAwardsControl leagueId={42} currentSeason={2024} />,
+      <SeasonAwardsControl leagueId={42} currentSeason={3} />,
     );
     rerender(
-      <SeasonAwardsControl
-        leagueId={42}
-        currentSeason={2024}
-        sport="football"
-      />,
+      <SeasonAwardsControl leagueId={42} currentSeason={3} sport="football" />,
     );
     fireEvent.click(screen.getByText('Open Voting'));
 
@@ -621,7 +609,7 @@ describe('SeasonAwardsControl — LS-10694 football award set', () => {
       expect.objectContaining({
         variables: {
           leagueId: 42,
-          season: 2024,
+          season: 3,
           awardTypes: ['mvp', 'rookie_of_the_year'],
         },
       }),
@@ -637,10 +625,76 @@ describe('SeasonAwardsControl — LS-10694 football award set', () => {
   });
 
   it('keeps the full baseball award set by default', () => {
-    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    render(<SeasonAwardsControl leagueId={42} currentSeason={3} />);
 
     for (const key of BASEBALL_ONLY) {
       expect(screen.getByTestId(`award-row-${key}`)).toBeTruthy();
     }
+  });
+});
+
+describe('SeasonAwardsControl — LS-10693 season picker uses league seasonNumber', () => {
+  const graphql = jest.requireMock<typeof import('@legacy-sports/graphql')>(
+    '@legacy-sports/graphql',
+  );
+
+  function seasonOptionLabels(): string[] {
+    const select = screen.getByRole('combobox', { name: /select season/i });
+    return within(select)
+      .getAllByRole('option')
+      .map((o) => o.textContent ?? '');
+  }
+
+  it('lists only the seasons the league has had, newest first (AC1, AC3)', () => {
+    render(<SeasonAwardsControl leagueId={42} currentSeason={3} />);
+
+    expect(seasonOptionLabels()).toEqual(['Season 3', 'Season 2', 'Season 1']);
+  });
+
+  it('offers just Season 1 for a first-season league — never a future season (AC3)', () => {
+    render(<SeasonAwardsControl leagueId={42} currentSeason={1} />);
+
+    expect(seasonOptionLabels()).toEqual(['Season 1']);
+  });
+
+  it('preselects the current season and queries with that same value (AC1, AC2)', () => {
+    render(<SeasonAwardsControl leagueId={42} currentSeason={1} />);
+
+    const select = screen.getByRole<HTMLSelectElement>('combobox', {
+      name: /select season/i,
+    });
+    expect(select.value).toBe('1');
+    const expected = { variables: { leagueId: 42, season: 1 } };
+    expect(graphql.useGetLeagueSeasonAwardsQuery).toHaveBeenLastCalledWith(
+      expected,
+    );
+    expect(graphql.useGetAwardVotingPeriodQuery).toHaveBeenLastCalledWith(
+      expected,
+    );
+    expect(graphql.useGetAwardVoteResultsQuery).toHaveBeenLastCalledWith(
+      expected,
+    );
+  });
+
+  it('defaults to Season 1 when the league season is unknown, not the calendar year', () => {
+    render(<SeasonAwardsControl leagueId={42} />);
+
+    expect(seasonOptionLabels()).toEqual(['Season 1']);
+    expect(graphql.useGetLeagueSeasonAwardsQuery).toHaveBeenLastCalledWith({
+      variables: { leagueId: 42, season: 1 },
+    });
+  });
+
+  it('follows currentSeason when the league loads after mount', () => {
+    const { rerender } = render(<SeasonAwardsControl leagueId={42} />);
+    rerender(<SeasonAwardsControl leagueId={42} currentSeason={2} />);
+
+    const select = screen.getByRole<HTMLSelectElement>('combobox', {
+      name: /select season/i,
+    });
+    expect(select.value).toBe('2');
+    expect(graphql.useGetLeagueSeasonAwardsQuery).toHaveBeenLastCalledWith({
+      variables: { leagueId: 42, season: 2 },
+    });
   });
 });

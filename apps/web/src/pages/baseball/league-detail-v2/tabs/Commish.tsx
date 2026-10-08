@@ -406,7 +406,7 @@ export const CommishTab: React.FC<CommishTabProps> = ({
       content: leagueId ? (
         <SeasonAwardsControl
           leagueId={leagueId}
-          currentSeason={league.seasonNumber ?? new Date().getFullYear()}
+          currentSeason={league.seasonNumber ?? undefined}
           sport={isFootball ? 'football' : 'baseball'}
         />
       ) : null,
