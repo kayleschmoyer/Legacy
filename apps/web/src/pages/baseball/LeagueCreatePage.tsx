@@ -322,6 +322,16 @@ const SELECTION_METHOD_OPTIONS = [
   { label: 'Random', value: 'random' },
 ] as const;
 
+/** Selection Method hint describing only the current selection (LS-10813). */
+const SELECTION_METHOD_HINTS: Record<
+  CreateLeagueFormData['selectionMethod'],
+  string
+> = {
+  standard: 'Teams take turns picking players in draft order.',
+  auction: 'Teams bid on players using a set budget.',
+  random: 'Players are assigned to teams at random.',
+};
+
 const DRAFT_ORDER_OPTIONS = [
   { label: 'Snake', value: 'snake' },
   { label: 'Linear', value: 'linear' },
@@ -3927,7 +3937,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                     hint={
                       formData.draftMode === 'automated'
                         ? 'Forced to Random in automated mode.'
-                        : 'Standard picks in order, auction bidding'
+                        : SELECTION_METHOD_HINTS[formData.selectionMethod]
                     }
                   >
                     <ButtonGroup

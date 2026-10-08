@@ -390,8 +390,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
 
     await leaguePage.button('Standard').first().expectVisible();
     await leaguePage.button('Auction').expectVisible();
+    // Hint describes only the selected method (Standard by default, LS-10813)
     await leaguePage
-      .text('Standard picks in order, auction bidding')
+      .text('Teams take turns picking players in draft order.')
       .expectVisible();
   });
 

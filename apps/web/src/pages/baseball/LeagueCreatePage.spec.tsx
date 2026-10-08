@@ -1333,6 +1333,60 @@ describe('LeagueCreatePage — Selection Method options in automated mode (LS-60
   });
 });
 
+describe('LeagueCreatePage — Selection Method hint per selection (LS-10813)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = true;
+  });
+
+  function selectionMethodRow() {
+    return within(
+      screen.getByText('Selection Method').closest('div')
+        ?.parentElement as HTMLElement,
+    );
+  }
+
+  it('describes only the current selection', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    const row = selectionMethodRow();
+
+    expect(
+      row.getByText('Teams take turns picking players in draft order.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Standard picks in order, auction bidding/),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(row.getByRole('button', { name: /^Auction$/i }));
+    expect(
+      selectionMethodRow().getByText(
+        'Teams bid on players using a set budget.',
+      ),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      selectionMethodRow().getByRole('button', { name: /^Random$/i }),
+    );
+    expect(
+      selectionMethodRow().getByText(
+        'Players are assigned to teams at random.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the automated-mode hint', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    fireEvent.click(screen.getByRole('button', { name: /^Automated Draft$/i }));
+    expect(
+      selectionMethodRow().getByText('Forced to Random in automated mode.'),
+    ).toBeInTheDocument();
+  });
+});
+
 describe('LeagueCreatePage — unsaved-changes navigation guard (LS-6109)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
