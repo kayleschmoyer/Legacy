@@ -248,10 +248,18 @@ describe('enforceSearchMinLength (LS-7127)', () => {
     expect(enforceSearchMinLength('trout')).toBe('trout');
   });
 
-  it('preserves surrounding whitespace once the trimmed term meets the minimum', () => {
-    // Only the length gate is applied here; the term itself is committed as-is so
-    // existing query-build behavior (which coalesces empty strings) is unchanged.
-    expect(enforceSearchMinLength('  ab  ')).toBe('  ab  ');
+  it('trims a padded search so the URL searchTerm is written clean (LS-10657)', () => {
+    expect(enforceSearchMinLength('  Bonds  ')).toBe('Bonds');
+    expect(enforceSearchMinLength('Bonds ')).toBe('Bonds');
+  });
+
+  it('drops a whitespace-only search (LS-10657)', () => {
+    expect(enforceSearchMinLength('    ')).toBe('');
+  });
+
+  it('commits the trimmed term once it meets the minimum (LS-10657)', () => {
+    // Padding must not reach the URL or the ILIKE pattern ("%  ab  %").
+    expect(enforceSearchMinLength('  ab  ')).toBe('ab');
   });
 });
 

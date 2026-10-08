@@ -263,12 +263,14 @@ export function normalizeViewMode(
 
 /**
  * Enforce the documented minimum search length before a term reaches the applied
- * filter snapshot. Returns the term unchanged when it meets
- * {@link MIN_SEARCH_LENGTH} after trimming, or an empty string otherwise so a
- * sub-minimum entry is treated as "no search" (PST-061 / LS-7127).
+ * filter snapshot. Returns the trimmed term when it meets
+ * {@link MIN_SEARCH_LENGTH}, so the URL `searchTerm` is written clean (LS-10657),
+ * or an empty string otherwise so a sub-minimum entry is treated as "no search"
+ * (PST-061 / LS-7127).
  */
 export function enforceSearchMinLength(search: string): string {
-  return search.trim().length >= MIN_SEARCH_LENGTH ? search : '';
+  const trimmed = search.trim();
+  return trimmed.length >= MIN_SEARCH_LENGTH ? trimmed : '';
 }
 
 /**

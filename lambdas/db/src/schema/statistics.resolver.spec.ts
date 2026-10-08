@@ -357,6 +357,44 @@ describe('Statistics Resolver', () => {
       );
     });
 
+    it('trims and collapses whitespace in searchTerm for data and count (LS-10657)', async () => {
+      mockStatistics.getCareerBattingStats.mockResolvedValueOnce([]);
+      mockStatistics.getCareerBattingStatsCount.mockResolvedValueOnce(0);
+
+      const resolver = getQuery('careerBattingStats');
+      await resolver(
+        {},
+        { searchTerm: '  Barry   Bonds  ' },
+        emptyCtx,
+        undefined as never,
+      );
+
+      expect(mockStatistics.getCareerBattingStats).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filters: expect.objectContaining({ searchTerm: 'Barry Bonds' }),
+        }),
+      );
+      expect(mockStatistics.getCareerBattingStatsCount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filters: expect.objectContaining({ searchTerm: 'Barry Bonds' }),
+        }),
+      );
+    });
+
+    it('treats a whitespace-only searchTerm as no search (LS-10657)', async () => {
+      mockStatistics.getCareerBattingStats.mockResolvedValueOnce([]);
+      mockStatistics.getCareerBattingStatsCount.mockResolvedValueOnce(0);
+
+      const resolver = getQuery('careerBattingStats');
+      await resolver({}, { searchTerm: '   ' }, emptyCtx, undefined as never);
+
+      expect(mockStatistics.getCareerBattingStats).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filters: expect.objectContaining({ searchTerm: undefined }),
+        }),
+      );
+    });
+
     it('caps first at 100 for a free (non-premium) user (LS-7119)', async () => {
       mockStatistics.getCareerBattingStats.mockResolvedValueOnce([]);
       mockStatistics.getCareerBattingStatsCount.mockResolvedValueOnce(0);
@@ -449,6 +487,24 @@ describe('Statistics Resolver', () => {
       expect(mockStatistics.getCareerPitchingStats).toHaveBeenCalledWith(
         expect.objectContaining({
           filters: expect.objectContaining({ searchTerm: 'b'.repeat(64) }),
+        }),
+      );
+    });
+
+    it('trims a padded searchTerm (LS-10657)', async () => {
+      mockStatistics.getCareerPitchingStats.mockResolvedValueOnce([]);
+
+      const resolver = getQuery('careerPitchingStats');
+      await resolver(
+        {},
+        { searchTerm: '  Ichiro  ' },
+        emptyCtx,
+        undefined as never,
+      );
+
+      expect(mockStatistics.getCareerPitchingStats).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filters: expect.objectContaining({ searchTerm: 'Ichiro' }),
         }),
       );
     });

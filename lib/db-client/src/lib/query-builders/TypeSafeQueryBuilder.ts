@@ -16,18 +16,29 @@ import type { PublicDb } from '../client/PublicDbClient';
 import { onBasePercentageSql } from '../stats/on-base-percentage';
 
 /**
+ * Normalize a free-text player search term: trim and collapse internal
+ * whitespace so `"  Bonds  "` matches like `"Bonds"` (LS-10657). Shared by the
+ * resolver-side cap and {@link buildPlayerNameSearch}.
+ */
+export function normalizeSearchTerm(searchTerm: string): string {
+  return searchTerm.trim().replace(/\s+/g, ' ');
+}
+
+/**
  * Build a name-search OR condition that matches first name, last name, or the
  * full name expression used by the trigram index (idx_players_name_trgm).
  *
  * The index is on `lower(first_name || ' ' || last_name)`, so the full-name
  * branch uses the identical expression with a lowercased pattern to allow
- * Postgres to use the index.
+ * Postgres to use the index. The term is normalized with
+ * {@link normalizeSearchTerm} first (LS-10657).
  */
 export function buildPlayerNameSearch(
   searchTerm: string,
 ): SQL<unknown> | undefined {
-  const searchPattern = `%${searchTerm}%`;
-  const fullNamePattern = `%${searchTerm.toLowerCase()}%`;
+  const term = normalizeSearchTerm(searchTerm);
+  const searchPattern = `%${term}%`;
+  const fullNamePattern = `%${term.toLowerCase()}%`;
   return or(
     ilike(PublicSchema.players.firstName, searchPattern),
     ilike(PublicSchema.players.lastName, searchPattern),

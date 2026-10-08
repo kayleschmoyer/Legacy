@@ -4,6 +4,7 @@ import {
   buildCareerBattingConditions,
   buildPlayerNameSearch,
   getCareerBattingOrderByClause,
+  normalizeSearchTerm,
   positionEligibilityFilter,
   type QueryOptions,
 } from './TypeSafeQueryBuilder';
@@ -167,6 +168,16 @@ describe('positionEligibilityFilter (LS-8835)', () => {
   );
 });
 
+describe('normalizeSearchTerm (LS-10657)', () => {
+  it('trims and collapses internal whitespace', () => {
+    expect(normalizeSearchTerm('  Barry \t  Bonds  ')).toBe('Barry Bonds');
+  });
+
+  it('reduces a whitespace-only term to an empty string', () => {
+    expect(normalizeSearchTerm('   ')).toBe('');
+  });
+});
+
 describe('buildPlayerNameSearch (shared by career batting + pitching search)', () => {
   it('matches first name, last name, or the lowercased full name', () => {
     const condition = buildPlayerNameSearch('Babe Ruth');
@@ -178,6 +189,16 @@ describe('buildPlayerNameSearch (shared by career batting + pitching search)', (
       /lower\("players"\."first_name" \|\| ' ' \|\| "players"\."last_name"\) ilike \$3/,
     );
     expect(query.params).toEqual(['%Babe Ruth%', '%Babe Ruth%', '%babe ruth%']);
+  });
+
+  it('trims and collapses whitespace in the term (LS-10657)', () => {
+    const condition = buildPlayerNameSearch('  Babe   Ruth  ');
+    if (!condition) throw new Error('expected a name-search condition');
+    expect(dialect.sqlToQuery(condition).params).toEqual([
+      '%Babe Ruth%',
+      '%Babe Ruth%',
+      '%babe ruth%',
+    ]);
   });
 });
 

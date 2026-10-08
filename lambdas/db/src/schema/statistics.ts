@@ -1,6 +1,7 @@
 import {
   computeOnBasePercentage,
   createDatabaseService,
+  normalizeSearchTerm,
 } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
@@ -1096,16 +1097,18 @@ const MAX_SEARCH_TERM_LENGTH = 64;
 
 /**
  * Bound the free-text `searchTerm` resolver argument before it reaches the
- * database `ILIKE '%term%'` query. Returns `undefined` for empty/absent input
- * (preserving the existing `args.searchTerm || undefined` semantics) and
- * truncates anything longer than MAX_SEARCH_TERM_LENGTH. Exported for unit
- * testing.
+ * database `ILIKE '%term%'` query. Trims and collapses internal whitespace so a
+ * padded or pasted term matches like its clean form (LS-10657), returns
+ * `undefined` for empty/absent/whitespace-only input (no search), and truncates
+ * anything longer than MAX_SEARCH_TERM_LENGTH. Exported for unit testing.
  */
 export function capSearchTerm(
   value: string | null | undefined,
 ): string | undefined {
   if (!value) return undefined;
-  return value.slice(0, MAX_SEARCH_TERM_LENGTH);
+  const normalized = normalizeSearchTerm(value);
+  if (!normalized) return undefined;
+  return normalized.slice(0, MAX_SEARCH_TERM_LENGTH).trimEnd();
 }
 
 // Career batting statistics with relay-style pagination and totalCount
