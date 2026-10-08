@@ -85,6 +85,8 @@ describe('Dues Resolver — Commissioner/GM Permission Guards', () => {
             userId: 'userId',
             teamId: 'teamId',
             permissionLevel: 'permissionLevel',
+            createdAt: 'createdAt',
+            updatedAt: 'updatedAt',
           },
           commissionerAuditLog: {
             id: 'id',
@@ -699,6 +701,117 @@ describe('Dues Resolver — Commissioner/GM Permission Guards', () => {
       };
       expect(auth.verifyLeagueMembership).toHaveBeenCalledWith(mockDb, 10, 1);
       expect(auth.verifyCommissionerAccess).not.toHaveBeenCalled();
+    });
+
+    // LS-10740: the list is built from league membership, so owners who
+    // were never marked still appear (as unpaid).
+    const memberRow = (
+      userId: number,
+      permissionLevel: string,
+      payment: Partial<typeof paymentStatusRow> | null = null,
+    ) => ({
+      id: payment?.id ?? null,
+      userId,
+      permissionLevel,
+      username: `owner${userId}`,
+      paid: payment?.paid ?? null,
+      paidAt: payment?.paidAt ?? null,
+      markedBy: payment?.markedBy ?? null,
+      createdAt: payment?.createdAt ?? null,
+      updatedAt: payment?.updatedAt ?? null,
+      memberCreatedAt: now,
+      memberUpdatedAt: now,
+    });
+
+    it('selects from league_members and left-joins payment status (LS-10740)', async () => {
+      mockDb.where.mockResolvedValueOnce([]);
+
+      const resolver = getQuery('leagueDuesStatus');
+      await resolver({}, { leagueId: 10 }, mockContext, undefined as never);
+
+      const { PublicSchema } = require('@legacy-sports/db-client');
+      expect(mockDb.from).toHaveBeenCalledWith(PublicSchema.leagueMembers);
+      expect(mockDb.leftJoin).toHaveBeenCalledWith(
+        PublicSchema.leagueMemberPaymentStatus,
+        expect.anything(),
+      );
+    });
+
+    it('returns every owner as unpaid when no payment rows exist (LS-10740)', async () => {
+      mockDb.where.mockResolvedValueOnce([
+        memberRow(1, 'commissioner'),
+        memberRow(2, 'general_manager'),
+        memberRow(3, 'general_manager'),
+      ]);
+
+      const resolver = getQuery('leagueDuesStatus');
+      const result = await resolver(
+        {},
+        { leagueId: 10 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toHaveLength(3);
+      expect(result).toEqual(
+        [1, 2, 3].map((userId) =>
+          expect.objectContaining({
+            id: null,
+            leagueId: 10,
+            userId,
+            username: `owner${userId}`,
+            paid: false,
+            paidAt: null,
+            markedBy: null,
+            createdAt: now,
+            updatedAt: now,
+          }),
+        ),
+      );
+    });
+
+    it('merges existing payment rows with unmarked members (LS-10740)', async () => {
+      mockDb.where.mockResolvedValueOnce([
+        memberRow(1, 'commissioner'),
+        memberRow(2, 'general_manager', paymentStatusRow),
+      ]);
+
+      const resolver = getQuery('leagueDuesStatus');
+      const result = await resolver(
+        {},
+        { leagueId: 10 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toEqual([
+        expect.objectContaining({ userId: 1, id: null, paid: false }),
+        expect.objectContaining({
+          userId: 2,
+          id: 1,
+          paid: true,
+          paidAt: now,
+          markedBy: 1,
+        }),
+      ]);
+    });
+
+    it('omits unmarked assistant managers but keeps marked ones (LS-10740)', async () => {
+      mockDb.where.mockResolvedValueOnce([
+        memberRow(2, 'general_manager'),
+        memberRow(4, 'assistant_manager'),
+        memberRow(5, 'assistant_manager', { ...paymentStatusRow, id: 7 }),
+      ]);
+
+      const resolver = getQuery('leagueDuesStatus');
+      const result = (await resolver(
+        {},
+        { leagueId: 10 },
+        mockContext,
+        undefined as never,
+      )) as Array<{ userId: number }>;
+
+      expect(result.map((r) => r.userId)).toEqual([2, 5]);
     });
   });
 });

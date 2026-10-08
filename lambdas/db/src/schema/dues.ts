@@ -58,7 +58,8 @@ DuesSettingsRef.implement({
 });
 
 interface MemberPaymentStatusShape {
-  id: number;
+  /** `null` for a member who has never been marked paid/unpaid (LS-10740). */
+  id: number | null;
   leagueId: number;
   userId: number;
   username: string | null;
@@ -76,7 +77,7 @@ const MemberPaymentStatusRef = builder.objectRef<MemberPaymentStatusShape>(
 MemberPaymentStatusRef.implement({
   description: 'Payment status for a single league member',
   fields: (t) => ({
-    id: t.exposeInt('id'),
+    id: t.exposeInt('id', { nullable: true }),
     leagueId: t.exposeInt('leagueId'),
     userId: t.exposeInt('userId'),
     username: t.exposeString('username', { nullable: true }),
@@ -145,34 +146,61 @@ builder.queryField('leagueDuesStatus', (t) =>
 
       await verifyLeagueMembership(context.db, leagueId, context.user.id);
 
+      // Build the list from league membership, not from payment rows: a
+      // payment row only exists once a member has been marked paid/unpaid,
+      // so a fresh league would otherwise list nobody and leave the
+      // commissioner nothing to mark (LS-10740). Members with no row default
+      // to unpaid. Assistant managers co-manage another owner's team and are
+      // not billed, unless a payment row already exists for them.
       const rows = await context.db
         .select({
           id: PublicSchema.leagueMemberPaymentStatus.id,
-          leagueId: PublicSchema.leagueMemberPaymentStatus.leagueId,
-          userId: PublicSchema.leagueMemberPaymentStatus.userId,
+          userId: PublicSchema.leagueMembers.userId,
+          permissionLevel: PublicSchema.leagueMembers.permissionLevel,
           username: PublicSchema.users.username,
           paid: PublicSchema.leagueMemberPaymentStatus.paid,
           paidAt: PublicSchema.leagueMemberPaymentStatus.paidAt,
           markedBy: PublicSchema.leagueMemberPaymentStatus.markedBy,
           createdAt: PublicSchema.leagueMemberPaymentStatus.createdAt,
           updatedAt: PublicSchema.leagueMemberPaymentStatus.updatedAt,
+          memberCreatedAt: PublicSchema.leagueMembers.createdAt,
+          memberUpdatedAt: PublicSchema.leagueMembers.updatedAt,
         })
-        .from(PublicSchema.leagueMemberPaymentStatus)
+        .from(PublicSchema.leagueMembers)
         .innerJoin(
           PublicSchema.users,
-          eq(
-            PublicSchema.leagueMemberPaymentStatus.userId,
-            PublicSchema.users.id,
+          eq(PublicSchema.leagueMembers.userId, PublicSchema.users.id),
+        )
+        .leftJoin(
+          PublicSchema.leagueMemberPaymentStatus,
+          and(
+            eq(
+              PublicSchema.leagueMemberPaymentStatus.leagueId,
+              PublicSchema.leagueMembers.leagueId,
+            ),
+            eq(
+              PublicSchema.leagueMemberPaymentStatus.userId,
+              PublicSchema.leagueMembers.userId,
+            ),
           ),
         )
-        .where(eq(PublicSchema.leagueMemberPaymentStatus.leagueId, leagueId));
+        .where(eq(PublicSchema.leagueMembers.leagueId, leagueId));
 
-      return rows.map((r) => ({
-        ...r,
-        createdAt: new Date(r.createdAt),
-        updatedAt: new Date(r.updatedAt),
-        paidAt: r.paidAt ? new Date(r.paidAt) : null,
-      }));
+      return rows
+        .filter(
+          (r) => r.permissionLevel !== 'assistant_manager' || r.id != null,
+        )
+        .map((r) => ({
+          id: r.id,
+          leagueId,
+          userId: r.userId,
+          username: r.username,
+          paid: r.paid ?? false,
+          paidAt: r.paidAt ? new Date(r.paidAt) : null,
+          markedBy: r.markedBy,
+          createdAt: new Date(r.createdAt ?? r.memberCreatedAt),
+          updatedAt: new Date(r.updatedAt ?? r.memberUpdatedAt),
+        }));
     },
   }),
 );
