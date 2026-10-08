@@ -588,7 +588,7 @@ export function LeagueSettingsControl({
           ) : (
             <Settings size={20} color={BRAND_NAVY_LIGHT} />
           )}
-          <YStack>
+          <YStack flex={1} flexShrink={1} minWidth={0}>
             <H4 margin={0}>League Settings</H4>
             <Text fontSize="$2" color="$gray10">
               {isLocked

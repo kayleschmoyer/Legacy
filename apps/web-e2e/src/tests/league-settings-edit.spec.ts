@@ -544,3 +544,37 @@ test.describe('League Settings Edit — Draft Settings @critical', () => {
     ).toHaveCount(0);
   });
 });
+
+// ── Tests: narrow-viewport layout (LS-10688) ──────────────────────────────────
+
+test.describe('League Settings Edit — card subtitles at narrow widths', () => {
+  // The card header text column used to keep Tamagui's default
+  // flexShrink: 0, so the subtitle stayed one line wide and was clipped
+  // by the card instead of wrapping.
+  test.use({ viewport: { width: 375, height: 667 } });
+
+  const subtitles = [
+    {
+      section: 'League Settings',
+      text: 'Configure matchup settings for the league. Changes apply to future scheduled matchups.',
+    },
+    {
+      section: 'Draft Settings',
+      text: 'Configure your draft before it begins. Settings lock once the draft starts.',
+    },
+  ];
+
+  for (const { section, text } of subtitles) {
+    test(`${section} subtitle wraps inside the viewport`, async ({ page }) => {
+      await setupGraphQL(page);
+      await page.goto('/baseball/league/1/commissioner');
+      await expandSection(page, section);
+
+      const subtitle = page.getByText(text, { exact: true });
+      await expect(subtitle).toBeVisible();
+      const box = await subtitle.boundingBox();
+      expect(box).not.toBeNull();
+      expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(375);
+    });
+  }
+});

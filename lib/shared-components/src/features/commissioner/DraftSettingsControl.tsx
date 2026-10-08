@@ -565,13 +565,19 @@ export function DraftSettingsControl({
         <YStack gap="$4">
           {/* Header */}
           <XStack alignItems="center" justifyContent="space-between">
-            <XStack alignItems="center" gap="$2">
+            <XStack
+              alignItems="center"
+              gap="$2"
+              flex={1}
+              flexShrink={1}
+              minWidth={0}
+            >
               {isDraftLocked ? (
                 <Lock size={20} color="$gray10" />
               ) : (
                 <Settings size={20} color={BRAND_NAVY_LIGHT} />
               )}
-              <YStack>
+              <YStack flex={1} flexShrink={1} minWidth={0}>
                 <H4 margin={0}>Draft Settings</H4>
                 <Text fontSize="$2" color="$gray10">
                   {isDraftLocked
