@@ -17,6 +17,13 @@ interface SummariesResult {
 }
 
 const mockUseSummaries = jest.fn<SummariesResult, []>();
+type PrefsResult = {
+  data?: { getUserPreferences: { onboardingCompletedAt: string | null } };
+  loading: boolean;
+  error?: Error;
+};
+const mockUsePrefs = jest.fn<PrefsResult, []>();
+const mockUpdatePrefs = jest.fn(() => Promise.resolve({}));
 const mockHomeScreen = jest.fn<null, [{ error: boolean; loading: boolean }]>();
 
 jest.mock('react-router-dom', () => ({
@@ -55,6 +62,8 @@ jest.mock('@legacy-sports/graphql', () => ({
   ],
   useGetArchivedUserLeagueSummariesQuery: () => ({ data: undefined }),
   useGetMyMockDraftUsageQuery: () => ({ data: undefined }),
+  useGetUserPreferencesQuery: () => mockUsePrefs(),
+  useUpdateUserPreferencesMutation: () => [mockUpdatePrefs],
 }));
 
 jest.mock('../../components/PageMeta', () => ({ PageMeta: () => null }));
@@ -75,6 +84,12 @@ describe('HomePage onboarding gate (LS-10716)', () => {
     window.localStorage.clear();
     mockUseSummaries.mockReset();
     mockHomeScreen.mockReset();
+    mockUsePrefs.mockReset();
+    mockUsePrefs.mockReturnValue({
+      data: { getUserPreferences: { onboardingCompletedAt: null } },
+      loading: false,
+    });
+    mockUpdatePrefs.mockClear();
     mockHomeScreen.mockReturnValue(null);
   });
 
@@ -186,5 +201,66 @@ describe('HomePage onboarding gate (LS-10716)', () => {
       expect.objectContaining({ error: false, loading: false, leagues }),
     );
     expect(screen.queryByTestId('onboarding-tutorial')).not.toBeInTheDocument();
+  });
+
+  describe('server-side completion flag (LS-6890)', () => {
+    const newUser = {
+      data: { getUserLeagueSummaries: [] },
+      loading: false,
+    };
+
+    it('does not open the tutorial when the server says it was completed', () => {
+      mockUseSummaries.mockReturnValue(newUser);
+      mockUsePrefs.mockReturnValue({
+        data: {
+          getUserPreferences: { onboardingCompletedAt: '2026-01-01T00:00:00Z' },
+        },
+        loading: false,
+      });
+
+      render(<HomePage />);
+
+      expect(
+        screen.queryByTestId('onboarding-tutorial'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('waits for the preferences query before deciding', () => {
+      mockUseSummaries.mockReturnValue(newUser);
+      mockUsePrefs.mockReturnValue({ data: undefined, loading: true });
+
+      render(<HomePage />);
+
+      expect(
+        screen.queryByTestId('onboarding-tutorial'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('falls back to localStorage when the preferences query fails', () => {
+      mockUseSummaries.mockReturnValue(newUser);
+      mockUsePrefs.mockReturnValue({
+        data: undefined,
+        loading: false,
+        error: new Error('offline'),
+      });
+
+      render(<HomePage />);
+
+      expect(screen.getByTestId('onboarding-tutorial')).toBeInTheDocument();
+    });
+
+    it('backfills the server when only localStorage has the flag', () => {
+      mockUseSummaries.mockReturnValue(newUser);
+      window.localStorage.setItem('ls_onboarding_complete', 'true');
+
+      render(<HomePage />);
+
+      expect(
+        screen.queryByTestId('onboarding-tutorial'),
+      ).not.toBeInTheDocument();
+      expect(mockUpdatePrefs).toHaveBeenCalledWith({
+        variables: { input: { markOnboardingComplete: true } },
+      });
+    });
   });
 });

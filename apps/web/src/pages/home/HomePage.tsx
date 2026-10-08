@@ -24,7 +24,9 @@ import {
   useGetMyMockDraftUsageQuery,
   useGetUserLeagueStandingsQuery,
   useGetUserLeagueSummariesQuery,
+  useGetUserPreferencesQuery,
   type UserLeagueSummaryFragment,
+  useUpdateUserPreferencesMutation,
 } from '@legacy-sports/graphql';
 import { LOGGER } from '@legacy-sports/logging';
 import {
@@ -209,6 +211,33 @@ export function HomePage(): React.JSX.Element {
   // failed query (offline, flaky network) also leaves the summaries empty, and
   // must not be read as "no leagues" — that opened the tutorial over the
   // dashboard error state for existing users (LS-10716).
+  // The server flag is the source of truth so completion follows the user
+  // across browsers/devices; localStorage stays as a same-device cache and the
+  // fallback when the preferences query fails (LS-6890).
+  const {
+    data: prefsData,
+    loading: prefsLoading,
+    error: prefsError,
+  } = useGetUserPreferencesQuery({
+    skip: !sessionPresent,
+    fetchPolicy: 'cache-and-network',
+  });
+  const [updatePreferences] = useUpdateUserPreferencesMutation();
+  const prefsSettled = !prefsLoading && (prefsData != null || !!prefsError);
+  const serverOnboardingCompleted =
+    prefsData?.getUserPreferences?.onboardingCompletedAt != null;
+
+  const persistOnboardingCompleteToServer = useCallback(() => {
+    updatePreferences({
+      variables: { input: { markOnboardingComplete: true } },
+    }).catch((caught: unknown) => {
+      LOGGER.error(
+        'HomePage: failed to persist onboarding completion to server',
+        caught instanceof Error ? caught : new Error(String(caught)),
+      );
+    });
+  }, [updatePreferences]);
+
   const confirmedNoLeagues =
     !summariesLoading &&
     !summariesError &&
@@ -216,19 +245,31 @@ export function HomePage(): React.JSX.Element {
     summaryData.getUserLeagueSummaries.length === 0;
 
   useEffect(() => {
-    if (!userId || !confirmedNoLeagues) return;
+    if (!userId || !confirmedNoLeagues || !prefsSettled) return;
     const key = getOnboardingKey(userId);
     try {
-      if (migrateLegacyOnboardingFlag(window.localStorage, key)) return;
-      const completed = parseOnboardingComplete(
-        window.localStorage.getItem(key),
-      );
-      if (!completed) {
-        setTutorialInitialStep(
-          readOnboardingStep(window.localStorage, getOnboardingStepKey(userId)),
-        );
-        setTutorialOpen(true);
+      if (serverOnboardingCompleted) {
+        // Seed this browser so the flag survives a later server outage.
+        window.localStorage.setItem(key, serializeOnboardingComplete(true));
+        window.localStorage.removeItem(getOnboardingStepKey(userId));
+        return;
       }
+      const legacyComplete = migrateLegacyOnboardingFlag(
+        window.localStorage,
+        key,
+      );
+      const completed =
+        legacyComplete ||
+        parseOnboardingComplete(window.localStorage.getItem(key));
+      if (completed) {
+        // Completed before the server flag existed: backfill it.
+        if (!prefsError) persistOnboardingCompleteToServer();
+        return;
+      }
+      setTutorialInitialStep(
+        readOnboardingStep(window.localStorage, getOnboardingStepKey(userId)),
+      );
+      setTutorialOpen(true);
     } catch (caught) {
       // Without storage we cannot tell whether the tutorial was already
       // completed, so leave it closed rather than re-showing it on every
@@ -238,13 +279,21 @@ export function HomePage(): React.JSX.Element {
         caught instanceof Error ? caught : new Error(String(caught)),
       );
     }
-  }, [userId, confirmedNoLeagues]);
+  }, [
+    userId,
+    confirmedNoLeagues,
+    prefsSettled,
+    prefsError,
+    serverOnboardingCompleted,
+    persistOnboardingCompleteToServer,
+  ]);
 
   const handleTutorialClose = () => {
     setTutorialOpen(false);
     // Hand keyboard focus to the empty-state CTA once the modal is gone (LS-6918).
     setCtaFocusRequest((n) => n + 1);
     if (userId) {
+      persistOnboardingCompleteToServer();
       try {
         window.localStorage.setItem(
           getOnboardingKey(userId),
