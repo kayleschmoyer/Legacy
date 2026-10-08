@@ -1,4 +1,4 @@
-import { getPickQuality } from './draftUtils';
+import { getPickQuality, hasDraftStarted } from './draftUtils';
 
 describe('getPickQuality', () => {
   it('returns null when the player has no ADP', () => {
@@ -33,5 +33,20 @@ describe('getPickQuality', () => {
   it('returns null when the pick lands close to ADP', () => {
     expect(getPickQuality(12, 15)).toBeNull();
     expect(getPickQuality(15, 12)).toBeNull();
+  });
+});
+
+describe('hasDraftStarted (LS-10811)', () => {
+  it('is false for a scheduled or not-yet-loaded draft', () => {
+    expect(hasDraftStarted('not-started')).toBe(false);
+    expect(hasDraftStarted('queued')).toBe(false);
+    expect(hasDraftStarted(null)).toBe(false);
+    expect(hasDraftStarted(undefined)).toBe(false);
+  });
+
+  it('is true once the draft is running, paused or done', () => {
+    expect(hasDraftStarted('in-progress')).toBe(true);
+    expect(hasDraftStarted('paused')).toBe(true);
+    expect(hasDraftStarted('completed')).toBe(true);
   });
 });

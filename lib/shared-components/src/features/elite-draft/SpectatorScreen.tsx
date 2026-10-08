@@ -220,7 +220,7 @@ export function SpectatorScreen({
               : 'The draft has not started yet. Hang tight — the board goes live the moment the first clock starts.'}
           </div>
           {data.boardOrderedTeams.length > 0 && (
-            <ol className="d-spec-lobby-order">
+            <ol className="d-spec-lobby-order" aria-label="Draft order">
               {data.boardOrderedTeams.map((team) => (
                 <li key={team.id}>{team.name}</li>
               ))}

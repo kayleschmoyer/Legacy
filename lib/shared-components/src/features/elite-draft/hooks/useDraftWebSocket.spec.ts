@@ -122,6 +122,28 @@ function makeDefaultParams() {
 
 // ── Tests ──────────────────────────────────────────────────────────────────
 
+describe('useDraftWebSocket — draft started (LS-10811)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('refetches the league so the now-started status unskips the current-pick read', () => {
+    const params = makeDefaultParams();
+
+    renderHook(() => useDraftWebSocket(params));
+
+    act(() => {
+      mockInstance._emit(ClientNotificationType.DRAFT_STARTED, {
+        leagueId: 1,
+        draftId: 42,
+      });
+    });
+
+    expect(params.refetchLeague).toHaveBeenCalledTimes(1);
+    expect(params.refetchDraft).toHaveBeenCalled();
+  });
+});
+
 describe('useDraftWebSocket — draft completion (LS-3823)', () => {
   beforeEach(() => {
     jest.clearAllMocks();

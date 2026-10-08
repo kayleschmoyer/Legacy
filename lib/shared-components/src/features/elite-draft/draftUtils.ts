@@ -282,3 +282,24 @@ export function computeDraftIntelligence(
 
   return recommendations.sort((a, b) => b.score - a.score).slice(0, 5);
 }
+
+// ---------------------------------------------------------------------------
+// Draft lifecycle
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether the draft has been started, so the server has seated it and the
+ * current pick can be read. Before that (`not-started` / `queued`, or a
+ * status not loaded yet) `getCurrentDraftPick` has no seats to read and
+ * answers DRAFT_TEAMS_NOT_CONFIGURED, which the room must not surface as an
+ * error for a draft that simply hasn't begun (LS-10811).
+ */
+export function hasDraftStarted(
+  draftStatus: string | null | undefined,
+): boolean {
+  return (
+    draftStatus === 'in-progress' ||
+    draftStatus === 'paused' ||
+    draftStatus === 'completed'
+  );
+}

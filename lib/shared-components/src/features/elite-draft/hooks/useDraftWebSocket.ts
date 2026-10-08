@@ -233,10 +233,15 @@ export function useDraftWebSocket({
         setPickDeadline(new Date(notification.currentPickDeadline));
       }
       void refetchDraft();
+      // The current-pick read is gated on the league's draft status
+      // (LS-10811), so refresh the status — that unskips the current-pick
+      // query, which then loads the first pick on its own.
+      void refetchLeague();
       void refetchCurrentPick({ draftId: notification.draftId });
     },
     [
       refetchDraft,
+      refetchLeague,
       refetchCurrentPick,
       setLiveMessage,
       setPickTimeLimitSeconds,

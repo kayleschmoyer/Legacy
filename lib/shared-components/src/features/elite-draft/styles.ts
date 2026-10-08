@@ -2340,11 +2340,20 @@ export const CSS = `
 .d-spec-lobby-order {
   margin: 8px 0 0;
   padding: 0 0 0 20px;
+  list-style: decimal outside;
   text-align: left;
   color: var(--d-text-secondary);
   font-size: 14px;
   columns: 2;
   column-gap: 32px;
+}
+/* The Tamagui web reset (@tamagui/core/reset.css) applies "all: unset" to
+   every <li>, which makes it inline — the team names then ran together on one
+   line ("Team AlphaTeam Beta…", LS-10811). Restore real list items. */
+.d-spec-lobby-order > li {
+  display: list-item;
+  padding: 2px 0;
+  break-inside: avoid;
 }
 /* Splash chrome: header (headshot + drafting team) and footer (media +
    queue badge) render in the announcement card's flow (LS-10593). */

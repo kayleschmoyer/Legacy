@@ -40,6 +40,7 @@ import type {
   NotablePlaySummary,
   PlayerStatsEntry,
 } from '../types';
+import { hasDraftStarted } from '../draftUtils';
 import { normalizeTeamId } from '../utils';
 
 /**
@@ -162,12 +163,15 @@ export function useSpectatorDraftData({
   const isAuctionDraft = leagueDraft?.selectionMethod === 'auction';
 
   // ---- Current pick (polled — the WS-fallback heartbeat of the page) ----
-  const { data: currentPickData, refetch: refetchCurrentPick } = useQuery<
+  const currentPickReadable = hasDraftStarted(league?.draftStatus);
+  const { data: currentPickData, refetch: refetchCurrentPickQuery } = useQuery<
     GetCurrentDraftPickQuery,
     GetCurrentDraftPickQueryVariables
   >(GET_CURRENT_DRAFT_PICK, {
     variables: { draftId: draftId ?? 0 },
-    skip: !draftId,
+    // Not polled before the draft starts: an unseated draft answers
+    // DRAFT_TEAMS_NOT_CONFIGURED, which toasted on every poll (LS-10811).
+    skip: !draftId || !currentPickReadable,
     errorPolicy: 'all',
     pollInterval: SPECTATOR_POLL_INTERVAL_MS,
   });
@@ -195,6 +199,14 @@ export function useSpectatorDraftData({
     };
   }, [currentPickData]);
   const currentPickTeamId = normalizeTeamId(currentPickInfo?.teamId);
+  // refetch() ignores `skip`, so the socket/timer paths are gated the same way.
+  const refetchCurrentPick = useCallback(
+    (variables?: GetCurrentDraftPickQueryVariables) =>
+      currentPickReadable
+        ? refetchCurrentPickQuery(variables)
+        : Promise.resolve(undefined),
+    [currentPickReadable, refetchCurrentPickQuery],
+  );
 
   // ---- Pick history ----
   // Snake drafts refresh via WebSocket pushes; auction drafts have no draft

@@ -8,7 +8,7 @@
  * end-to-end through the screen's wiring.
  */
 import React from 'react';
-import { act } from '@testing-library/react';
+import { act, within } from '@testing-library/react';
 import { CombinedGraphQLErrors } from '@apollo/client';
 import { SpectatorScreen } from './SpectatorScreen';
 import { useDraftTimer } from './hooks/useDraftTimer';
@@ -273,6 +273,30 @@ describe('SpectatorScreen — full-page states', () => {
     );
     const { getByTestId } = render(<SpectatorScreen {...defaultProps} />);
     expect(getByTestId('spectator-lobby')).toBeTruthy();
+  });
+
+  it('lists each lobby team as its own item in a labelled list (LS-10811)', () => {
+    mockUseSpectatorDraftData.mockReturnValue(
+      makeData({
+        league: {
+          id: 1,
+          name: 'History League',
+          draftStatus: 'queued',
+        },
+        boardOrderedTeams: [
+          { id: '1', name: "legacyplaywrightqa's Team", leagueId: 1 },
+          { id: '2', name: 'Team Alpha', leagueId: 1 },
+          { id: '3', name: 'Team Beta', leagueId: 1 },
+        ],
+      }),
+    );
+    const { getByRole } = render(<SpectatorScreen {...defaultProps} />);
+    const list = getByRole('list', { name: 'Draft order' });
+    expect(
+      within(list)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual(["legacyplaywrightqa's Team", 'Team Alpha', 'Team Beta']);
   });
 
   it('shows the complete view when the draft is done', () => {

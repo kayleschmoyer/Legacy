@@ -55,6 +55,7 @@ import type {
   PlayerFootballStatsEntry,
   PlayerStatsEntry,
 } from '../types';
+import { hasDraftStarted } from '../draftUtils';
 import { normalizeTeamId } from '../utils';
 
 const PLAYER_PAGE_SIZE = 200;
@@ -314,15 +315,19 @@ export function useDraftQueries({
   }, [draftError]);
 
   // ---- Current Pick ----
+  const currentPickReadable = hasDraftStarted(draftStatus);
   const {
     data: currentPickData,
     error: currentPickError,
-    refetch: refetchCurrentPick,
+    refetch: refetchCurrentPickQuery,
   } = useQuery<GetCurrentDraftPickQuery, GetCurrentDraftPickQueryVariables>(
     GET_CURRENT_DRAFT_PICK,
     {
       variables: { draftId: draftId ?? 0 },
-      skip: !draftId || isAuctionDraft,
+      // A scheduled draft has a draftId but no seats until it starts, so the
+      // read would fail with DRAFT_TEAMS_NOT_CONFIGURED and toast an error
+      // over the pre-draft lobby (LS-10811).
+      skip: !draftId || isAuctionDraft || !currentPickReadable,
       errorPolicy: 'all',
     },
   );
@@ -353,6 +358,16 @@ export function useDraftQueries({
   }, [currentPickData]);
   const currentPickTeamId = normalizeTeamId(currentPickInfo?.teamId);
   const currentPickErrorMessage = currentPickError?.message ?? '';
+  // Apollo's refetch hits the network even while the query is skipped, so the
+  // socket resync / timer paths must not read the pick before the draft
+  // starts either. DRAFT_STARTED refetches the status, which unskips the query.
+  const refetchCurrentPick = useCallback(
+    (variables?: GetCurrentDraftPickQueryVariables) =>
+      currentPickReadable
+        ? refetchCurrentPickQuery(variables)
+        : Promise.resolve(undefined),
+    [currentPickReadable, refetchCurrentPickQuery],
+  );
 
   // ---- Pick History ----
   const { data: picksData, refetch: refetchPickHistory } = useQuery<

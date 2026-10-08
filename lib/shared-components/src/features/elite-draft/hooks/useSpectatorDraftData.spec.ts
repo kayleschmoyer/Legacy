@@ -36,6 +36,19 @@ interface RecordedCall {
 }
 
 const recordedCalls: RecordedCall[] = [];
+// Settable per test (LS-10811): the league's draft lifecycle status, or
+// undefined to leave the league unloaded.
+let mockDraftStatus: string | undefined;
+const mockRefetchCurrentPick = jest.fn();
+
+// Matched by operation name: jest's module-factory sandbox cannot close over
+// the imported documents.
+function mockOpName(document: {
+  definitions: readonly { kind: string; name?: { value: string } }[];
+}): string | undefined {
+  return document.definitions.find((d) => d.kind === 'OperationDefinition')
+    ?.name?.value;
+}
 
 jest.mock('@apollo/client/react', () => ({
   useQuery: (
@@ -43,6 +56,30 @@ jest.mock('@apollo/client/react', () => ({
     options: RecordedCall['options'],
   ): unknown => {
     recordedCalls.push({ document, options });
+    if (mockOpName(document) === 'GetLeagueById' && mockDraftStatus) {
+      return {
+        data: { league: { id: 1, draftStatus: mockDraftStatus } },
+        loading: false,
+        error: undefined,
+        refetch: jest.fn(),
+      };
+    }
+    if (mockOpName(document) === 'GetLiveDraftLeagueDraft' && mockDraftStatus) {
+      return {
+        data: { getLeagueDraft: { id: 42, selectionMethod: 'snake' } },
+        loading: false,
+        error: undefined,
+        refetch: jest.fn(),
+      };
+    }
+    if (mockOpName(document) === 'GetCurrentDraftPick') {
+      return {
+        data: undefined,
+        loading: false,
+        error: undefined,
+        refetch: mockRefetchCurrentPick,
+      };
+    }
     return {
       data: undefined,
       loading: false,
@@ -60,6 +97,8 @@ function issuedDocuments(): DocumentNode[] {
 describe('useSpectatorDraftData', () => {
   beforeEach(() => {
     recordedCalls.length = 0;
+    mockDraftStatus = 'in-progress';
+    mockRefetchCurrentPick.mockClear();
   });
 
   it('mounts only the read-only spectator query set', () => {
@@ -105,7 +144,27 @@ describe('useSpectatorDraftData', () => {
     );
   });
 
+  it.each(['not-started', 'queued'])(
+    'does not poll the current pick for a %s draft (LS-10811)',
+    async (status) => {
+      mockDraftStatus = status;
+      const { result } = renderHook(() =>
+        useSpectatorDraftData({ leagueId: 1 }),
+      );
+
+      expect(issuedDocuments()).not.toContain(GET_CURRENT_DRAFT_PICK);
+      await result.current.refetchCurrentPick({ draftId: 42 });
+      expect(mockRefetchCurrentPick).not.toHaveBeenCalled();
+    },
+  );
+
+  it('polls the current pick once the draft is live (LS-10811)', () => {
+    renderHook(() => useSpectatorDraftData({ leagueId: 1 }));
+    expect(issuedDocuments()).toContain(GET_CURRENT_DRAFT_PICK);
+  });
+
   it('issues no queries at all without a leagueId', () => {
+    mockDraftStatus = undefined;
     renderHook(() => useSpectatorDraftData({ leagueId: null }));
     expect(issuedDocuments()).toEqual([]);
   });

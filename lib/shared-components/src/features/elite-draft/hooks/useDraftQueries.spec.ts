@@ -29,6 +29,9 @@ const mockRecordedCalls: {
 // query failure without needing a real Apollo error shape per case.
 let mockDraftError: unknown;
 
+// Settable by individual tests (LS-10811) — the league's draft lifecycle.
+let mockLeagueDraftStatus = 'in-progress';
+
 // Settable by individual tests (LS-10501) to give a mock draft a
 // `draftRoom` payload — its roster slots arrive on `rules`.
 let mockDraftRoom: unknown;
@@ -77,7 +80,7 @@ jest.mock('@apollo/client/react', () => ({
     mockRecordedCalls.push({ operationName: opName, options });
     if (opName === 'GetLeagueById') {
       return {
-        data: { league: { id: 1, draftStatus: 'in-progress' } },
+        data: { league: { id: 1, draftStatus: mockLeagueDraftStatus } },
         loading: false,
         error: undefined,
         refetch: mockRefetchFor(opName),
@@ -315,5 +318,76 @@ describe('useDraftQueries — mock-draft roster slots (LS-10501)', () => {
       'DST',
     ]);
     expect(result.current.maxRosterSize).toBe(16);
+  });
+});
+
+// LS-10811: a scheduled draft has a draftId but no seats until it starts, so
+// getCurrentDraftPick answers DRAFT_TEAMS_NOT_CONFIGURED — which the global
+// error toast and the "Re-start the live draft" copy surfaced over the
+// pre-draft lobby. The read must wait for the draft to start.
+describe('useDraftQueries — current pick waits for the draft to start (LS-10811)', () => {
+  function currentPickSkip(): boolean | undefined {
+    return mockRecordedCalls.find(
+      (c) => c.operationName === 'GetCurrentDraftPick',
+    )?.options?.skip;
+  }
+
+  function renderBoard() {
+    return renderHook(() =>
+      useDraftQueries({
+        leagueId: 1,
+        playerSearch: '',
+        selectedPosition: '',
+        viewMode: 'grid',
+        isCompact: false,
+      }),
+    );
+  }
+
+  beforeEach(() => {
+    mockRecordedCalls.length = 0;
+    mockDraftError = undefined;
+    mockRefetchByOperation.clear();
+  });
+
+  afterEach(() => {
+    mockLeagueDraftStatus = 'in-progress';
+  });
+
+  it.each(['not-started', 'queued'])(
+    'skips the current-pick query for a %s draft',
+    (status) => {
+      mockLeagueDraftStatus = status;
+      renderBoard();
+      expect(currentPickSkip()).toBe(true);
+    },
+  );
+
+  it.each(['in-progress', 'paused'])(
+    'mounts the current-pick query once the draft is %s',
+    (status) => {
+      mockLeagueDraftStatus = status;
+      renderBoard();
+      expect(currentPickSkip()).toBe(false);
+    },
+  );
+
+  it('does not refetch the current pick before the draft starts', async () => {
+    mockLeagueDraftStatus = 'queued';
+    const { result } = renderBoard();
+
+    await result.current.refetchCurrentPick({ draftId: 99 });
+
+    expect(mockRefetchFor('GetCurrentDraftPick')).not.toHaveBeenCalled();
+  });
+
+  it('refetches the current pick during a live draft', async () => {
+    const { result } = renderBoard();
+
+    await result.current.refetchCurrentPick({ draftId: 99 });
+
+    expect(mockRefetchFor('GetCurrentDraftPick')).toHaveBeenCalledWith({
+      draftId: 99,
+    });
   });
 });

@@ -102,3 +102,16 @@ describe('elite-draft player dock is not media-gated (LS-10005)', () => {
     }
   });
 });
+
+// LS-10811: the Tamagui web reset applies `all: unset` to <li>, making the
+// spectator lobby's team names inline and run together. The list items must
+// stay real list items.
+describe('elite-draft spectator lobby order list (LS-10811)', () => {
+  it('restores list-item display on the lobby order entries', () => {
+    const match = CSS.match(/\.d-spec-lobby-order\s*>\s*li\s*\{([^}]*)\}/);
+    if (!match) {
+      throw new Error('.d-spec-lobby-order > li rule not found in CSS');
+    }
+    expect(match[1]).toMatch(/display:\s*list-item/);
+  });
+});
