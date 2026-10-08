@@ -21,6 +21,7 @@ import {
   getDraftCompletionActions,
   resolveDraftedPlayers,
 } from './draftCompletion';
+import { computeTeamDraftGrade } from './draftGrades';
 import { useDraftPalette } from './nativeDraftPalette';
 import type { DraftPickRecord, DraftPlayer, LeagueTeam } from './types';
 import { withAlpha } from '../../utils/colors';
@@ -49,50 +50,6 @@ export interface DraftRoomRecapProps {
   /** Every team in the draft — drives the roster team selector. */
   leagueTeams: LeagueTeam[];
   onNavigate: (path: string) => void;
-}
-
-interface PickValue {
-  pick: DraftPickRecord;
-  player: DraftPlayer;
-  /** overallPick - adpRank; positive means the player fell further than expected (good value). */
-  value: number;
-}
-
-/**
- * No ADP field exists on `DraftPlayer` (see DraftPlayersTab.tsx) — proxy
- * each drafted player's expected pick position with their 1-based rank by
- * projected points among every player drafted this draft, mirroring the
- * same "no real ADP" proxy already established elsewhere in this feature.
- */
-function buildAdpRanks(
-  pickHistory: DraftPickRecord[],
-  statsLookup: Map<number, DraftPlayer>,
-): Map<number, number> {
-  const ranked = pickHistory
-    .map((pick) => ({
-      playerId: pick.playerId,
-      ppg: statsLookup.get(pick.playerId)?.ppg ?? 0,
-    }))
-    .sort((a, b) => b.ppg - a.ppg);
-  const ranks = new Map<number, number>();
-  ranked.forEach((entry, index) => {
-    if (!ranks.has(entry.playerId)) ranks.set(entry.playerId, index + 1);
-  });
-  return ranks;
-}
-
-/** Coarse letter grade from the average per-pick ADP value — the "prototype"
- *  heuristic the README calls for (sum of overall − ADP), bucketed since the
- *  underlying ADP is itself only a same-draft proxy, not real precision. */
-function gradeFor(totalValue: number, pickCount: number): string {
-  if (pickCount === 0) return '—';
-  const avg = totalValue / pickCount;
-  if (avg >= 15) return 'A+';
-  if (avg >= 8) return 'A';
-  if (avg >= 3) return 'B+';
-  if (avg >= -2) return 'B';
-  if (avg >= -8) return 'C';
-  return 'D';
 }
 
 interface StatCardProps {
@@ -173,31 +130,16 @@ export function DraftRoomRecap({
     [isViewingOwnTeam, myTeam, rosterPicks, statsLookup],
   );
 
-  const pickValues = useMemo<PickValue[]>(() => {
-    const adpRanks = buildAdpRanks(pickHistory, statsLookup);
-    return rosterPicks.map((pick, i) => {
-      const rank = adpRanks.get(pick.playerId) ?? pick.overallPick;
-      return { pick, player: rosterPlayers[i], value: pick.overallPick - rank };
-    });
-  }, [pickHistory, rosterPicks, rosterPlayers, statsLookup]);
-
-  const totalValue = useMemo(
-    () => pickValues.reduce((sum, v) => sum + v.value, 0),
-    [pickValues],
-  );
-  const projPtsTotal = useMemo(
-    () => rosterPlayers.reduce((sum, p) => sum + (p.ppg ?? 0), 0),
-    [rosterPlayers],
-  );
-  const bestValue = useMemo(
+  const { grade, totalValue, projPts, bestValue } = useMemo(
     () =>
-      pickValues.reduce<PickValue | null>(
-        (best, v) => (best == null || v.value > best.value ? v : best),
-        null,
+      computeTeamDraftGrade(
+        pickHistory,
+        rosterPicks,
+        rosterPlayers,
+        statsLookup,
       ),
-    [pickValues],
+    [pickHistory, rosterPicks, rosterPlayers, statsLookup],
   );
-  const grade = gradeFor(totalValue, rosterPicks.length);
 
   const pickByPlayerId = useMemo(() => {
     const map = new Map<number, DraftPickRecord>();
@@ -271,7 +213,7 @@ export function DraftRoomRecap({
           <StatCard label="Draft Grade" value={grade} color="$brandGold" />
           <StatCard
             label="Proj Pts"
-            value={projPtsTotal.toFixed(1)}
+            value={projPts.toFixed(1)}
             color="$color"
           />
           <StatCard

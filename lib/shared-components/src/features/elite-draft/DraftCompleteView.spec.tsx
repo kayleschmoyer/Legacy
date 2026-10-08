@@ -9,8 +9,9 @@
  */
 import React from 'react';
 import { DraftCompleteView } from './DraftCompleteView';
+import { DraftRoomRecap } from './DraftRoomRecap';
 import type { DraftPickRecord, DraftPlayer } from './types';
-import { fireEvent, render } from '../../test-utils';
+import { fireEvent, render, within } from '../../test-utils';
 
 function buildLargeRoster(count: number): {
   picks: DraftPickRecord[];
@@ -264,6 +265,92 @@ describe('DraftCompleteView', () => {
       expect(utils.getByText('HR')).toBeTruthy();
       expect(utils.getAllByLabelText('baseball').length).toBeGreaterThan(0);
       expect(utils.queryByText('PASS YDS')).toBeNull();
+    });
+  });
+
+  // LS-10997: the wide view grades whichever team is selected, and must agree
+  // with the compact recap for the same team.
+  describe('draft grades (LS-10997)', () => {
+    const roster = buildLargeRoster(6);
+    const players = roster.players.map((p, i) => ({
+      ...p,
+      ppg: (i % 3) * 10 + i,
+    }));
+    const statsLookup = new Map(players.map((p) => [p.id, p]));
+    const picks = roster.picks.map((p, i) => ({
+      ...p,
+      teamId: (i % 2) + 1,
+    }));
+    const leagueTeams = [
+      { id: 1, name: 'Aces' },
+      { id: 2, name: 'Bombers' },
+    ] as React.ComponentProps<typeof DraftCompleteView>['leagueTeams'];
+    const wideProps = {
+      ...defaultProps,
+      pickHistory: picks,
+      statsLookup,
+      leagueTeams,
+      myTeamId: 1,
+      myTeam: players.filter((_, i) => i % 2 === 0),
+      myTeamPicks: picks.filter((p) => p.teamId === 1),
+    };
+
+    const LABELS = ['Draft Grade', 'Proj Pts', 'ADP Value'];
+
+    function recapValues(teamId: number): string[] {
+      const view = render(
+        <DraftRoomRecap
+          pickHistory={picks}
+          myTeamPicks={wideProps.myTeamPicks}
+          myTeam={wideProps.myTeam}
+          statsLookup={statsLookup}
+          leaguePositions={[{ positionType: 'OF' }]}
+          sport="baseball"
+          maxRosterSize={6}
+          isPremium={false}
+          teamNameById={() => 'Team'}
+          isMock={false}
+          leagueId={1}
+          myTeamId={1}
+          leagueTeams={leagueTeams}
+          onNavigate={jest.fn()}
+        />,
+      );
+      fireEvent.click(view.getByTestId(`draft-recap-team-${teamId}`));
+      const recap = within(view.getByTestId('draft-room-recap'));
+      return LABELS.map((label) =>
+        (recap.getByText(label).parentElement?.textContent ?? '').replace(
+          label,
+          '',
+        ),
+      );
+    }
+
+    function wideValues(
+      view: ReturnType<typeof render>,
+      teamName: string | RegExp,
+    ): string[] {
+      fireEvent.click(view.getByText(teamName));
+      return [
+        ['draft-complete-grade-letter', LABELS[0]],
+        ['draft-complete-proj-pts', LABELS[1]],
+        ['draft-complete-adp-value', LABELS[2]],
+      ].map(([id, label]) =>
+        (view.getByTestId(id).textContent ?? '').replace(label, ''),
+      );
+    }
+
+    it.each([
+      [1, /^Aces/],
+      [2, 'Bombers'],
+    ])('matches DraftRoomRecap for team %d', (teamId, teamName) => {
+      const wide = wideValues(
+        render(<DraftCompleteView {...wideProps} />),
+        teamName,
+      );
+      expect(wide[0]).toMatch(/^(A\+|A|B\+|B|C|D|—)$/);
+      expect(wide[1]).toMatch(/^\d+\.\d$/);
+      expect(wide).toEqual(recapValues(teamId));
     });
   });
 });

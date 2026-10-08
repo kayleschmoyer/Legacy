@@ -8,6 +8,7 @@ import {
 } from '@legacy-sports/design-tokens';
 import type { DraftPickRecord, DraftPlayer, LeagueTeam } from './types';
 import { BaseballCard } from './BaseballCard';
+import { computeTeamDraftGrade } from './draftGrades';
 import {
   getDraftCompletionActions,
   resolveDraftedPlayers,
@@ -96,6 +97,47 @@ function RosterCardGrid({
   );
 }
 
+interface GradeStatProps {
+  testID: string;
+  label: string;
+  value: string;
+  color: string;
+}
+
+function GradeStat({
+  testID,
+  label,
+  value,
+  color,
+}: GradeStatProps): React.JSX.Element {
+  return (
+    <YStack
+      testID={testID}
+      flex={1}
+      backgroundColor={withAlpha(darkText.fg1Strong, 0.05)}
+      borderRadius={14}
+      paddingVertical={12}
+      paddingHorizontal={8}
+      alignItems="center"
+      gap={4}
+    >
+      <Text
+        fontSize={9}
+        fontWeight="700"
+        letterSpacing={1.2}
+        textTransform="uppercase"
+        color="$textMuted"
+        textAlign="center"
+      >
+        {label}
+      </Text>
+      <Text fontFamily="$heading" fontSize={20} fontWeight="800" color={color}>
+        {value}
+      </Text>
+    </YStack>
+  );
+}
+
 export function DraftCompleteView({
   draftSummary,
   leagueId,
@@ -123,6 +165,17 @@ export function DraftCompleteView({
   const selectedTeamPlayers: DraftPlayer[] = useMemo(
     () => resolveDraftedPlayers(selectedTeamPicks, statsLookup),
     [selectedTeamPicks, statsLookup],
+  );
+
+  const { grade, totalValue, projPts } = useMemo(
+    () =>
+      computeTeamDraftGrade(
+        pickHistory,
+        selectedTeamPicks,
+        selectedTeamPlayers,
+        statsLookup,
+      ),
+    [pickHistory, selectedTeamPicks, selectedTeamPlayers, statsLookup],
   );
 
   const actions = getDraftCompletionActions({
@@ -275,6 +328,34 @@ export function DraftCompleteView({
                   </Button>
                 );
               })}
+            </XStack>
+
+            {/* Selected team's grade — same helper as DraftRoomRecap so both
+                views grade a team identically (LS-10997). */}
+            <XStack
+              testID="draft-complete-grade"
+              gap={10}
+              marginBottom="$4"
+              justifyContent="center"
+            >
+              <GradeStat
+                testID="draft-complete-grade-letter"
+                label="Draft Grade"
+                value={grade}
+                color="$brandGold"
+              />
+              <GradeStat
+                testID="draft-complete-proj-pts"
+                label="Proj Pts"
+                value={projPts.toFixed(1)}
+                color="$color"
+              />
+              <GradeStat
+                testID="draft-complete-adp-value"
+                label="ADP Value"
+                value={`${totalValue >= 0 ? '+' : ''}${totalValue}`}
+                color="$statusSuccessFg"
+              />
             </XStack>
 
             {/* Roster header */}
