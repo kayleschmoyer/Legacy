@@ -178,6 +178,14 @@ export async function addLabelAsApp(prNumber, label) {
 }
 
 /**
+ * Opening line of every LLM-clean APPROVE body. Exported so the LS-10963
+ * unchanged-diff check (unchanged-diff.mjs) can recognise an earlier bot
+ * approval after `dismiss_stale_reviews_on_push` has flipped its state to
+ * DISMISSED — GraphQL keeps the body but not the original verdict.
+ */
+export const APPROVE_BODY_TEXT = 'LGTM — no blocking findings.';
+
+/**
  * Format the PR review body for a blocking or approving review.
  * Each blocking finding gets an embedded <!-- issue-id: ... --> marker so
  * T22 (cycle protocol) can correlate author replies to specific findings.
@@ -196,23 +204,28 @@ export async function addLabelAsApp(prNumber, label) {
  * @param {Array<import('./findings.mjs').Finding & { issueId: string }>} blockingWithIds
  * @param {'REQUEST_CHANGES'|'APPROVE'} event
  * @param {import('./findings.mjs').Finding[]} [observations]
- * @param {{ fallbackModel?: string, unanchored?: import('./findings.mjs').Finding[] }} [opts]
+ * `notice` (LS-10963) is a pre-rendered block placed before everything else —
+ * used for the unchanged-diff re-affirmation note.
+ *
+ * @param {{ fallbackModel?: string, unanchored?: import('./findings.mjs').Finding[], notice?: string }} [opts]
  * @returns {string}
  */
 export function formatReviewBody(
   blockingWithIds,
   event,
   observations = [],
-  { fallbackModel, unanchored = [] } = {},
+  { fallbackModel, unanchored = [], notice } = {},
 ) {
-  const banner = fallbackModel
-    ? `> [!NOTE]\n> This review was generated using **${fallbackModel}** (fallback) because the primary model was temporarily unavailable. Quality may differ slightly.\n\n`
-    : '';
+  const banner =
+    (notice ? `${notice}\n\n` : '') +
+    (fallbackModel
+      ? `> [!NOTE]\n> This review was generated using **${fallbackModel}** (fallback) because the primary model was temporarily unavailable. Quality may differ slightly.\n\n`
+      : '');
 
   const parts = [];
 
   if (event === 'APPROVE') {
-    parts.push(`${banner}LGTM — no blocking findings.`);
+    parts.push(`${banner}${APPROVE_BODY_TEXT}`);
   } else {
     parts.push(`${banner}## Changes Required\n`);
     for (const f of blockingWithIds) {
@@ -412,11 +425,12 @@ export function partitionFindingsForInline(findingsWithIds, ranges) {
  *            nonBlocking: import('./findings.mjs').Finding[],
  *            observations?: import('./findings.mjs').Finding[],
  *            fallbackModel?: string,
- *            diff?: string }} gated
+ *            diff?: string,
+ *            notice?: string }} gated  `notice`: see formatReviewBody (LS-10963)
  */
 export async function postRealReview(
   prNumber,
-  { blocking, nonBlocking, observations = [], fallbackModel, diff },
+  { blocking, nonBlocking, observations = [], fallbackModel, diff, notice },
 ) {
   const appId = process.env.REVIEWER_BOT_APP_ID;
   const privateKeyPem = process.env.REVIEWER_BOT_APP_PRIVATE_KEY;
@@ -476,6 +490,7 @@ export async function postRealReview(
   const body = formatReviewBody(blockingWithIds, event, observations, {
     fallbackModel,
     unanchored: unanchoredNonBlocking,
+    notice,
   });
   const comments = buildInlineComments([
     ...blockingSplit.anchorable,

@@ -52,6 +52,24 @@ describe('formatReviewBody', () => {
     assert.match(body, /LGTM/);
   });
 
+  it('places a notice before the fallback banner and the LGTM line (LS-10963)', () => {
+    const body = formatReviewBody([], 'APPROVE', [], {
+      notice: '> [!NOTE]\n> re-affirmed',
+      fallbackModel: 'fallback-model',
+    });
+    const noticeAt = body.indexOf('re-affirmed');
+    const bannerAt = body.indexOf('fallback-model');
+    const lgtmAt = body.indexOf('LGTM — no blocking findings.');
+    assert.ok(noticeAt >= 0 && noticeAt < bannerAt && bannerAt < lgtmAt);
+  });
+
+  it('omits the notice block when no notice is given', () => {
+    assert.strictEqual(
+      formatReviewBody([], 'APPROVE'),
+      'LGTM — no blocking findings.',
+    );
+  });
+
   it('includes finding titles in REQUEST_CHANGES body', () => {
     const findings = [
       {

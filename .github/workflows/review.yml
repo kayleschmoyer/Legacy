@@ -17,6 +17,11 @@ name: Reviewer (W1)
 # guard — once the label was present, that guard made every subsequent
 # trigger a no-op forever.
 #
+# Unchanged-diff re-affirmation (LS-10963): a synchronize that moves the head
+# SHA without changing the PR's own diff (merge from base, update-branch, clean
+# rebase) re-posts the bot's last APPROVE on the new head instead of running
+# the LLM again — see lib/unchanged-diff.mjs. Fails open to a full review.
+#
 # Queued-PR coverage (LS-8289/LS-8297): merge-when-ready deliberately does
 # NOT trigger this workflow. When a queued PR's head SHA is missing its
 # bot-review status (the deadlock that froze 30+ PRs on 2026-07-01), the

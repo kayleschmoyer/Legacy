@@ -65,6 +65,8 @@ When the cycle limit (MAX_CYCLE = 3) is reached, the bot posts an arbitration co
 
 > Prior `APPROVED` bot reviews do **not** count toward `MAX_CYCLE` (LS-4904) — only unresolved `CHANGES_REQUESTED` cycles consume slots, so post-approval pushes start fresh.
 
+> A push that does not change the PR's own diff since the bot's last approval — a merge from the base branch, `update-branch`, or a clean rebase — is **not re-reviewed** (LS-10963). The bot compares the PR diff at the approved commit and at the new head (`compare/{base}...{sha}`, hunk line numbers ignored) and, if identical, re-posts `bot-review` success plus an APPROVE noting "diff unchanged since approved `<sha>`; re-affirmed without re-review". No LLM call is made and no cycle is consumed. Any comparison error, `needs-human-arbitration`, or an admin `bot:reset-cycle-counter` falls back to a full review.
+
 **Author agent response:**
 
 1. Push new commits addressing each outstanding finding listed in the arbitration comment.

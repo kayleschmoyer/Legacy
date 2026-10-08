@@ -82,6 +82,10 @@ import {
 import { filterStaleMissingArtifactFindings } from './lib/head-artifacts.mjs';
 import { filterFabricatedFindings } from './lib/finding-verifier.mjs';
 import { reclassifyAffirmationFindings } from './lib/affirmation-guard.mjs';
+import {
+  checkDiffUnchangedSinceApproval,
+  buildReaffirmNotice,
+} from './lib/unchanged-diff.mjs';
 
 // Cap on the current-HEAD file context injected into the review prompt (LS-7768).
 // Keeps a large PR from blowing the prompt size; the diff is always included in
@@ -562,6 +566,7 @@ async function main() {
     process.env.TRIGGERED_BY_SYNCHRONIZE === 'true';
   const triggeredByReadyForReviewLabel =
     process.env.TRIGGERED_BY_READY_LABEL === 'true';
+  let arbitrationCycleAutoReset = false;
   if (
     shouldAutoResetArbitrationCycle({
       cycle,
@@ -599,6 +604,7 @@ async function main() {
     );
     removeLabel(prNumber, NEEDS_HUMAN_ARBITRATION_LABEL);
     cycle = 1;
+    arbitrationCycleAutoReset = true;
     process.stdout.write(
       `[reviewer] Auto-reset cycle counter after post-arbitration push; ${reviewsToDismiss.length} review(s) dismissed\n`,
     );
@@ -615,6 +621,59 @@ async function main() {
       },
     );
     return;
+  }
+
+  // --- Unchanged-diff re-affirmation (LS-10963) ---
+  // A merge from the base branch, `update-branch`, or a clean rebase moves the
+  // head SHA without changing the PR's own diff, yet (with
+  // bot:ready-for-review persisting) still fires this workflow. When the bot's
+  // latest verdict is an APPROVE and the diff is identical to the one it
+  // approved, re-post that verdict on the new head and skip the LLM entirely:
+  // no spend, and no nondeterministic non-APPROVE burning a cycle on code
+  // that has not changed. Every gate above (human stand-down, override,
+  // cycle-reset handling, arbitration auto-reset, MAX_CYCLE escalation) has
+  // already run; only the LLM passes are skipped. An explicit reset, an
+  // arbitration label, shadow mode or the REVIEWER_FORCE_FAIL test hook force
+  // a full review. Fails open — any comparison error means a full review.
+  const forceFullReviewReason = cycleResetByAdmin
+    ? 'admin cycle-counter reset'
+    : arbitrationCycleAutoReset ||
+        prLabels.includes(NEEDS_HUMAN_ARBITRATION_LABEL)
+      ? `'${NEEDS_HUMAN_ARBITRATION_LABEL}' present`
+      : process.env.REVIEWER_SHADOW_MODE === 'true'
+        ? 'shadow mode'
+        : process.env.REVIEWER_FORCE_FAIL === 'true'
+          ? 'REVIEWER_FORCE_FAIL'
+          : null;
+  if (forceFullReviewReason) {
+    process.stdout.write(
+      `[reviewer] Unchanged-diff check skipped (${forceFullReviewReason}) — running full review\n`,
+    );
+  } else {
+    const unchanged = checkDiffUnchangedSinceApproval({
+      reviews: allReviews,
+      issueComments: prIssueComments,
+      headSha: sha,
+      baseRef: ctx.baseRefName,
+    });
+    if (unchanged.unchanged) {
+      await reaffirmUnchangedApproval(prNumber, sha, unchanged.approvedSha, {
+        provider: providerName,
+        cycle,
+        authorLogin,
+        authorType,
+        cycleCounterExclusions: {
+          infra_failure: cycleExcludedInfra,
+          dismissed: cycleExcludedDismissed,
+          thread_reply_artifact: cycleExcludedThreadReplyArtifact,
+          admin_reset: cycleResetByAdmin,
+        },
+      });
+      return;
+    }
+    process.stdout.write(
+      `[reviewer] Unchanged-diff check: ${unchanged.reason} — running full review\n`,
+    );
   }
 
   // Gather prior review context for C2/C3 post-LLM validators.
@@ -1461,6 +1520,89 @@ async function main() {
       preserveReadyLabel: true,
     });
   }
+}
+
+/**
+ * Re-post the bot's APPROVE verdict on `sha` without running the LLM, because
+ * the PR's diff is unchanged since the approval at `approvedSha` (LS-10963).
+ *
+ * Mirrors the tail of the normal APPROVED path in main() — `bot-review`
+ * success, telemetry, an APPROVE review via postRealReview (so the
+ * ci-orchestrator's restore-merge-label and everything else keyed on an
+ * active bot approval behave exactly as after a clean review),
+ * `merge-when-ready`, and operational-label cleanup preserving
+ * `bot:ready-for-review`. The new APPROVED review is excluded from the cycle
+ * counter like every approval (computeCycle), so this never consumes a cycle.
+ *
+ * @param {number} prNumber
+ * @param {string} sha
+ * @param {string} approvedSha
+ * @param {{ provider: string, cycle: number, authorLogin: string, authorType: string, cycleCounterExclusions: object }} telemetryCtx
+ */
+async function reaffirmUnchangedApproval(
+  prNumber,
+  sha,
+  approvedSha,
+  telemetryCtx,
+) {
+  const shortSha = approvedSha.slice(0, 7);
+  process.stdout.write(
+    `[reviewer] Diff unchanged since approved ${shortSha} — re-affirming APPROVE on ${sha.slice(0, 7)} without LLM review (LS-10963)\n`,
+  );
+  try {
+    setCommitStatus(
+      sha,
+      'success',
+      `Review passed (diff unchanged since approved ${shortSha})`,
+    );
+  } catch (err) {
+    process.stderr.write(
+      `[reviewer] Failed to set bot-review success: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+  }
+  await emitTelemetry(
+    buildRecord({
+      pr: prNumber,
+      sha,
+      model: process.env.REVIEWER_MODEL ?? 'codex',
+      provider: telemetryCtx.provider,
+      cycle: telemetryCtx.cycle,
+      verdict: 'APPROVED',
+      reviewType: 'reaffirmed',
+      findings: [],
+      usage: undefined,
+      latencyMs: 0,
+      shadow: false,
+      authorLogin: telemetryCtx.authorLogin,
+      authorType: telemetryCtx.authorType,
+      cycleCounterExclusions: telemetryCtx.cycleCounterExclusions,
+    }),
+  );
+  try {
+    await postRealReview(prNumber, {
+      blocking: [],
+      nonBlocking: [],
+      observations: [],
+      notice: buildReaffirmNotice(approvedSha),
+    });
+  } catch (err) {
+    process.stderr.write(
+      `[reviewer] Failed to post re-affirmed approval review: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+    process.exit(0);
+  }
+  try {
+    addLabel(prNumber, 'merge-when-ready');
+    process.stdout.write(
+      `[reviewer] Added 'merge-when-ready' label to PR #${prNumber}\n`,
+    );
+  } catch (err) {
+    process.stderr.write(
+      `[reviewer] Failed to add label 'merge-when-ready': ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+  }
+  // Keep bot:ready-for-review through merge (LS-4678), as on the normal path.
+  cleanupOperationalLabels(prNumber, { preserveReadyLabel: true });
 }
 
 /**
