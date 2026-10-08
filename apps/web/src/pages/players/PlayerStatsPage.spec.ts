@@ -15,6 +15,7 @@ import {
   MAX_EXPORT_BYTES,
   migrateStatsSearchParams,
   parseClampedInt,
+  parseGridPageParam,
   parsePageSize,
   parsePitchingSortParams,
   parseStatsSearchParams,
@@ -747,6 +748,61 @@ describe('parseStatsSortParams (LS-7115)', () => {
     expect(
       parseStatsSortParams(new URLSearchParams('view=hitters')),
     ).toBeNull();
+  });
+});
+
+describe('grid pager URL persistence (LS-10658)', () => {
+  it('writes page/pitchingPage only past page 1', () => {
+    const out = buildStatsSearchParams({
+      viewMode: 'combined',
+      pageSize: 25,
+      filters: { page: 3, pitchingPage: 2 },
+    });
+    expect(out.get('page')).toBe('3');
+    expect(out.get('pitchingPage')).toBe('2');
+
+    const first = buildStatsSearchParams({
+      viewMode: 'combined',
+      pageSize: 25,
+      filters: { page: 1 },
+    });
+    expect(first.has('page')).toBe(false);
+    expect(first.has('pitchingPage')).toBe(false);
+  });
+
+  it('round-trips page, pitchingPage and pageSize through the URL', () => {
+    const url = buildStatsSearchParams({
+      viewMode: 'combined',
+      pageSize: 50,
+      filters: { searchTerm: 'Ruth', page: 768, pitchingPage: 4 },
+    });
+    const parsed = parseStatsSearchParams(url);
+    expect(parsed.pageSize).toBe(50);
+    expect(parsed.filters).toMatchObject({
+      searchTerm: 'Ruth',
+      page: 768,
+      pitchingPage: 4,
+    });
+  });
+
+  it('parses the page from the reported URL shape', () => {
+    const parsed = parseStatsSearchParams(
+      new URLSearchParams('pageSize=25&sport=mlb&v=1&view=combined&page=3'),
+    );
+    expect(parsed.filters.page).toBe(3);
+    expect(parsed.filters.pitchingPage).toBeUndefined();
+  });
+
+  it.each([null, '', '0', '1', '-2', '2.5', '1e3', 'abc', '1000001'])(
+    'parseGridPageParam(%p) falls back to page 1',
+    (raw) => {
+      expect(parseGridPageParam(raw)).toBeUndefined();
+    },
+  );
+
+  it('parseGridPageParam accepts a plain integer page', () => {
+    expect(parseGridPageParam('2')).toBe(2);
+    expect(parseGridPageParam('1000000')).toBe(1000000);
   });
 });
 

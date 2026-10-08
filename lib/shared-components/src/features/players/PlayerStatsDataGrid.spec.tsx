@@ -556,6 +556,120 @@ describe('PlayerStatsDataGrid - Interactions', () => {
 });
 
 // =============================================================================
+// Controlled pagination (LS-10658)
+// =============================================================================
+
+/** One-row career-batting page at `offset`, 50 rows total (2 pages of 25). */
+function battingPageMock(offset: number, playerId: number): MockedResponse {
+  return {
+    request: {
+      query: CAREER_BATTING_STATS_QUERY,
+      variables: {
+        first: 25,
+        after: offset > 0 ? btoa(String(offset)) : undefined,
+        orderBy: 'homeRuns',
+        orderDirection: 'desc',
+        minGames: 0,
+        minHomeRuns: 0,
+        minRBI: 0,
+        minBattingAvg: 0,
+        searchTerm: '',
+      },
+    },
+    result: {
+      data: {
+        careerBattingStats: {
+          __typename: 'CareerBattingConnection',
+          edges: [
+            {
+              __typename: 'CareerBattingEdge',
+              node: { ...mockPlayerData[0], playerId },
+              cursor: btoa(String(offset)),
+            },
+          ],
+          pageInfo: {
+            __typename: 'PageInfo',
+            hasNextPage: offset === 0,
+            hasPreviousPage: offset > 0,
+            startCursor: btoa(String(offset)),
+            endCursor: btoa(String(offset)),
+          },
+          totalCount: 50,
+        },
+      },
+    },
+  };
+}
+
+describe('PlayerStatsDataGrid - Controlled pagination (LS-10658)', () => {
+  test('a controlled page loads that page and reports moves to the host', async () => {
+    const onPageChange = jest.fn();
+    render(
+      <TestWrapper mocks={[battingPageMock(25, 2), playersQueryMock]}>
+        <PlayerStatsDataGrid
+          {...defaultProps}
+          page={2}
+          onPageChange={onPageChange}
+        />
+      </TestWrapper>,
+    );
+
+    // Restored straight onto page 2 (offset 25) — e.g. from `?page=2`.
+    await waitFor(() => {
+      expect(screen.getByTestId('player-row-2')).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Page 2 of 2/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('← Previous'));
+    expect(onPageChange).toHaveBeenCalledWith(1);
+    // The host owns the page, so the grid does not move until the prop does.
+    expect(screen.getByText(/Page 2 of 2/)).toBeInTheDocument();
+  });
+
+  test('Next reports the following page to the host', async () => {
+    const onPageChange = jest.fn();
+    render(
+      <TestWrapper mocks={[battingPageMock(0, 1), playersQueryMock]}>
+        <PlayerStatsDataGrid
+          {...defaultProps}
+          page={1}
+          onPageChange={onPageChange}
+        />
+      </TestWrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('player-row-1')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText('Next →'));
+    expect(onPageChange).toHaveBeenCalledWith(2);
+  });
+
+  test('pager offers only the host page sizes and reports "Show: N"', async () => {
+    const onPageSizeChange = jest.fn();
+    render(
+      <TestWrapper mocks={[battingPageMock(0, 1), playersQueryMock]}>
+        <PlayerStatsDataGrid
+          {...defaultProps}
+          page={1}
+          pageSize={25}
+          pageSizeOptions={[10, 25, 50]}
+          onPageSizeChange={onPageSizeChange}
+        />
+      </TestWrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('player-row-1')).toBeInTheDocument();
+    });
+    // Combined caps at 50 (LS-7117), so the pager must not offer 100.
+    expect(screen.queryByText('100')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('50'));
+    expect(onPageSizeChange).toHaveBeenCalledWith(50);
+  });
+});
+
+// =============================================================================
 // Error Handling Tests
 // =============================================================================
 

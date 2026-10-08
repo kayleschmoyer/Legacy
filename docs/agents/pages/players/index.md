@@ -72,6 +72,8 @@ Clicking a player row opens `PlayerDetailModal` (full stat breakdown).
 | `minERA` / `maxERA`               | ERA range                     |
 | `minWins` / `maxWins`             | Wins range                    |
 | `minStrikeouts` / `maxStrikeouts` | SO range                      |
+| `page`                            | batting grid page (≥ 2)       |
+| `pitchingPage`                    | pitching grid page (≥ 2)      |
 
 All numeric values clamped to `MAX_GRAPHQL_INT = 2,147,483,647`.
 

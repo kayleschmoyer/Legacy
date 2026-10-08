@@ -338,6 +338,31 @@ export function appendSortParams(
 }
 
 /**
+ * Coerce an untrusted page number (e.g. parsed from a URL) to a valid 1-based
+ * page: anything that is not a positive safe integer becomes page 1 (LS-10658).
+ */
+export function normalizeGridPage(page: number | undefined): number {
+  return page !== undefined && Number.isSafeInteger(page) && page >= 1
+    ? page
+    : 1;
+}
+
+/**
+ * The `page`/`pitchingPage` pair for the batting and pitching grid pagers,
+ * omitting either one while it is on page 1 so default views keep clean URLs.
+ * Pure (LS-10658).
+ */
+export function gridPageFilter(
+  battingPage: number,
+  pitchingPage: number,
+): Pick<PlayerStatsFilters, 'page' | 'pitchingPage'> {
+  const filter: Pick<PlayerStatsFilters, 'page' | 'pitchingPage'> = {};
+  if (battingPage > 1) filter.page = battingPage;
+  if (pitchingPage > 1) filter.pitchingPage = pitchingPage;
+  return filter;
+}
+
+/**
  * Serialize a committed filter snapshot into the shareable relative URL. Reads
  * the *applied* snapshot (never the uncommitted toolbar draft) so a shared link
  * always reflects what the sender sees on screen (LS-7131 / PST-071). Free of
@@ -350,6 +375,8 @@ export function buildShareUrl(
   sortDir: 'asc' | 'desc' = DEFAULT_BATTING_SORT_DIR,
   pitchingSortBy: string = DEFAULT_PITCHING_SORT_BY,
   pitchingSortDir: 'asc' | 'desc' = DEFAULT_PITCHING_SORT_DIR,
+  battingPage = 1,
+  pitchingPage = 1,
 ): string {
   const params = new URLSearchParams({
     view: viewMode,
@@ -381,6 +408,11 @@ export function buildShareUrl(
   if (filters.maxSO < SO_MAX)
     params.set('maxStrikeouts', String(filters.maxSO));
   appendSortParams(params, sortBy, sortDir, pitchingSortBy, pitchingSortDir);
+  const pages = gridPageFilter(battingPage, pitchingPage);
+  if (pages.page) params.set('page', String(pages.page));
+  if (pages.pitchingPage) {
+    params.set('pitchingPage', String(pages.pitchingPage));
+  }
   // LS-9076: /players is the canonical stats route (formerly /players/stats).
   return `/players?${params.toString()}`;
 }

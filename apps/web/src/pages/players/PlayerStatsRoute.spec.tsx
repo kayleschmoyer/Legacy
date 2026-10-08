@@ -795,6 +795,57 @@ describe('PlayerStatsRoute MLB pitching sort URL round-trip (LS-10690)', () => {
   });
 });
 
+// LS-10658: the grid pagers' page and "Show: N" never reached the URL, so F5,
+// a new tab, Back or a shared link always landed on page 1 at 25 rows.
+describe('PlayerStatsRoute MLB grid pager URL round-trip (LS-10658)', () => {
+  beforeEach(() => {
+    mockNavigate.mockClear();
+    mockSetSearchParams.mockClear();
+    mockFootballEnabled = true;
+  });
+
+  it('seeds the MLB page with the pager state from the URL (reload)', () => {
+    mockSearchParams = new URLSearchParams(
+      'sport=mlb&v=1&view=combined&pageSize=50&page=3&pitchingPage=2',
+    );
+    render(<PlayerStatsRoute />);
+    expect(mockStatsPageProps.initialPageSize).toBe(50);
+    expect(mockStatsPageProps.initialFilters).toMatchObject({
+      page: 3,
+      pitchingPage: 2,
+    });
+  });
+
+  it('ignores a malformed page param', () => {
+    mockSearchParams = new URLSearchParams('sport=mlb&view=hitters&page=abc');
+    render(<PlayerStatsRoute />);
+    const initialFilters = mockStatsPageProps.initialFilters as Record<
+      string,
+      unknown
+    >;
+    expect(initialFilters.page).toBeUndefined();
+  });
+
+  it('mirrors a pager move and page size to the URL', () => {
+    mockSearchParams = new URLSearchParams('sport=mlb&view=combined');
+    render(<PlayerStatsRoute />);
+    const onFiltersChange = mockStatsPageProps.onFiltersChange as (
+      state: unknown,
+    ) => void;
+    act(() =>
+      onFiltersChange({
+        viewMode: 'combined',
+        pageSize: 50,
+        filters: { page: 3, pitchingPage: 2 },
+      }),
+    );
+    const call = mockSetSearchParams.mock.calls.at(-1) as [URLSearchParams];
+    expect(call[0].get('page')).toBe('3');
+    expect(call[0].get('pitchingPage')).toBe('2');
+    expect(call[0].get('pageSize')).toBe('50');
+  });
+});
+
 // LS-7146 / PST-111: the URL parser used to blindly cast `view` to a
 // PlayerStatsViewMode without normalizing, so /players/stats?view=batting
 // rendered the Hitters tab while the address bar kept the `batting` alias

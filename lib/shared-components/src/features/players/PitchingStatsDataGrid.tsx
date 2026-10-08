@@ -70,6 +70,23 @@ export interface PitchingStatsDataGridProps {
     rows: readonly CareerPitchingFragment[],
     totalCount: number,
   ) => void;
+  /**
+   * Controlled 1-based page (LS-10658). When set, the grid reads its page from
+   * this prop instead of local state and reports pager moves via
+   * `onPageChange`, so the host can persist the page to the URL.
+   */
+  page?: number;
+  /** Fired with the target 1-based page on Prev/Next/jump (LS-10658). */
+  onPageChange?: (page: number) => void;
+  /**
+   * Controlled page size (LS-10658). When set, "Show: N" in the pager reports
+   * via `onPageSizeChange` instead of changing local state.
+   */
+  pageSize?: number;
+  /** Fired with the new size when the user picks "Show: N" in the pager. */
+  onPageSizeChange?: (pageSize: number) => void;
+  /** Page sizes offered by the pager (defaults to the pager's own set). */
+  pageSizeOptions?: readonly number[];
 }
 
 /** Key of the always-visible player-name column (never hidden by the picker). */
@@ -467,8 +484,13 @@ export function PitchingStatsDataGrid({
   availabilityFilter,
   onSortChange,
   onDataLoaded,
+  page: controlledPage,
+  onPageChange,
+  pageSize: controlledPageSize,
+  onPageSizeChange,
+  pageSizeOptions,
 }: PitchingStatsDataGridProps): React.ReactElement {
-  const [queryParams, setQueryParams] =
+  const [localQueryParams, setQueryParams] =
     useState<GetCareerPitchingStatsQueryVariables>({
       limit: initialParams.limit || 25,
       offset: initialParams.offset || 0,
@@ -476,6 +498,23 @@ export function PitchingStatsDataGrid({
       orderDirection: initialParams.orderDirection || 'desc',
       ...initialParams,
     });
+
+  // A host-controlled page/page size (LS-10658) overrides the local offset so
+  // the pager position can live in the URL; uncontrolled callers are unchanged.
+  const queryParams = useMemo<GetCareerPitchingStatsQueryVariables>(() => {
+    if (controlledPage === undefined && controlledPageSize === undefined) {
+      return localQueryParams;
+    }
+    const limit = controlledPageSize ?? localQueryParams.limit;
+    return {
+      ...localQueryParams,
+      limit,
+      offset:
+        controlledPage !== undefined
+          ? (controlledPage - 1) * (limit || 25)
+          : localQueryParams.offset,
+    };
+  }, [localQueryParams, controlledPage, controlledPageSize]);
 
   const { data, loading, error, refetch } = useGetCareerPitchingStatsQuery({
     variables: queryParams,
@@ -554,33 +593,43 @@ export function PitchingStatsDataGrid({
     [updateQueryParams, onSortChange],
   );
 
+  // Move to a 1-based page: report it to the host (LS-10658) and, unless the
+  // host controls the page, update the local offset.
+  const goToPage = useCallback(
+    (page: number) => {
+      onPageChange?.(page);
+      if (controlledPage === undefined) {
+        updateQueryParams({ offset: (page - 1) * (queryParams.limit || 25) });
+      }
+    },
+    [onPageChange, controlledPage, queryParams.limit, updateQueryParams],
+  );
+
   const handlePageChange = useCallback(
     (direction: 'next' | 'prev') => {
       const pageSize = queryParams.limit || 25;
-      const currentOffset = queryParams.offset || 0;
+      const currentPage = Math.floor((queryParams.offset || 0) / pageSize) + 1;
 
       if (direction === 'next') {
-        updateQueryParams({ offset: currentOffset + pageSize });
-      } else if (direction === 'prev' && currentOffset > 0) {
-        updateQueryParams({ offset: Math.max(0, currentOffset - pageSize) });
+        goToPage(currentPage + 1);
+      } else if (direction === 'prev' && currentPage > 1) {
+        goToPage(currentPage - 1);
       }
     },
-    [queryParams.limit, queryParams.offset, updateQueryParams],
+    [queryParams.limit, queryParams.offset, goToPage],
   );
 
   const handlePageSizeChange = useCallback(
     (newPageSize: number) => {
-      updateQueryParams({ limit: newPageSize, offset: 0 });
+      onPageSizeChange?.(newPageSize);
+      if (controlledPageSize === undefined) {
+        updateQueryParams({ limit: newPageSize, offset: 0 });
+      }
     },
-    [updateQueryParams],
+    [onPageSizeChange, controlledPageSize, updateQueryParams],
   );
 
-  const handleGoToPage = useCallback(
-    (page: number) => {
-      updateQueryParams({ offset: (page - 1) * (queryParams.limit || 25) });
-    },
-    [queryParams.limit, updateQueryParams],
-  );
+  const handleGoToPage = goToPage;
 
   const handleRowClick = useCallback(
     (player: CareerPitchingFragment) => {
@@ -603,7 +652,8 @@ export function PitchingStatsDataGrid({
       position: undefined,
       offset: 0,
     });
-  }, [updateQueryParams]);
+    if (controlledPage !== undefined) onPageChange?.(1);
+  }, [updateQueryParams, controlledPage, onPageChange]);
 
   const pageSize = queryParams.limit || 25;
   const currentOffset = queryParams.offset || 0;
@@ -655,6 +705,7 @@ export function PitchingStatsDataGrid({
       totalPages={totalPages}
       totalCount={totalCount}
       pageSize={pageSize}
+      pageSizeOptions={pageSizeOptions}
       hasPreviousPage={hasPreviousPage}
       hasNextPage={hasNextPage}
       onPrev={() => handlePageChange('prev')}

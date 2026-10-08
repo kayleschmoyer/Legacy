@@ -26,11 +26,13 @@ import {
   DEFAULT_PITCHING_SORT_DIR,
   enforceSearchMinLength,
   ERA_MAX_OFF,
+  gridPageFilter,
   hasPendingFilterChanges,
   HR_MAX,
   HR_STEP,
   MIN_SEARCH_LENGTH,
   MLB_TEAMS,
+  normalizeGridPage,
   normalizeViewMode,
   pageSizeOptionsForViewMode,
   pitchingSortFilter,
@@ -288,6 +290,20 @@ export function useBaseballController(
     () => initialFilters.pitchingSortDir ?? DEFAULT_PITCHING_SORT_DIR,
   );
 
+  // ── Grid pager pages (persisted to URL, LS-10658) ──────────────
+  // Lifted out of the grids (which now take them as controlled props) so the
+  // page survives reload / share / Back. One page per grid: Combined shows both.
+  const [battingPage, setBattingPage] = useState(() =>
+    normalizeGridPage(initialFilters.page),
+  );
+  const [pitchingPage, setPitchingPage] = useState(() =>
+    normalizeGridPage(initialFilters.pitchingPage),
+  );
+  const resetGridPages = useCallback(() => {
+    setBattingPage(1);
+    setPitchingPage(1);
+  }, []);
+
   // ── Toolbar draft state (not applied until applyFilters()) ─────
   const [search, setSearch] = useState(initialFilters.searchTerm ?? '');
   const [position, setPosition] = useState(
@@ -391,8 +407,12 @@ export function useBaseballController(
   );
 
   const applyFilters = useCallback(() => {
+    // A real filter change starts both grids over at page 1 (LS-10658).
+    if (hasPendingFilterChanges(committedDraft, appliedFilters)) {
+      resetGridPages();
+    }
     setAppliedFilters(committedDraft);
-  }, [committedDraft]);
+  }, [committedDraft, appliedFilters, resetGridPages]);
 
   const hasPendingChanges = useMemo(
     () => hasPendingFilterChanges(committedDraft, appliedFilters),
@@ -402,17 +422,37 @@ export function useBaseballController(
   const handleViewModeChange = useCallback(
     (next: 'combined' | 'hitters' | 'pitchers') => {
       setViewMode(next);
+      // The tab changes the result set (e.g. Combined vs Hitters batting rows),
+      // so the old page number no longer points anywhere meaningful.
+      resetGridPages();
       setPageSize((cur) => clampPageSizeForViewMode(cur, next));
       setAppliedFilters((cur) => {
         const clamped = clampPageSizeForViewMode(cur.pageSize, next);
         return clamped === cur.pageSize ? cur : { ...cur, pageSize: clamped };
       });
     },
-    [],
+    [resetGridPages],
+  );
+
+  // "Show: N" in a grid pager (LS-10658): commits the page size straight to the
+  // applied snapshot — mirrored in the toolbar ROWS control and the URL — and
+  // restarts both grids, which share it, at page 1.
+  const handleGridPageSizeChange = useCallback(
+    (next: number) => {
+      const clamped = clampPageSizeForViewMode(next, viewMode);
+      setPageSize(clamped);
+      setAppliedFilters((cur) =>
+        cur.pageSize === clamped ? cur : { ...cur, pageSize: clamped },
+      );
+      resetGridPages();
+    },
+    [viewMode, resetGridPages],
   );
 
   // Stringify-based key forces grid unmount/remount on each filter commit.
-  const appliedKey = JSON.stringify(appliedFilters);
+  // Page size is excluded: the grids take it as a controlled prop (LS-10658),
+  // so a pager "Show: N" change re-queries in place instead of remounting.
+  const appliedKey = JSON.stringify({ ...appliedFilters, pageSize: undefined });
   const battingKey = `batting-${appliedKey}`;
   const pitchingKey = `pitching-${appliedKey}`;
 
@@ -448,6 +488,7 @@ export function useBaseballController(
     (nextSortBy: string, nextSortDir: 'asc' | 'desc') => {
       setSortBy(nextSortBy);
       setSortDir(nextSortDir);
+      setBattingPage(1);
     },
     [],
   );
@@ -484,6 +525,7 @@ export function useBaseballController(
     (nextSortBy: string, nextSortDir: 'asc' | 'desc') => {
       setPitchingSortBy(nextSortBy);
       setPitchingSortDir(nextSortDir);
+      setPitchingPage(1);
     },
     [],
   );
@@ -522,6 +564,7 @@ export function useBaseballController(
       filters.maxStrikeouts = appliedFilters.maxSO;
     Object.assign(filters, battingSortFilter(sortBy, sortDir));
     Object.assign(filters, pitchingSortFilter(pitchingSortBy, pitchingSortDir));
+    Object.assign(filters, gridPageFilter(battingPage, pitchingPage));
     onFiltersChange({
       viewMode,
       pageSize: appliedFilters.pageSize,
@@ -534,6 +577,8 @@ export function useBaseballController(
     sortDir,
     pitchingSortBy,
     pitchingSortDir,
+    battingPage,
+    pitchingPage,
     onFiltersChange,
   ]);
 
@@ -731,6 +776,8 @@ export function useBaseballController(
         sortDir,
         pitchingSortBy,
         pitchingSortDir,
+        battingPage,
+        pitchingPage,
       ),
     );
   }, [
@@ -741,15 +788,19 @@ export function useBaseballController(
     sortDir,
     pitchingSortBy,
     pitchingSortDir,
+    battingPage,
+    pitchingPage,
   ]);
 
   // ── Visibility flags ───────────────────────────────────────────
   const showBatting = viewMode === 'combined' || viewMode === 'hitters';
   const showPitching = viewMode === 'combined' || viewMode === 'pitchers';
 
-  const pageSizeOptions = pageSizeOptionsForViewMode(
-    viewMode,
-    isPremiumPageSize,
+  // Memoized: also fed to the grid pagers (LS-10658), so a fresh array per
+  // render would needlessly invalidate the grid render callback.
+  const pageSizeOptions = useMemo(
+    () => pageSizeOptionsForViewMode(viewMode, isPremiumPageSize),
+    [viewMode, isPremiumPageSize],
   );
 
   // ── Column picker derived state (LS-7105) ──────────────────────
@@ -1207,6 +1258,11 @@ export function useBaseballController(
               initialParams={battingParams}
               onPlayerSelect={handleBattingPlayerClick}
               onSortChange={handleBattingSortChange}
+              page={battingPage}
+              onPageChange={setBattingPage}
+              pageSize={appliedFilters.pageSize}
+              onPageSizeChange={handleGridPageSizeChange}
+              pageSizeOptions={pageSizeOptions}
               showPagination={true}
               statsFormat={statsFormat}
               visibleColumns={gridVisibleColumns}
@@ -1228,6 +1284,11 @@ export function useBaseballController(
               initialParams={pitchingParams}
               onPlayerSelect={handlePitchingPlayerClick}
               onSortChange={handlePitchingSortChange}
+              page={pitchingPage}
+              onPageChange={setPitchingPage}
+              pageSize={appliedFilters.pageSize}
+              onPageSizeChange={handleGridPageSizeChange}
+              pageSizeOptions={pageSizeOptions}
               showPagination={true}
               statsFormat={statsFormat}
               visibleColumns={gridVisibleColumns}
@@ -1254,6 +1315,11 @@ export function useBaseballController(
     handlePitchingPlayerClick,
     handleBattingSortChange,
     handlePitchingSortChange,
+    battingPage,
+    pitchingPage,
+    appliedFilters.pageSize,
+    handleGridPageSizeChange,
+    pageSizeOptions,
     statsFormat,
     gridVisibleColumns,
     showAvailabilityFilter,

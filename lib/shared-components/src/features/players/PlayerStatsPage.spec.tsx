@@ -10,7 +10,9 @@ import {
   DEFAULT_BATTING_SORT_BY,
   DEFAULT_BATTING_SORT_DIR,
   enforceSearchMinLength,
+  gridPageFilter,
   hasPendingFilterChanges,
+  normalizeGridPage,
   pageSizeOptionsForViewMode,
   parseSliderValue,
   pitchingSortFilter,
@@ -613,6 +615,44 @@ describe('buildShareUrl (LS-7131)', () => {
     const url = buildShareUrl('pitchers', APPLIED_DEFAULTS);
     expect(url).not.toContain('pitchingSortBy');
     expect(url).not.toContain('pitchingSortDir');
+  });
+
+  it('carries both grid pages in the share URL (LS-10658)', () => {
+    const url = buildShareUrl(
+      'combined',
+      APPLIED_DEFAULTS,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      3,
+      2,
+    );
+    const params = new URLSearchParams(url.split('?')[1]);
+    expect(params.get('page')).toBe('3');
+    expect(params.get('pitchingPage')).toBe('2');
+  });
+
+  it('keeps page keys out of a page-1 share URL (LS-10658)', () => {
+    const url = buildShareUrl('combined', APPLIED_DEFAULTS);
+    expect(url).not.toMatch(/[?&](page|pitchingPage)=/);
+  });
+});
+
+describe('gridPageFilter / normalizeGridPage (LS-10658)', () => {
+  it('omits either page while it is on page 1', () => {
+    expect(gridPageFilter(1, 1)).toEqual({});
+    expect(gridPageFilter(3, 1)).toEqual({ page: 3 });
+    expect(gridPageFilter(1, 2)).toEqual({ pitchingPage: 2 });
+  });
+
+  it('coerces invalid pages to 1', () => {
+    expect(normalizeGridPage(undefined)).toBe(1);
+    expect(normalizeGridPage(0)).toBe(1);
+    expect(normalizeGridPage(-3)).toBe(1);
+    expect(normalizeGridPage(2.5)).toBe(1);
+    expect(normalizeGridPage(Number.NaN)).toBe(1);
+    expect(normalizeGridPage(7)).toBe(7);
   });
 });
 

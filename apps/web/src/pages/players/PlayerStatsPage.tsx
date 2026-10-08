@@ -125,6 +125,23 @@ export function parsePageSize(raw: string | null): number {
     : DEFAULT_PAGE_SIZE;
 }
 
+// Upper bound for the `page`/`pitchingPage` URL params. Keeps the derived
+// offset ((page - 1) * pageSize, at most 500 rows/page) inside GraphQL's
+// 32-bit INT range however the URL was edited.
+const MAX_GRID_PAGE = 1_000_000;
+
+/**
+ * Parse a grid-pager page URL param (`page` / `pitchingPage`, LS-10658). Only a
+ * plain positive integer up to MAX_GRID_PAGE is accepted; anything else —
+ * absent, `0`, negative, `2.5`, `abc` — yields `undefined` (page 1). Exported
+ * for unit testing.
+ */
+export function parseGridPageParam(raw: string | null): number | undefined {
+  if (!raw || !/^\d+$/.test(raw)) return undefined;
+  const parsed = Number.parseInt(raw, 10);
+  return parsed >= 2 && parsed <= MAX_GRID_PAGE ? parsed : undefined;
+}
+
 /**
  * Current version of the URL query-param schema for this page.
  *
@@ -393,6 +410,17 @@ export function buildStatsSearchParams(state: {
     next.set('pitchingSortBy', state.filters.pitchingSortBy);
     next.set('pitchingSortDir', state.filters.pitchingSortDir ?? 'desc');
   }
+  // Grid pager positions, so reload / new tab / Back / share land on the same
+  // page (LS-10658). The shell only populates these past page 1.
+  if (state.filters.page !== undefined && state.filters.page > 1) {
+    next.set('page', String(state.filters.page));
+  }
+  if (
+    state.filters.pitchingPage !== undefined &&
+    state.filters.pitchingPage > 1
+  ) {
+    next.set('pitchingPage', String(state.filters.pitchingPage));
+  }
 
   // Serialize keys in a deterministic alphabetical order (PST-104). URLSearchParams
   // preserves insertion order, so the same filter state could otherwise produce
@@ -506,6 +534,13 @@ export function parseStatsSearchParams(searchParams: URLSearchParams): {
     filters.pitchingSortBy = pitchingSort.pitchingSortBy;
     filters.pitchingSortDir = pitchingSort.pitchingSortDir;
   }
+
+  // Grid pager positions (LS-10658) — the inverse of the `page`/`pitchingPage`
+  // keys buildStatsSearchParams writes.
+  const page = parseGridPageParam(params.get('page'));
+  if (page !== undefined) filters.page = page;
+  const pitchingPage = parseGridPageParam(params.get('pitchingPage'));
+  if (pitchingPage !== undefined) filters.pitchingPage = pitchingPage;
 
   return {
     viewMode,

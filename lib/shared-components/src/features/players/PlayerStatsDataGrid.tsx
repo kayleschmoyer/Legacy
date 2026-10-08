@@ -97,6 +97,30 @@ export interface PlayerStatsDataGridProps {
     rows: readonly PlayerCareerStats[],
     totalCount: number,
   ) => void;
+  /**
+   * Controlled 1-based page (LS-10658). When set, the grid reads its page from
+   * this prop instead of local state and reports pager moves via
+   * `onPageChange`, so the host can persist the page to the URL.
+   */
+  page?: number;
+  /** Fired with the target 1-based page on Prev/Next/jump (LS-10658). */
+  onPageChange?: (page: number) => void;
+  /**
+   * Controlled page size (LS-10658). When set, "Show: N" in the pager reports
+   * via `onPageSizeChange` instead of changing local state.
+   */
+  pageSize?: number;
+  /** Fired with the new size when the user picks "Show: N" in the pager. */
+  onPageSizeChange?: (pageSize: number) => void;
+  /** Page sizes offered by the pager (defaults to the pager's own set). */
+  pageSizeOptions?: readonly number[];
+}
+
+/** Offset cursor for a 1-based page, matching the backend's `after` encoding. */
+function cursorForPage(page: number, pageSize: number): string | undefined {
+  const offset = (page - 1) * pageSize;
+  // btoa (browser-native) rather than Buffer (Node-only) so it works on web.
+  return offset > 0 ? btoa(String(offset)) : undefined;
 }
 
 // =============================================================================
@@ -526,11 +550,33 @@ export function PlayerStatsDataGrid({
   availabilityFilter,
   onSortChange,
   onDataLoaded,
+  page: controlledPage,
+  onPageChange,
+  pageSize: controlledPageSize,
+  onPageSizeChange,
+  pageSizeOptions,
 }: PlayerStatsDataGridProps): React.ReactElement {
-  const [queryParams, setQueryParams] = useState<CareerStatsQueryParams>({
+  const [localQueryParams, setQueryParams] = useState<CareerStatsQueryParams>({
     ...DEFAULT_CAREER_STATS_PARAMS,
     ...initialParams,
   });
+
+  // A host-controlled page/page size (LS-10658) overrides the local cursor so
+  // the pager position can live in the URL; uncontrolled callers are unchanged.
+  const queryParams = useMemo<CareerStatsQueryParams>(() => {
+    if (controlledPage === undefined && controlledPageSize === undefined) {
+      return localQueryParams;
+    }
+    const first = controlledPageSize ?? localQueryParams.first;
+    return {
+      ...localQueryParams,
+      first,
+      after:
+        controlledPage !== undefined
+          ? cursorForPage(controlledPage, first ?? 25)
+          : localQueryParams.after,
+    };
+  }, [localQueryParams, controlledPage, controlledPageSize]);
 
   const {
     data: rawData,
@@ -596,60 +642,6 @@ export function PlayerStatsDataGrid({
     [updateQueryParams, onSortChange],
   );
 
-  const handlePageChange = useCallback(
-    (direction: 'next' | 'prev') => {
-      // Use btoa/atob (browser-native) instead of Buffer (Node.js-only) so
-      // cursor encoding works in the browser environment.
-      const currentOffset = queryParams.after
-        ? parseInt(atob(queryParams.after))
-        : 0;
-      const pageSz = queryParams.first ?? 25;
-
-      if (direction === 'next' && hasNextPage) {
-        // The backend treats the `after` cursor as the starting offset of the
-        // next page, so advance by a full page size.
-        const nextOffset = currentOffset + pageSz;
-        updateQueryParams({ after: btoa(String(nextOffset)) });
-      } else if (direction === 'prev' && hasPreviousPage) {
-        // Go back one full page; if we reach offset 0 omit the cursor so the
-        // query defaults to the first page (matching initial load behaviour).
-        const newOffset = Math.max(0, currentOffset - pageSz);
-        const prevCursor =
-          newOffset > 0 ? btoa(newOffset.toString()) : undefined;
-        updateQueryParams({ after: prevCursor });
-      }
-    },
-    [
-      queryParams.after,
-      queryParams.first,
-      hasNextPage,
-      hasPreviousPage,
-      updateQueryParams,
-    ],
-  );
-
-  const handlePageSizeChange = useCallback(
-    (newPageSize: number) => {
-      updateQueryParams({ first: newPageSize, after: undefined });
-    },
-    [updateQueryParams],
-  );
-
-  const handleGoToPage = useCallback(
-    (pageNumber: number) => {
-      const pageSz = queryParams.first ?? 25;
-      const totalPages = Math.ceil(totalCount / pageSz);
-      if (pageNumber < 1 || pageNumber > totalPages) {
-        return;
-      }
-      const offset = (pageNumber - 1) * pageSz;
-      // Cursor from offset (same encoding used by backend)
-      const cursor = offset > 0 ? btoa(offset.toString()) : undefined;
-      updateQueryParams({ after: cursor });
-    },
-    [queryParams.first, totalCount, updateQueryParams],
-  );
-
   const totalPages = useMemo(() => {
     const pageSz = queryParams.first ?? 25;
     return Math.max(1, Math.ceil(totalCount / pageSz));
@@ -657,9 +649,56 @@ export function PlayerStatsDataGrid({
 
   const currentPageNumber = useMemo(() => {
     const pageSz = queryParams.first ?? 25;
+    // atob (browser-native) rather than Buffer (Node-only) so it works on web.
     const offset = queryParams.after ? parseInt(atob(queryParams.after)) : 0;
     return Math.floor(offset / pageSz) + 1;
   }, [queryParams.after, queryParams.first]);
+
+  // Move to a 1-based page: report it to the host (LS-10658) and, unless the
+  // host controls the page, update the local cursor. The backend treats the
+  // `after` cursor as the starting offset, so page N starts at (N-1)*pageSize.
+  const goToPage = useCallback(
+    (pageNumber: number) => {
+      onPageChange?.(pageNumber);
+      if (controlledPage === undefined) {
+        updateQueryParams({
+          after: cursorForPage(pageNumber, queryParams.first ?? 25),
+        });
+      }
+    },
+    [onPageChange, controlledPage, queryParams.first, updateQueryParams],
+  );
+
+  const handlePageChange = useCallback(
+    (direction: 'next' | 'prev') => {
+      if (direction === 'next' && hasNextPage) {
+        goToPage(currentPageNumber + 1);
+      } else if (direction === 'prev' && hasPreviousPage) {
+        goToPage(Math.max(1, currentPageNumber - 1));
+      }
+    },
+    [hasNextPage, hasPreviousPage, currentPageNumber, goToPage],
+  );
+
+  const handlePageSizeChange = useCallback(
+    (newPageSize: number) => {
+      onPageSizeChange?.(newPageSize);
+      if (controlledPageSize === undefined) {
+        updateQueryParams({ first: newPageSize, after: undefined });
+      }
+    },
+    [onPageSizeChange, controlledPageSize, updateQueryParams],
+  );
+
+  const handleGoToPage = useCallback(
+    (pageNumber: number) => {
+      if (pageNumber < 1 || pageNumber > totalPages) {
+        return;
+      }
+      goToPage(pageNumber);
+    },
+    [totalPages, goToPage],
+  );
 
   const handleRowClick = useCallback(
     (player: PlayerCareerStats) => {
@@ -683,7 +722,8 @@ export function PlayerStatsDataGrid({
       position: undefined,
       after: undefined,
     });
-  }, [updateQueryParams]);
+    if (controlledPage !== undefined) onPageChange?.(1);
+  }, [updateQueryParams, controlledPage, onPageChange]);
 
   // Columns to render: an explicit per-column selection (LS-7105) overrides the
   // statsFormat preset; the Player column is always kept. When no selection is
@@ -757,6 +797,7 @@ export function PlayerStatsDataGrid({
       totalPages={totalPages}
       totalCount={totalCount}
       pageSize={pageSize}
+      pageSizeOptions={pageSizeOptions}
       hasPreviousPage={hasPreviousPage}
       hasNextPage={hasNextPage}
       onPrev={() => handlePageChange('prev')}

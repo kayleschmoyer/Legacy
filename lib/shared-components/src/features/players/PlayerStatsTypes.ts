@@ -35,6 +35,11 @@ export interface PlayerStatsFilters {
   // `careerPitchingStats` orderBy field (e.g. 'outsRecorded', 'whip').
   pitchingSortBy?: string;
   pitchingSortDir?: 'asc' | 'desc';
+  // Grid pager position (1-based), persisted so reload / share / Back restore
+  // the page the user was on (LS-10658). Omitted when on page 1. `page` is the
+  // batting grid; `pitchingPage` the pitching grid, so Combined carries both.
+  page?: number;
+  pitchingPage?: number;
 
   // Pitching statistics filters
   minWins?: number;
