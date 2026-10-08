@@ -679,6 +679,17 @@ describe('PricingPage — Free plan card CTA by viewer state (LS-7184, LS-7185)'
     ).not.toBeInTheDocument();
   });
 
+  it('renders the bottom "Get Started Free" as a muted link beside a single primary CTA (LS-7172)', () => {
+    render(<PricingPage />);
+
+    const freeLink = screen.getByTestId('bottom-cta-free-link');
+    expect(freeLink).toHaveTextContent('Get Started Free');
+    expect(freeLink.tagName).toBe('BUTTON');
+    expect(
+      screen.getAllByRole('button', { name: 'Upgrade to Premium' }),
+    ).toHaveLength(2);
+  });
+
   it('shows a disabled "Current plan" marker instead for authenticated free users', () => {
     mockUseAuth.mockReturnValue({ isAuthenticated: true });
 

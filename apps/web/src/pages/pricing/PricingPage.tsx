@@ -1248,9 +1248,19 @@ export default function PricingPage() {
                 </OutlineButton>
               )}
               {showFreeCta && (
-                <OutlineButton onPress={navigateToHome} width={180}>
+                // LS-7172: the bottom CTA has one primary action; the free
+                // option is a muted text link so the two don't compete.
+                <Button
+                  data-testid="bottom-cta-free-link"
+                  chromeless
+                  size="$3"
+                  color="$gray11"
+                  textDecorationLine="underline"
+                  hoverStyle={{ color: '$color' }}
+                  onPress={navigateToHome}
+                >
                   Get Started Free
-                </OutlineButton>
+                </Button>
               )}
             </XStack>
           </YStack>
