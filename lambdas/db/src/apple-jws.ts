@@ -181,10 +181,13 @@ export async function verifyAppleJwsPayload(jws: string): Promise<JWTPayload> {
  *
  * Validates the x5c certificate chain against Apple Root CA G3 and verifies
  * the ES256 signature before returning the payload. Throws if the JWS is
- * malformed, the certificate chain is untrusted, or the signature is invalid.
+ * malformed, the certificate chain is untrusted, the signature is invalid, or
+ * the transaction's bundleId is not `expectedBundleId` (a validly signed JWS
+ * from a different app must never be accepted).
  */
 export async function decodeAndVerifyJwsTransaction(
   jwsTransaction: string,
+  expectedBundleId: string,
 ): Promise<VerifiedAppleTransactionPayload> {
   const payload = await verifyAppleJwsPayload(jwsTransaction);
 
@@ -196,6 +199,10 @@ export async function decodeAndVerifyJwsTransaction(
     throw new Error(
       `Invalid transaction payload: missing or invalid fields (${fields})`,
     );
+  }
+
+  if (result.data.bundleId !== expectedBundleId) {
+    throw new Error('Invalid transaction: bundle ID mismatch');
   }
 
   return result.data;

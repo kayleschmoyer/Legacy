@@ -1563,7 +1563,10 @@ builder.mutationField('verifyApplePurchase', (t) =>
       // Decode and cryptographically verify the JWS transaction (x5c chain + ES256 signature)
       let transaction: AppleTransactionPayload;
       try {
-        transaction = await decodeAndVerifyJwsTransaction(args.jwsTransaction);
+        transaction = await decodeAndVerifyJwsTransaction(
+          args.jwsTransaction,
+          getExpectedAppleBundleId(),
+        );
       } catch (err) {
         LOGGER.warn('verifyApplePurchase — failed to verify JWS transaction', {
           userId,
@@ -1582,26 +1585,7 @@ builder.mutationField('verifyApplePurchase', (t) =>
         );
       }
 
-      const { originalTransactionId, productId, expiresDate, bundleId } =
-        transaction;
-
-      // Validate bundle ID to prevent cross-app receipt submission
-      const expectedBundleId =
-        process.env['APPLE_BUNDLE_ID'] ?? 'com.legacysports.app';
-      if (bundleId !== expectedBundleId) {
-        LOGGER.warn('verifyApplePurchase — bundle ID mismatch', {
-          userId,
-          bundleId,
-          expectedBundleId,
-        });
-        captureWarning(new Error('verifyApplePurchase — bundle ID mismatch'), {
-          userId,
-          bundleId,
-          expectedBundleId,
-          operation: 'verifyApplePurchase',
-        });
-        throw new Error('Invalid transaction: bundle ID mismatch');
-      }
+      const { originalTransactionId, productId, expiresDate } = transaction;
 
       // Map iOS product IDs to subscription tiers
       const tier = tierFromAppleProductId(productId);
@@ -1701,13 +1685,24 @@ builder.mutationField('restoreApplePurchases', (t) =>
 
       let transaction: AppleTransactionPayload;
       try {
-        transaction = await decodeAndVerifyJwsTransaction(args.jwsTransaction);
+        transaction = await decodeAndVerifyJwsTransaction(
+          args.jwsTransaction,
+          getExpectedAppleBundleId(),
+        );
       } catch (err) {
         LOGGER.warn(
           'restoreApplePurchases — failed to verify JWS transaction',
           {
             userId,
             err,
+          },
+        );
+        captureWarning(
+          new Error('restoreApplePurchases — failed to verify JWS transaction'),
+          {
+            userId,
+            cause: err instanceof Error ? err.message : String(err),
+            operation: 'restoreApplePurchases',
           },
         );
         throw UserInputError(
@@ -1793,6 +1788,10 @@ builder.mutationField('restoreApplePurchases', (t) =>
 // ─── Apple IAP Helpers ────────────────────────────────────────────────────────
 
 type AppleTransactionPayload = VerifiedAppleTransactionPayload;
+
+function getExpectedAppleBundleId(): string {
+  return process.env['APPLE_BUNDLE_ID'] ?? 'com.legacysports.app';
+}
 
 function tierFromAppleProductId(productId: string): 'free' | 'premium' {
   // Product IDs configured in App Store Connect:

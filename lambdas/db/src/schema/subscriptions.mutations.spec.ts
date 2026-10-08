@@ -13,6 +13,7 @@ describe('Google Play mutation validation (LS-5121)', () => {
   let mockFetchGoogleSubscription: jest.Mock;
   let mockIsActiveGoogleSubscription: jest.Mock;
   let mockCaptureWarning: jest.Mock;
+  let mockDecodeJws: jest.Mock;
   let mockCheckAndIncrementRateLimit: jest.Mock;
   let mockLogger: {
     info: jest.Mock;
@@ -33,6 +34,7 @@ describe('Google Play mutation validation (LS-5121)', () => {
     mockFetchGoogleSubscription = jest.fn();
     mockIsActiveGoogleSubscription = jest.fn();
     mockCaptureWarning = jest.fn();
+    mockDecodeJws = jest.fn();
     mockLogger = {
       info: jest.fn(),
       warn: jest.fn(),
@@ -213,7 +215,7 @@ describe('Google Play mutation validation (LS-5121)', () => {
 
     // Stub apple-jws to prevent real Apple JWS crypto calls in tests.
     jest.doMock('../apple-jws', () => ({
-      decodeAndVerifyJwsTransaction: jest.fn(),
+      decodeAndVerifyJwsTransaction: mockDecodeJws,
     }));
 
     const schemaModule = await import('./index');
@@ -232,6 +234,57 @@ describe('Google Play mutation validation (LS-5121)', () => {
     }
     return field.resolve;
   }
+
+  describe.each(['verifyApplePurchase', 'restoreApplePurchases'])(
+    '%s bundle ID enforcement (LS-7414)',
+    (mutationName) => {
+      it('rejects a foreign-bundle JWS, warns, and writes nothing', async () => {
+        mockDecodeJws.mockRejectedValue(
+          new Error('Invalid transaction: bundle ID mismatch'),
+        );
+        const { runWithInternalClient } =
+          await import('@legacy-sports/db-client');
+
+        const resolve = getResolver(mutationName);
+        await expect(
+          resolve(
+            {},
+            { jwsTransaction: 'foreign.app.jws' },
+            mockContext,
+            undefined as never,
+          ),
+        ).rejects.toThrow('Invalid JWS transaction: could not verify payload');
+
+        expect(mockLogger.warn).toHaveBeenCalled();
+        expect(mockCaptureWarning).toHaveBeenCalledWith(
+          expect.any(Error),
+          expect.objectContaining({
+            operation: mutationName,
+            cause: 'Invalid transaction: bundle ID mismatch',
+          }),
+        );
+        expect(runWithInternalClient).not.toHaveBeenCalled();
+      });
+
+      it('passes the expected Apple bundle ID to JWS verification', async () => {
+        mockDecodeJws.mockRejectedValue(new Error('stop'));
+        const resolve = getResolver(mutationName);
+        await expect(
+          resolve(
+            {},
+            { jwsTransaction: 'some.jws' },
+            mockContext,
+            undefined as never,
+          ),
+        ).rejects.toThrow();
+
+        expect(mockDecodeJws).toHaveBeenCalledWith(
+          'some.jws',
+          process.env['APPLE_BUNDLE_ID'] ?? 'com.legacysports.app',
+        );
+      });
+    },
+  );
 
   describe('verifyGooglePurchase', () => {
     it('throws UserInputError (BAD_USER_INPUT) when subscription is not active', async () => {

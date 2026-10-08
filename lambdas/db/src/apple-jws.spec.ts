@@ -92,7 +92,10 @@ describe('decodeAndVerifyJwsTransaction', () => {
     mockDecodeProtectedHeader.mockReturnValue({ alg: 'ES256' });
 
     await expect(
-      decodeAndVerifyJwsTransaction('header.payload.sig'),
+      decodeAndVerifyJwsTransaction(
+        'header.payload.sig',
+        'com.legacysports.app',
+      ),
     ).rejects.toThrow('JWS header missing x5c certificate chain');
   });
 
@@ -103,7 +106,10 @@ describe('decodeAndVerifyJwsTransaction', () => {
     });
 
     await expect(
-      decodeAndVerifyJwsTransaction('header.payload.sig'),
+      decodeAndVerifyJwsTransaction(
+        'header.payload.sig',
+        'com.legacysports.app',
+      ),
     ).rejects.toThrow('JWS header missing x5c certificate chain');
   });
 
@@ -121,7 +127,10 @@ describe('decodeAndVerifyJwsTransaction', () => {
     );
 
     await expect(
-      decodeAndVerifyJwsTransaction('header.payload.sig'),
+      decodeAndVerifyJwsTransaction(
+        'header.payload.sig',
+        'com.legacysports.app',
+      ),
     ).rejects.toThrow(/Last certificate is not issued by Apple Root CA G3/);
   });
 
@@ -139,7 +148,10 @@ describe('decodeAndVerifyJwsTransaction', () => {
     );
 
     await expect(
-      decodeAndVerifyJwsTransaction('header.payload.sig'),
+      decodeAndVerifyJwsTransaction(
+        'header.payload.sig',
+        'com.legacysports.app',
+      ),
     ).rejects.toThrow(
       /Certificate chain does not terminate at Apple Root CA G3/,
     );
@@ -165,7 +177,10 @@ describe('decodeAndVerifyJwsTransaction', () => {
     );
 
     await expect(
-      decodeAndVerifyJwsTransaction('header.payload.sig'),
+      decodeAndVerifyJwsTransaction(
+        'header.payload.sig',
+        'com.legacysports.app',
+      ),
     ).rejects.toThrow('JWSSignatureVerificationFailed');
   });
 
@@ -196,7 +211,10 @@ describe('decodeAndVerifyJwsTransaction', () => {
     } as unknown as Awaited<ReturnType<typeof jwtVerify>>);
 
     await expect(
-      decodeAndVerifyJwsTransaction('header.payload.sig'),
+      decodeAndVerifyJwsTransaction(
+        'header.payload.sig',
+        'com.legacysports.app',
+      ),
     ).rejects.toThrow(/originalTransactionId/);
   });
 
@@ -220,12 +238,39 @@ describe('decodeAndVerifyJwsTransaction', () => {
       protectedHeader: { alg: 'ES256' },
     } as unknown as Awaited<ReturnType<typeof jwtVerify>>);
 
-    const result = await decodeAndVerifyJwsTransaction('header.payload.sig');
+    const result = await decodeAndVerifyJwsTransaction(
+      'header.payload.sig',
+      'com.legacysports.app',
+    );
 
     expect(result.originalTransactionId).toBe('txn-orig-001');
     expect(result.productId).toBe('com.legacysports.app.premium.monthly');
     expect(result.bundleId).toBe('com.legacysports.app');
     expect(result.expiresDate).toBe(1800000000000);
+  });
+
+  it('rejects a validly signed JWS whose bundleId is for a different app', async () => {
+    mockDecodeProtectedHeader.mockReturnValue({
+      alg: 'ES256',
+      x5c: [STUB_DER],
+    });
+    MockX509Certificate.mockReturnValueOnce(makeLeafCert()).mockReturnValueOnce(
+      makeRootCert(),
+    );
+    mockImportX509.mockResolvedValue(
+      {} as Awaited<ReturnType<typeof importX509>>,
+    );
+    mockJwtVerify.mockResolvedValue({
+      payload: { ...validPayload, bundleId: 'com.otherapp.app' },
+      protectedHeader: { alg: 'ES256' },
+    } as unknown as Awaited<ReturnType<typeof jwtVerify>>);
+
+    await expect(
+      decodeAndVerifyJwsTransaction(
+        'header.payload.sig',
+        'com.legacysports.app',
+      ),
+    ).rejects.toThrow('Invalid transaction: bundle ID mismatch');
   });
 
   it('rejects a crafted JWS (attacker cannot forge Apple certificate chain)', async () => {
@@ -242,7 +287,7 @@ describe('decodeAndVerifyJwsTransaction', () => {
     );
 
     await expect(
-      decodeAndVerifyJwsTransaction('forged.jws.token'),
+      decodeAndVerifyJwsTransaction('forged.jws.token', 'com.legacysports.app'),
     ).rejects.toThrow(/Last certificate is not issued by Apple Root CA G3/);
   });
 
@@ -269,7 +314,10 @@ describe('decodeAndVerifyJwsTransaction', () => {
       protectedHeader: { alg: 'ES256' },
     } as unknown as Awaited<ReturnType<typeof jwtVerify>>);
 
-    const result = await decodeAndVerifyJwsTransaction('header.payload.sig');
+    const result = await decodeAndVerifyJwsTransaction(
+      'header.payload.sig',
+      'com.legacysports.app',
+    );
 
     expect(result.transactionId).toBe('txn-001');
   });
@@ -296,7 +344,10 @@ describe('decodeAndVerifyJwsTransaction', () => {
       protectedHeader: { alg: 'ES256' },
     } as unknown as Awaited<ReturnType<typeof jwtVerify>>);
 
-    const result = await decodeAndVerifyJwsTransaction('header.payload.sig');
+    const result = await decodeAndVerifyJwsTransaction(
+      'header.payload.sig',
+      'com.legacysports.app',
+    );
 
     expect(result.transactionId).toBe('txn-001');
   });
@@ -315,7 +366,10 @@ describe('decodeAndVerifyJwsTransaction', () => {
     );
 
     await expect(
-      decodeAndVerifyJwsTransaction('header.payload.sig'),
+      decodeAndVerifyJwsTransaction(
+        'header.payload.sig',
+        'com.legacysports.app',
+      ),
     ).rejects.toThrow(/Certificate expired/);
   });
 
@@ -333,7 +387,10 @@ describe('decodeAndVerifyJwsTransaction', () => {
     );
 
     await expect(
-      decodeAndVerifyJwsTransaction('header.payload.sig'),
+      decodeAndVerifyJwsTransaction(
+        'header.payload.sig',
+        'com.legacysports.app',
+      ),
     ).rejects.toThrow(/Certificate not yet valid/);
   });
 
@@ -377,7 +434,10 @@ describe('decodeAndVerifyJwsTransaction', () => {
       protectedHeader: { alg: 'ES256' },
     } as unknown as Awaited<ReturnType<typeof jwtVerify>>);
 
-    const result = await decodeAndVerifyJwsTransaction('header.payload.sig');
+    const result = await decodeAndVerifyJwsTransaction(
+      'header.payload.sig',
+      'com.legacysports.app',
+    );
 
     expect(result.transactionId).toBe('txn-001');
     // The leaf was checked against the intermediate, and the intermediate
