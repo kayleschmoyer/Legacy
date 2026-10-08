@@ -700,9 +700,15 @@ for (const colorScheme of ['light', 'dark'] as const) {
               'rgba(0, 0, 0, 0)',
             );
 
-            const violations = await getViolations(page, undefined, {
-              runOnly: { type: 'rule', values: ['color-contrast'] },
-            });
+            // The header's "LEGACY / SPORTS" wordmark is a logotype — exempt
+            // from WCAG 1.4.3 and colored `$wordmarkGold` on purpose
+            // (LS-10697, design-tokens colors.ts). Signed-out visitors see
+            // that header here since LS-10767; everything else is checked.
+            const violations = await getViolations(
+              page,
+              { exclude: [['[data-testid="brand-text"]']] },
+              { runOnly: { type: 'rule', values: ['color-contrast'] } },
+            );
             expect(
               violations.flatMap((v) =>
                 v.nodes.map(

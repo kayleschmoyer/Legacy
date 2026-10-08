@@ -1,4 +1,4 @@
-import { act, render } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import { BrowserRouter, MemoryRouter, useLocation } from 'react-router-dom';
 import React from 'react';
 
@@ -204,6 +204,16 @@ jest.mock('../components/a11y/GlobalAnnouncer', () => ({
 // Mock page components (default exports)
 jest.mock('../pages/about/AboutPage', () => () => <div>About Page</div>);
 jest.mock('../pages/pricing/PricingPage', () => () => <div>Pricing Page</div>);
+// Public pages rendered signed-out by the PublicHeader / MobileBottomBar
+// suites — stubbed so a resolved lazy chunk doesn't render the real page
+// against this file's partial Tamagui mocks (LS-10767).
+jest.mock('../pages/help/HelpPage', () => () => <div>Help Page</div>);
+jest.mock('../pages/legal/TermsOfServicePage', () => () => (
+  <div>Terms Page</div>
+));
+jest.mock('../pages/legal/PrivacyPolicyPage', () => () => (
+  <div>Privacy Page</div>
+));
 
 jest.mock('../pages/management/ManagementPage', () => () => (
   <div>Management Page</div>
@@ -544,6 +554,79 @@ describe('App', () => {
           configurable: true,
         });
       }
+    });
+  });
+
+  describe('PublicHeader (LS-10767)', () => {
+    let useAuthMock: jest.Mock;
+    let defaultAuth: unknown;
+
+    beforeEach(() => {
+      useAuthMock = (
+        jest.requireMock(
+          '@legacy-sports/shared-components/auth',
+        ) as unknown as {
+          useAuth: jest.Mock;
+        }
+      ).useAuth;
+      defaultAuth = useAuthMock();
+    });
+
+    afterEach(() => {
+      useAuthMock.mockReturnValue(defaultAuth);
+    });
+
+    it.each(['/terms', '/privacy', '/pricing', '/help'])(
+      'shows a banner with a home logo and Sign in for signed-out visitors on %s',
+      (path) => {
+        useAuthMock.mockReturnValue({
+          isAuthenticated: false,
+          isLoading: false,
+          isImpersonating: false,
+          user: undefined,
+          logout: jest.fn(),
+        });
+
+        render(
+          <MemoryRouter
+            future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+            initialEntries={[path]}
+          >
+            <App />
+          </MemoryRouter>,
+        );
+
+        const banner = screen.getByRole('banner');
+        expect(
+          within(banner).getByRole('link', { name: 'Legacy Sports home' }),
+        ).toHaveAttribute('href', '/');
+        expect(
+          within(banner).getByRole('link', { name: 'Sign in' }),
+        ).toHaveAttribute('href', '/');
+        // None of the signed-in chrome leaks through.
+        expect(
+          within(banner).queryByRole('navigation', { name: 'Primary' }),
+        ).not.toBeInTheDocument();
+      },
+    );
+
+    it('keeps the signed-in header (no Sign in link) for signed-in users', () => {
+      render(
+        <MemoryRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          initialEntries={['/']}
+        >
+          <App />
+        </MemoryRouter>,
+      );
+
+      const banner = screen.getByRole('banner');
+      expect(
+        within(banner).getByRole('navigation', { name: 'Primary' }),
+      ).toBeInTheDocument();
+      expect(
+        within(banner).queryByRole('link', { name: 'Sign in' }),
+      ).not.toBeInTheDocument();
     });
   });
 

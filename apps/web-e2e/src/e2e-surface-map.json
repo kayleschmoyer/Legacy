@@ -6034,6 +6034,17 @@
       "lib/shared-components/src/entry/auth.ts",
       "lib/shared-components/src/features/auth/**"
     ],
+    "apps/web-e2e/src/tests/public-pages-header.spec.ts": [
+      "apps/web/src/app/app.tsx",
+      "apps/web/src/main.tsx",
+      "apps/web/src/components/layout/**",
+      "apps/web/src/pages/help/**",
+      "apps/web/src/pages/legal/**",
+      "apps/web/src/pages/pricing/**",
+      "lib/shared-components/src/components/NavBar.tsx",
+      "lib/shared-components/src/entry/auth.ts",
+      "lib/shared-components/src/features/auth/**"
+    ],
     "apps/web-e2e/src/tests/navigation-dropdowns.spec.ts": [
       "apps/web/src/pages/home/**",
       "apps/web/src/components/**",

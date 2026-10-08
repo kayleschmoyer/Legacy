@@ -1,6 +1,5 @@
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import {
-  Link,
   Navigate,
   Route,
   Routes,
@@ -15,7 +14,7 @@ import {
   YStack,
 } from '@legacy-sports/shared-components/ui';
 import { NavBar, type NavLink } from '@legacy-sports/shared-components';
-import { styled, Text } from 'tamagui';
+import { styled } from 'tamagui';
 import { Menu } from '@tamagui/lucide-icons/icons/Menu';
 import { useThemeContext } from '../context/ThemeContext';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
@@ -33,6 +32,8 @@ import { LeagueSwitcherChip } from '../components/layout/LeagueSwitcherChip';
 import { HelpMenuButton } from '../components/layout/HelpMenuButton';
 import { MobileBottomBar } from '../components/layout/MobileBottomBar';
 import { MobileNavDrawer } from '../components/layout/MobileNavDrawer';
+import { HeaderLogo } from '../components/layout/HeaderLogo';
+import { PublicHeader } from '../components/layout/PublicHeader';
 import { GlobalAnnouncer } from '../components/a11y/GlobalAnnouncer';
 import { usePageTracking } from '../hooks/usePageTracking';
 import { useRouteAnnouncer } from '../hooks/useRouteAnnouncer';
@@ -343,8 +344,6 @@ const NavContent = styled(XStack, {
  * Navigation component
  * ──────────────────────────────────────────────────────── */
 
-const FONT_DISPLAY = "'Big Shoulders Display', system-ui, sans-serif";
-
 /** Desktop pill-nav destinations — mirrors the mobile drawer's primary links. */
 function useDesktopNavLinks(): NavLink[] {
   const location = useLocation();
@@ -423,7 +422,9 @@ function Navigation() {
     }
   }, []);
 
-  if (!isAuthenticated) return null;
+  // Signed-out visitors on public routes get a minimal header (logo + Sign
+  // in) instead of nothing, so /terms, /pricing etc. have a way home (LS-10767).
+  if (!isAuthenticated) return <PublicHeader />;
 
   return (
     <YStack
@@ -460,77 +461,7 @@ function Navigation() {
           >
             <NavBar
               brand=""
-              logo={
-                <Link
-                  to="/"
-                  aria-label="Legacy Sports home"
-                  style={{ textDecoration: 'none', flexShrink: 0 }}
-                >
-                  <XStack alignItems="center" gap={0} cursor="pointer">
-                    <img
-                      src="/logo.png"
-                      alt="Legacy Sports"
-                      data-testid="header-logo"
-                      style={{
-                        height: compact ? 30 : 38,
-                        width: 'auto',
-                        display: 'block',
-                        transition: 'height 200ms ease',
-                      }}
-                    />
-                    {/* Always mounted (rather than conditionally rendered)
-                        and collapsed via width/opacity in the same 200ms
-                        window as the logo's height transition above — a
-                        hard mount/unmount here raced the logo's animation
-                        and produced a brief overlap right at the `compact`
-                        toggle. */}
-                    <div
-                      data-testid="brand-text"
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        userSelect: 'none',
-                        lineHeight: 1,
-                        overflow: 'hidden',
-                        whiteSpace: 'nowrap',
-                        marginLeft: compact ? 0 : 8,
-                        maxWidth: compact ? 0 : 140,
-                        opacity: compact ? 0 : 1,
-                        transition:
-                          'max-width 200ms ease, margin-left 200ms ease, opacity 150ms ease',
-                      }}
-                    >
-                      <Text
-                        color="$wordmarkGold"
-                        style={{
-                          fontFamily: FONT_DISPLAY,
-                          fontWeight: '800',
-                          fontSize: 14,
-                          letterSpacing: '0.04em',
-                          // Pixel value, not unitless: Tamagui's Text style
-                          // treats a bare `1` as 1px, which clipped the
-                          // wordmark to a 1px sliver (LS-10697).
-                          lineHeight: '14px',
-                        }}
-                      >
-                        LEGACY
-                      </Text>
-                      <Text
-                        color="$color12"
-                        style={{
-                          fontFamily: FONT_DISPLAY,
-                          fontWeight: '700',
-                          fontSize: 11,
-                          letterSpacing: '0.16em',
-                          lineHeight: '11px',
-                        }}
-                      >
-                        SPORTS
-                      </Text>
-                    </div>
-                  </XStack>
-                </Link>
-              }
+              logo={<HeaderLogo compact={compact} />}
               afterBrand={<LeagueSwitcherChip />}
               links={navLinks}
               trailing={

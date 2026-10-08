@@ -75,23 +75,29 @@ export function NavBar({
       {afterBrand}
 
       {/* Pill nav — matches components-nav.html spec */}
-      <XStack
-        alignItems="center"
-        gap={4}
-        paddingHorizontal={6}
-        paddingVertical={6}
-        borderRadius={9999}
-        borderWidth={1}
-        borderColor="$outlineSubtle"
-        backgroundColor="$surfacePanel"
-        flex={1}
-        justifyContent="center"
-        $sm={{ display: 'none' }}
-      >
-        {links.map((l) => (
-          <NavPill key={l.label} link={l} />
-        ))}
-      </XStack>
+      {links.length > 0 ? (
+        <XStack
+          alignItems="center"
+          gap={4}
+          paddingHorizontal={6}
+          paddingVertical={6}
+          borderRadius={9999}
+          borderWidth={1}
+          borderColor="$outlineSubtle"
+          backgroundColor="$surfacePanel"
+          flex={1}
+          justifyContent="center"
+          $sm={{ display: 'none' }}
+        >
+          {links.map((l) => (
+            <NavPill key={l.label} link={l} />
+          ))}
+        </XStack>
+      ) : (
+        // No links (e.g. the signed-out header): no empty pill track — just
+        // push `trailing` to the right edge.
+        <XStack flex={1} />
+      )}
 
       <XStack gap="$2" alignItems="center">
         {trailing}

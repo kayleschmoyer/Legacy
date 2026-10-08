@@ -47,7 +47,11 @@ export class ResetPasswordPage extends BaseScreen {
     });
     this.#submitButton = driver.byRole('button', { name: /update password/i });
     this.#successMessage = driver.byText(/your password has been updated/i);
-    this.#signInLink = driver.byRole('link', { name: /sign in/i });
+    // Scoped to the page body: signed-out visitors also get the header's own
+    // "Sign in" link (LS-10767), which goes to / rather than /login.
+    this.#signInLink = driver
+      .byTestId('main-content')
+      .byRole('link', { name: /sign in/i });
   }
 
   // ── Actions ──────────────────────────────────────────────────────

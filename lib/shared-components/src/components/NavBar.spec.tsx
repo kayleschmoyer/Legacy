@@ -47,6 +47,15 @@ describe('NavBar', () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
+  it('renders only the brand and trailing slots when links is empty (LS-10767)', () => {
+    const { getByText, queryByRole } = render(
+      <NavBar brand="" links={[]} trailing={<span>Sign in</span>} />,
+    );
+    expect(getByText('Sign in')).toBeTruthy();
+    expect(queryByRole('link')).toBeNull();
+    expect(queryByRole('button')).toBeNull();
+  });
+
   describeWeb('web anchor rendering (LS-10779)', () => {
     it('renders an href pill as a real anchor so it can open in a new tab (LS-10779)', () => {
       const { getByRole } = render(
