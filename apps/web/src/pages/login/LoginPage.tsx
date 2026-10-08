@@ -37,6 +37,7 @@ import { fullPageRedirect } from '../../lib/full-page-redirect';
 import { consumeCameFrom, storeCameFrom } from '../../lib/came-from';
 import { getLastVisitedLeagueForUser } from '../../lib/last-visited-league';
 import { env } from '../../config/environment';
+import { CookieSettingsButton } from '../../consent/ConsentManager';
 import './LoginPage.css';
 
 /* ── Icons ── */
@@ -789,6 +790,10 @@ export function LoginPage(): React.JSX.Element {
               <div className="ll-footer-sep">·</div>
               <div className="ll-footer-item">
                 <span>Free to play · No credit card</span>
+              </div>
+              <div className="ll-footer-sep">·</div>
+              <div className="ll-footer-item">
+                <CookieSettingsButton />
               </div>
             </div>
           </section>

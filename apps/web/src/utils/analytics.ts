@@ -7,6 +7,7 @@
 
 import { LOGGER } from '@legacy-sports/logging';
 import { getEnvironmentConfig } from '../config/environment';
+import { hasAnalyticsConsent, subscribeConsent } from '../consent/consentStore';
 
 // Internal state — updated by setUserProperties(); auto-included in all events
 let _subscriptionTier: 'free' | 'premium' | undefined;
@@ -14,7 +15,7 @@ let _subscriptionTier: 'free' | 'premium' | undefined;
 declare global {
   interface Window {
     gtag?: (
-      command: 'config' | 'event' | 'set',
+      command: 'config' | 'consent' | 'event' | 'set',
       targetId: string,
       config?: Record<string, unknown>,
     ) => void;
@@ -27,6 +28,90 @@ export interface AnalyticsEvent {
   label?: string;
   value?: number;
   [key: string]: string | number | boolean | undefined;
+}
+
+/**
+ * Google Consent Mode v2 ad signals (LS-10764). We run no advertising, so
+ * these are always denied and never offered as a choice.
+ */
+const AD_SIGNALS_DENIED = {
+  ad_storage: 'denied',
+  ad_user_data: 'denied',
+  ad_personalization: 'denied',
+} as const;
+
+let _scriptLoaded = false;
+let _appliedConsent: boolean | undefined;
+
+/**
+ * True when an event may be sent: GA is configured, gtag exists, and the
+ * visitor's analytics consent is granted. Events are dropped (not queued)
+ * without consent, so nothing collected before a choice is sent afterwards.
+ */
+function canTrack(): boolean {
+  const env = getEnvironmentConfig();
+  return Boolean(
+    window.gtag && env.googleAnalyticsMeasurementId && hasAnalyticsConsent(),
+  );
+}
+
+function loadGtagScript(measurementId: string): void {
+  if (_scriptLoaded) return;
+  _scriptLoaded = true;
+  // `crossorigin` lets the browser report full exception details
+  // (message/filename/lineno) for errors thrown inside this cross-origin
+  // script instead of masking them as an opaque "Script error." with no
+  // `error` object — which is what led Rollbar's automatic uncaught-exception
+  // capture to log an untitled "(unknown)" item for a gtag.js-internal error
+  // (LS-9170).
+  const script = document.createElement('script');
+  script.async = true;
+  script.crossOrigin = 'anonymous';
+  script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;
+  document.head.appendChild(script);
+}
+
+/** Expire GA's first-party cookies on this host and its parent domains. */
+function clearGaCookies(): void {
+  const names = document.cookie
+    .split(';')
+    .map((part) => part.split('=')[0].trim())
+    .filter((name) => /^_ga($|_)|^_gid$|^_gat($|_)/.test(name));
+  if (names.length === 0) return;
+
+  const labels = window.location.hostname.split('.');
+  const domains: (string | undefined)[] = [undefined];
+  for (let i = 0; i < labels.length - 1; i++) {
+    domains.push(`.${labels.slice(i).join('.')}`);
+  }
+  for (const name of names) {
+    for (const domain of domains) {
+      document.cookie = `${name}=; Max-Age=0; path=/${domain ? `; domain=${domain}` : ''}`;
+    }
+  }
+}
+
+/**
+ * Bring GA in line with the current consent: on grant, tell Consent Mode and
+ * load gtag.js (first time only); on withdrawal, tell Consent Mode and expire
+ * GA cookies. gtag.js is never requested while consent is denied.
+ */
+function applyAnalyticsConsent(measurementId: string): void {
+  const granted = hasAnalyticsConsent();
+  if (granted === _appliedConsent) return;
+  const isInitial = _appliedConsent === undefined;
+  _appliedConsent = granted;
+
+  if (!isInitial) {
+    window.gtag?.('consent', 'update', {
+      analytics_storage: granted ? 'granted' : 'denied',
+    });
+  }
+  if (granted) {
+    loadGtagScript(measurementId);
+  } else if (!isInitial) {
+    clearGaCookies();
+  }
 }
 
 /**
@@ -43,18 +128,6 @@ export function initializeAnalytics(): void {
     return;
   }
 
-  // Load gtag.js script. `crossorigin` lets the browser report full
-  // exception details (message/filename/lineno) for errors thrown inside
-  // this cross-origin script instead of masking them as an opaque
-  // "Script error." with no `error` object — which is what led Rollbar's
-  // automatic uncaught-exception capture to log an untitled "(unknown)"
-  // item for a gtag.js-internal error (LS-9170).
-  const script = document.createElement('script');
-  script.async = true;
-  script.crossOrigin = 'anonymous';
-  script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;
-  document.head.appendChild(script);
-
   // Initialize dataLayer and gtag function
   window.dataLayer = window.dataLayer || [];
   window.gtag = function gtag() {
@@ -62,11 +135,20 @@ export function initializeAnalytics(): void {
     window.dataLayer?.push(arguments);
   };
 
+  // Consent Mode v2 defaults must be queued before `config` (LS-10764).
+  window.gtag('consent', 'default', {
+    ...AD_SIGNALS_DENIED,
+    analytics_storage: hasAnalyticsConsent() ? 'granted' : 'denied',
+  });
+
   // Configure GA4
   window.gtag('config', measurementId, {
     send_page_view: false, // We'll manually track page views
     cookie_flags: 'SameSite=None;Secure',
   });
+
+  applyAnalyticsConsent(measurementId);
+  subscribeConsent(() => applyAnalyticsConsent(measurementId));
 
   LOGGER.info('[Analytics] Google Analytics initialized:', measurementId);
 }
@@ -77,13 +159,9 @@ export function initializeAnalytics(): void {
  * @param title - Optional page title
  */
 export function trackPageView(path: string, title?: string): void {
-  const env = getEnvironmentConfig();
+  if (!canTrack()) return;
 
-  if (!window.gtag || !env.googleAnalyticsMeasurementId) {
-    return;
-  }
-
-  window.gtag('event', 'page_view', {
+  window.gtag?.('event', 'page_view', {
     page_path: path,
     page_title: title || document.title,
   });
@@ -97,13 +175,9 @@ export function trackPageView(path: string, title?: string): void {
  * @param params - Event parameters
  */
 export function trackEvent(eventName: string, params?: AnalyticsEvent): void {
-  const env = getEnvironmentConfig();
+  if (!canTrack()) return;
 
-  if (!window.gtag || !env.googleAnalyticsMeasurementId) {
-    return;
-  }
-
-  window.gtag('event', eventName, {
+  window.gtag?.('event', eventName, {
     subscription_tier: _subscriptionTier,
     ...params,
   });
@@ -253,11 +327,11 @@ export function trackTeamViewed(teamId: number, leagueId: number): void {
 export function setUserId(userId: string | number): void {
   const env = getEnvironmentConfig();
 
-  if (!window.gtag || !env.googleAnalyticsMeasurementId) {
+  if (!canTrack() || !env.googleAnalyticsMeasurementId) {
     return;
   }
 
-  window.gtag('set', env.googleAnalyticsMeasurementId, {
+  window.gtag?.('set', env.googleAnalyticsMeasurementId, {
     user_id: String(userId),
   });
 
@@ -276,13 +350,9 @@ export function setUserProperties(properties: {
   accountAge?: 'new' | 'returning' | 'veteran'; // <7 days, <30 days, 30+ days
   subscriptionTier?: 'free' | 'premium';
 }): void {
-  const env = getEnvironmentConfig();
+  if (!canTrack()) return;
 
-  if (!window.gtag || !env.googleAnalyticsMeasurementId) {
-    return;
-  }
-
-  window.gtag('set', 'user_properties', {
+  window.gtag?.('set', 'user_properties', {
     user_type: properties.userType,
     total_leagues: properties.totalLeagues,
     primary_sport: properties.primarySport,
@@ -470,9 +540,8 @@ export function trackBeginCheckout(
   billingCycle: 'monthly' | 'annual',
   value: number,
 ): void {
-  const env = getEnvironmentConfig();
-  if (!window.gtag || !env.googleAnalyticsMeasurementId) return;
-  window.gtag('event', 'begin_checkout', {
+  if (!canTrack()) return;
+  window.gtag?.('event', 'begin_checkout', {
     currency: 'USD',
     value,
     items: [

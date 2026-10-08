@@ -4,7 +4,8 @@
  * Wrap the app with <GrowthBookProvider> to enable feature flags and
  * experiments. The SDK fetches feature definitions from GrowthBook Cloud
  * and fires an `experiment_viewed` GA4 event whenever a user is assigned
- * to an experiment variant.
+ * to an experiment variant — only with analytics consent (LS-10764). Flag
+ * evaluation itself is strictly necessary and always runs.
  *
  * Usage:
  *   import { useFeatureIsOn, useFeatureValue } from './GrowthBookProvider';
@@ -25,6 +26,7 @@ import {
 } from '@growthbook/growthbook-react';
 import { LOGGER } from '@legacy-sports/logging';
 import { env } from '../config/environment';
+import { hasAnalyticsConsent } from '../consent/consentStore';
 
 // Re-export hooks so consumers have a single import path if desired
 export { useFeatureIsOn, useFeatureValue } from '@growthbook/growthbook-react';
@@ -45,6 +47,8 @@ export const growthbook = new GrowthBook({
   enableDevMode: env.isDev,
   features: seededFeatures,
   trackingCallback: (experiment, result) => {
+    // Exposure tracking is analytics, so it needs consent (LS-10764).
+    if (!hasAnalyticsConsent()) return;
     // Report to GA4 so experiment results can be analyzed in GA4 Explorations
     if (window.gtag && env.googleAnalyticsMeasurementId) {
       window.gtag('event', 'experiment_viewed', {

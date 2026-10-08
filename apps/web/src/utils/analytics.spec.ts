@@ -33,6 +33,13 @@ jest.mock('../config/environment', () => ({
   getEnvironmentConfig: jest.fn(),
 }));
 
+// Consent gating has its own spec (analytics.consent.spec.ts); these payload
+// tests assume analytics consent is granted.
+jest.mock('../consent/consentStore', () => ({
+  hasAnalyticsConsent: () => true,
+  subscribeConsent: () => () => undefined,
+}));
+
 const mockGetEnvironmentConfig = getEnvironmentConfig as jest.MockedFunction<
   typeof getEnvironmentConfig
 >;

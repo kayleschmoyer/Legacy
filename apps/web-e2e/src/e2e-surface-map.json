@@ -708,6 +708,18 @@
       "lib/shared-components/src/features/roster/**",
       "lib/shared-components/src/features/stats/**"
     ],
+    "apps/web-e2e/src/tests/consent-banner.spec.ts": [
+      "apps/web/src/consent/**",
+      "apps/web/src/main.tsx",
+      "apps/web/src/pages/legal/**",
+      "apps/web/src/pages/login/**",
+      "apps/web/src/pages/preferences/**",
+      "apps/web/src/utils/analytics.ts",
+      "apps/web/src/context/GrowthBookProvider.tsx",
+      "apps/web/src/config/**",
+      "lib/shared-components/src/features/consent/**",
+      "apps/web-e2e/playwright.config.ts"
+    ],
     "apps/web-e2e/src/tests/mock-draft-room.spec.ts": [
       "apps/web/src/pages/draft/**",
       "apps/web/src/components/MockDraftBoard.tsx",

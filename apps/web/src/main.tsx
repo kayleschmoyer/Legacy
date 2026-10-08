@@ -41,6 +41,7 @@ import {
   useThemeContext,
 } from './context/ThemeContext';
 import { GrowthBookProvider } from './context/GrowthBookProvider';
+import { ConsentManager } from './consent/ConsentManager';
 import { LoginPage } from './pages/login/LoginPage';
 import { clearWebPushRegistration } from './hooks/useWebPushRegistration';
 import { clearUserScopedStorage } from './lib/user-scoped-storage';
@@ -244,6 +245,11 @@ try {
       >
         <ThemeProvider>
           <ThemedTamaguiProvider>
+            {/* Analytics consent banner + Privacy choices panel (LS-10764).
+                Mounted above the auth guard so it also covers the signed-out
+                landing page, and early in DOM order so keyboard and
+                screen-reader users reach it first. */}
+            <ConsentManager />
             <AuthProvider
               config={authConfig}
               onUserSwitch={async () => {

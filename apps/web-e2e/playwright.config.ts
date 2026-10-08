@@ -187,6 +187,13 @@ export default defineConfig({
      * Playwright 1.59.x — top-level reducedMotion is not a typed property. */
     contextOptions: { reducedMotion: 'reduce' },
 
+    /* Pin a non-EU time zone (LS-10764): the analytics consent banner shows
+     * for EU/EEA/UK/CH and location-less (UTC) zones, and a CI runner's UTC
+     * would otherwise put a fixed banner over every test's bottom-of-page
+     * controls. consent-banner.spec.ts overrides this to exercise the EU
+     * path. */
+    timezoneId: 'America/New_York',
+
     /* Traces disabled (LS-4537): a single trace zip can exceed GitHub's 100 MB
      * per-file limit when pushed to the legacy-sports-deploys gh-pages branch,
      * causing the Deploy Playwright Report job to fail. Re-enable once report

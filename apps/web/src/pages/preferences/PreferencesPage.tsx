@@ -26,6 +26,7 @@ import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
 import { LogIn } from '@tamagui/lucide-icons/icons/LogIn';
 import { Minus } from '@tamagui/lucide-icons/icons/Minus';
 import { Plus } from '@tamagui/lucide-icons/icons/Plus';
+import { Shield } from '@tamagui/lucide-icons/icons/Shield';
 import { SunMoon } from '@tamagui/lucide-icons/icons/SunMoon';
 import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
 import { X } from '@tamagui/lucide-icons/icons/X';
@@ -55,6 +56,7 @@ import {
 import { useCoalescedSave } from './useCoalescedSave';
 import { useRetryingSave } from './useRetryingSave';
 import { PageMeta } from '../../components/PageMeta';
+import { openCookieSettings } from '../../consent/consentStore';
 import { useBrowserNotificationPermission } from '../../hooks/useBrowserNotificationPermission';
 import {
   BG_DARK,
@@ -1381,6 +1383,52 @@ function NotificationsSignInCard({
 
 /* ─── Main Component ─── */
 
+/**
+ * Static "Privacy" card holding the Cookie settings entry point (LS-10764).
+ * Signed-in users have no footer, so this is their way back to the
+ * Privacy choices panel.
+ */
+function PrivacySection({
+  cardStyle,
+}: {
+  cardStyle: React.CSSProperties;
+}): React.JSX.Element {
+  return (
+    <SectionCard style={cardStyle}>
+      <SectionHeader expanded cursor="default" hoverStyle={{}} pressStyle={{}}>
+        <SectionIconBox>
+          <Shield size={18} color="$brandGoldLight" strokeWidth={1.8} />
+        </SectionIconBox>
+        <YStack flex={1} gap={2}>
+          <SectionTitle>Privacy</SectionTitle>
+          <SectionMeta>Cookies · Analytics</SectionMeta>
+        </YStack>
+      </SectionHeader>
+      <SectionBody>
+        <PrefRow>
+          <PrefLabel>
+            <Paragraph size="$4" color="$color" fontWeight="600">
+              Cookie settings
+            </Paragraph>
+            <Paragraph size="$3" color="$colorPress">
+              Choose whether we can use Google Analytics to measure how the app
+              is used.
+            </Paragraph>
+          </PrefLabel>
+          <Button
+            variant="primary"
+            size="sm"
+            onPress={openCookieSettings}
+            data-testid="prefs-cookie-settings"
+          >
+            Cookie settings
+          </Button>
+        </PrefRow>
+      </SectionBody>
+    </SectionCard>
+  );
+}
+
 const PreferencesPage: React.FC = () => {
   const { themePreference, resolvedTheme, setThemePreference } =
     useThemeContext();
@@ -1713,6 +1761,9 @@ const PreferencesPage: React.FC = () => {
           ) : (
             <NotificationsSignInCard cardStyle={cardStyle} />
           )}
+
+          {/* ── Privacy ── */}
+          <PrivacySection cardStyle={cardStyleAlt} />
         </ContentContainer>
       </ScrollView>
     </PageContainer>

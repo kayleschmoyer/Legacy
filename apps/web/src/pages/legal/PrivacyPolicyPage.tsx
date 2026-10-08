@@ -9,6 +9,7 @@ import {
 } from '@legacy-sports/shared-components/ui';
 import { styled, Text } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
+import { CookieSettingsButton } from '../../consent/ConsentManager';
 import { BRAND_GOLD } from '../../constants/colors';
 
 const Container = styled(YStack, {
@@ -77,7 +78,7 @@ export default function PrivacyPolicyPage() {
       <YStack gap="$2" marginBottom="$2">
         <H1>Privacy Policy</H1>
         <Text color="$gray11" fontSize="$4">
-          Last updated: January 1, 2025
+          Last updated: October 6, 2026
         </Text>
       </YStack>
 
@@ -124,10 +125,41 @@ export default function PrivacyPolicyPage() {
       <Section>
         <SectionTitle>5. Cookies and Tracking</SectionTitle>
         <BodyText>
-          We use cookies and similar tracking technologies to enhance your
-          experience, analyze usage, and remember your preferences. You can
-          control cookie settings through your browser, though disabling cookies
-          may affect Service functionality.
+          We use cookies and similar browser storage (such as local storage) in
+          two categories:
+        </BodyText>
+        <BodyText>
+          <Text fontWeight="700">Strictly necessary.</Text> These keep you
+          signed in, secure your account, remember your settings (such as your
+          theme) and remember your cookie choice. They also store the feature
+          settings GrowthBook needs to show you the right version of the
+          Service. They are always on because the Service does not work without
+          them.
+        </BodyText>
+        <BodyText>
+          <Text fontWeight="700">Analytics.</Text> With your permission, we use
+          Google Analytics 4 to understand which pages and features are used, so
+          we can improve the Service. Google Analytics sets first-party cookies
+          (named _ga and _ga_&lt;ID&gt;) that hold a pseudonymous identifier. If
+          you are in the European Economic Area, the United Kingdom or
+          Switzerland, analytics is off until you choose to allow it. Elsewhere,
+          analytics is on by default and you can turn it off at any time. If you
+          turn it off, we stop sending analytics data and delete the Google
+          Analytics cookies from your browser.
+        </BodyText>
+        <BodyText>
+          We do not use advertising cookies, and we do not sell your data or
+          share it for targeted advertising.
+        </BodyText>
+        <BodyText>
+          You can change your choice at any time with the Cookie settings link
+          at the bottom of our public pages, on your Preferences page, or here:{' '}
+          <CookieSettingsButton style={{ color: BRAND_GOLD }}>
+            Change your cookie settings
+          </CookieSettingsButton>
+          . We remember your choice for 12 months, then ask again. Your browser
+          settings can also block or delete cookies, though blocking strictly
+          necessary cookies may stop the Service from working.
         </BodyText>
       </Section>
 
@@ -267,6 +299,70 @@ export default function PrivacyPolicyPage() {
                   style={{ color: BRAND_GOLD }}
                 >
                   policies.google.com/privacy
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td style={tdStyle}>
+                Google Analytics 4 (Google LLC; measurement ID G-DHBXH3R106)
+              </td>
+              <td style={tdStyle}>
+                Usage analytics: which pages and features are used, so we can
+                improve the Service. Only with your consent in the EEA, UK and
+                Switzerland; see section 5.
+              </td>
+              <td style={tdStyle}>
+                Pages viewed and in-app events (for example, starting a mock
+                draft); a pseudonymous browser ID (_ga cookie); when signed in,
+                your account ID, plan type, account age, number of leagues and
+                main sport; device and browser type; approximate location
+                derived from your IP address (Google Analytics 4 does not log or
+                store IP addresses). Google Analytics deletes this data
+                automatically when our data-retention period ends.
+              </td>
+              <td style={tdStyle}>
+                <a
+                  href="https://policies.google.com/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: BRAND_GOLD }}
+                >
+                  policies.google.com/privacy
+                </a>
+                <br />
+                Opt out: Cookie settings, or the{' '}
+                <a
+                  href="https://tools.google.com/dlpage/gaoptout"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: BRAND_GOLD }}
+                >
+                  Google Analytics opt-out add-on
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td style={tdStyle}>GrowthBook</td>
+              <td style={tdStyle}>
+                Feature flags and experiments: deciding which features, and
+                which version of a feature, you see.
+              </td>
+              <td style={tdStyle}>
+                Your browser downloads feature settings from GrowthBook&apos;s
+                content delivery network, which receives your IP address and
+                browser details as part of that request. Feature decisions are
+                made in your browser, and the settings are cached in local
+                storage. With analytics consent, which version of an experiment
+                you saw is sent to Google Analytics (not to GrowthBook).
+              </td>
+              <td style={tdStyle}>
+                <a
+                  href="https://www.growthbook.io/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: BRAND_GOLD }}
+                >
+                  growthbook.io/privacy
                 </a>
               </td>
             </tr>

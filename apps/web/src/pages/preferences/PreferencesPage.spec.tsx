@@ -82,6 +82,7 @@ jest.mock('@tamagui/lucide-icons/icons/Bell', () => {
     LogIn: icon,
     Minus: icon,
     Plus: icon,
+    Shield: icon,
     SunMoon: icon,
     Trophy: icon,
   };

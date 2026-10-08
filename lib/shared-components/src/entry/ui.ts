@@ -34,6 +34,7 @@ export * from '../components/Table';
 export * from '../features/common/SearchBar';
 export * from '../features/onboarding/ConceptTooltip';
 export * from '../features/onboarding/OnboardingTutorial';
+export * from '../features/consent';
 export * from '../hooks/useThemeTokens';
 export * from '../hooks/useWebSocket';
 export * from '../components/branding';
