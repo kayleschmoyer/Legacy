@@ -1,7 +1,11 @@
 import React from 'react';
 import { fireEvent, screen } from '@testing-library/react';
 
-import { SegmentedControl, type SegmentedOption } from './ToggleControls';
+import {
+  Checkbox,
+  SegmentedControl,
+  type SegmentedOption,
+} from './ToggleControls';
 import { render } from '../test-utils';
 
 const OPTIONS: SegmentedOption[] = [
@@ -147,5 +151,99 @@ describe('SegmentedControl — keyboard + screen reader (LS-10696)', () => {
     });
     expect(first).toHaveBeenLastCalledWith('all');
     expect(second).not.toHaveBeenCalled();
+  });
+});
+
+describe('Checkbox — checked state is visually distinct (LS-10798)', () => {
+  type FrameProps = {
+    checked?: boolean | 'indeterminate';
+    backgroundColor?: string;
+    borderColor?: string;
+  };
+  type TamaguiModule = { Checkbox: React.ComponentType<FrameProps> };
+  const frameCalls: FrameProps[] = [];
+  let original: TamaguiModule['Checkbox'];
+
+  // Tamagui has no `$checked` pseudo, so the fill must be passed explicitly.
+  // Record the props handed to the Tamagui frame by wrapping whichever mock
+  // the web/mobile harness installed (a function on web, a forwardRef object
+  // on mobile — so jest.spyOn can't be used). Patch the raw mocked module,
+  // not an `import * as` interop copy, so ToggleControls sees the wrapper.
+  beforeEach(() => {
+    const tamagui = jest.requireMock<TamaguiModule>('tamagui');
+    original = tamagui.Checkbox;
+    const Original = original;
+    tamagui.Checkbox = Object.assign(
+      (props: FrameProps) => {
+        frameCalls.push(props);
+        return <Original {...props} />;
+      },
+      { Indicator: (original as unknown as { Indicator: unknown }).Indicator },
+    );
+  });
+  afterEach(() => {
+    jest.requireMock<TamaguiModule>('tamagui').Checkbox = original;
+    frameCalls.length = 0;
+  });
+
+  // The web and mobile icon mocks use different test ids.
+  const CHECK_ICON = /^Check(Icon)?$/;
+
+  const lastFrameProps = (): FrameProps => frameCalls[frameCalls.length - 1];
+
+  it('fills checked boxes navy with a gold border and renders the check mark', () => {
+    render(<Checkbox checked aria-label="MVP" />);
+
+    expect(lastFrameProps()).toMatchObject({
+      checked: true,
+      backgroundColor: '$brandNavy',
+      borderColor: '$brandGold',
+    });
+    expect(screen.getByTestId(CHECK_ICON)).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: 'MVP' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+  });
+
+  it('keeps unchecked boxes on the card surface with no check mark', () => {
+    render(<Checkbox checked={false} aria-label="MVP" />);
+
+    expect(lastFrameProps()).toMatchObject({
+      checked: false,
+      backgroundColor: '$surfaceCard',
+      borderColor: '$outlineStrong',
+    });
+    expect(screen.queryByTestId(CHECK_ICON)).toBeNull();
+    expect(screen.getByRole('checkbox', { name: 'MVP' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+  });
+
+  it('never passes the unsupported `$checked` style prop', () => {
+    render(<Checkbox checked aria-label="MVP" />);
+
+    expect(lastFrameProps()).not.toHaveProperty('$checked');
+  });
+
+  it('tracks state when uncontrolled so the fill follows toggles', () => {
+    const onCheckedChange = jest.fn();
+    render(
+      <Checkbox
+        defaultChecked
+        onCheckedChange={onCheckedChange}
+        aria-label="MVP"
+      />,
+    );
+    expect(lastFrameProps().backgroundColor).toBe('$brandNavy');
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'MVP' }));
+
+    expect(onCheckedChange).toHaveBeenCalledWith(false);
+    expect(lastFrameProps()).toMatchObject({
+      checked: false,
+      backgroundColor: '$surfaceCard',
+    });
   });
 });

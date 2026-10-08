@@ -79,22 +79,37 @@ export interface CheckboxProps extends Omit<
 export function Checkbox({
   label,
   indeterminate,
+  checked: checkedProp,
+  defaultChecked,
+  onCheckedChange,
   ...props
 }: CheckboxProps): React.JSX.Element {
+  // Tamagui has no `$checked` pseudo, so the checked fill must be driven from
+  // the resolved state explicitly — otherwise checked and unchecked boxes
+  // render identically (LS-10798). Mirror the state for uncontrolled usage.
+  const [uncontrolledChecked, setUncontrolledChecked] = React.useState(
+    defaultChecked ?? false,
+  );
+  const isControlled = checkedProp !== undefined;
+  const checked = isControlled ? checkedProp : uncontrolledChecked;
+  const isOn = checked !== false;
   const checkbox = (
     <TamaguiCheckbox
       size="$3"
       width={18}
       height={18}
-      backgroundColor="$surfaceCard"
-      borderColor="$outlineStrong"
       borderWidth={1.5}
       borderRadius={4}
-      $checked={{
-        backgroundColor: '$brandNavy',
-        borderColor: '$brandNavy',
-      }}
       {...props}
+      // Navy fill carries the light theme; the gold border keeps the checked
+      // box distinct on the dark card surface, where navy alone is ~1.4:1.
+      backgroundColor={isOn ? '$brandNavy' : '$surfaceCard'}
+      borderColor={isOn ? '$brandGold' : '$outlineStrong'}
+      checked={checked}
+      onCheckedChange={(next) => {
+        if (!isControlled) setUncontrolledChecked(next);
+        onCheckedChange?.(next);
+      }}
     >
       <TamaguiCheckbox.Indicator>
         {indeterminate ? (
