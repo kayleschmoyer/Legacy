@@ -9,6 +9,7 @@ import {
   useGetCommissionerAuditLogsQuery,
 } from '@legacy-sports/graphql';
 import { SeasonAwardsControl } from '@legacy-sports/shared-components/commissioner';
+import { formatCommissionerAuditAction } from '@legacy-sports/utils';
 import {
   useCurrentWeek,
   useMatchupsForLeague,
@@ -81,15 +82,6 @@ const Accord: React.FC<{
   </div>
 );
 
-const ACTION_LABELS: Record<string, string> = {
-  force_add: 'Force Add',
-  force_drop: 'Force Drop',
-  lock_team: 'Lock Team',
-  unlock_team: 'Unlock Team',
-  bulk_drop_players: 'Bulk Drop',
-  recalculate_scores: 'Recalculate Scores',
-};
-
 const AUDIT_PAGE_SIZE = 25;
 
 function AuditLogPanel({ leagueId }: { leagueId: number }) {
@@ -158,7 +150,7 @@ function AuditLogPanel({ leagueId }: { leagueId: number }) {
           }}
         >
           <div style={{ fontWeight: 600, fontSize: 13 }}>
-            {log.action ? (ACTION_LABELS[log.action] ?? log.action) : ''}
+            {formatCommissionerAuditAction(log.action)}
           </div>
           {log.reason ? (
             <div style={{ fontSize: 12, color: 'var(--fg2)', marginTop: 2 }}>

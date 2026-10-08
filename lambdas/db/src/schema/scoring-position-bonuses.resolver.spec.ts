@@ -317,6 +317,42 @@ describe('updateLeagueScoringPositionBonuses — premium gate (LS-9104)', () => 
     );
   });
 
+  it('writes a commissioner audit row (LS-10736)', async () => {
+    stripeYields([ENTITLEMENTS.custom_scoring_multipliers]);
+    const resolve = getMutationResolve();
+    const db = makeDb({
+      permissionLevel: 'commissioner',
+      stripeCustomerId: 'cus_premium',
+    });
+
+    await resolve(
+      {},
+      { leagueId: 10, updates: validUpdates },
+      { user: { id: 1, username: 'gm1', isAdmin: false }, db },
+      undefined as never,
+    );
+
+    const valuesCall = db.insert.mock.results[0].value.values;
+    expect(valuesCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        leagueId: 10,
+        userId: 1,
+        action: 'update_scoring_position_bonuses',
+        targetType: 'league',
+        targetId: 10,
+        details: {
+          changes: [
+            expect.objectContaining({
+              statDefinitionId: 1,
+              position: 'TE',
+              newBonusMultiplier: 0.5,
+            }),
+          ],
+        },
+      }),
+    );
+  });
+
   it('allows an admin to update position bonuses without a premium subscription', async () => {
     const resolve = getMutationResolve();
 

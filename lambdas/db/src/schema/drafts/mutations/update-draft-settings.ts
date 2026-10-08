@@ -15,6 +15,7 @@ import {
   ForbiddenError,
   UserInputError,
 } from '../../graphql-errors';
+import { writeAuditLog } from '../../audit-log';
 import { requireEntitlement } from '../../authorization';
 import {
   isEraFreeForSport,
@@ -353,6 +354,15 @@ builder.mutationField('updateDraftSettings', (t) =>
         const changesSummary =
           changedFields.length > 0 ? ` (${changedFields.join(', ')})` : '';
         const notificationText = `${username} updated draft settings${changesSummary}.`;
+
+        await writeAuditLog(context.db, {
+          leagueId,
+          userId,
+          action: 'update_draft_settings',
+          targetType: 'draft',
+          targetId: existingDraft.id,
+          details: { changes: changedFields },
+        });
 
         const [chatMsg] = await context.db
           .insert(PublicSchema.leagueMessages)

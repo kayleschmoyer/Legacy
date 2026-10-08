@@ -26,6 +26,7 @@ import {
 } from '../../services/roster-service';
 import { WaiverClaimProcessor } from '../../services/waiver-processor';
 import { assertAuthorized } from '../matchups/scheduled-mutations';
+import { writeAuditLog } from '../audit-log';
 import { builder } from '../builder';
 import { insertActivityLog } from '../../services/activity-log';
 import {
@@ -419,7 +420,23 @@ builder.mutationField('processWaiverClaims', (t) =>
         context.db,
         context.notificationService,
       );
-      return processor.process({ leagueId: args.leagueId });
+      const result = await processor.process({ leagueId: args.leagueId });
+
+      // Audit a commissioner's manual "Process Waivers Now" (LS-10736). The
+      // scheduled EventBridge run has no user and spans every league, so it
+      // is not a commissioner action.
+      if (args.leagueId && context.user && !context.isSystemRequest) {
+        await writeAuditLog(context.db, {
+          leagueId: args.leagueId,
+          userId: context.user.id,
+          action: 'process_waivers',
+          targetType: 'league',
+          targetId: args.leagueId,
+          details: { ...result },
+        });
+      }
+
+      return result;
     },
   }),
 );

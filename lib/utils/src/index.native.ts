@@ -4,6 +4,7 @@
 // read ENTITLEMENTS / ENTITLEMENT_LABELS; mirrors the export in `mobile.ts`.
 export * from './lib/entitlements';
 export * from './lib/allowed-positions';
+export * from './lib/commissioner-audit-actions';
 export * from './lib/ErrorHandling';
 export * from './lib/disclosure-scoring';
 export * from './lib/DbOptions.native';

@@ -18,6 +18,7 @@ import {
   verifyCommissionerAccess,
   verifyLeagueMembership,
 } from './authorization';
+import { writeAuditLog } from './audit-log';
 import { assertAuthorized } from './matchups/system-auth';
 import { isValidDiscordWebhookUrl } from '../services/discord-league';
 
@@ -261,6 +262,20 @@ builder.mutationField('updateDuesSettings', (t) =>
         userId: context.user.id,
       });
 
+      await writeAuditLog(context.db, {
+        leagueId,
+        userId: context.user.id,
+        action: 'update_dues_settings',
+        targetType: 'league',
+        targetId: leagueId,
+        details: {
+          enabled,
+          amountCents,
+          reminderEnabled,
+          reminderDayOfWeek: row.reminderDayOfWeek,
+        },
+      });
+
       return {
         ...row,
         createdAt: new Date(row.createdAt),
@@ -328,6 +343,15 @@ builder.mutationField('markMemberPaid', (t) =>
         leagueId,
         userId,
         markedBy: context.user.id,
+      });
+
+      await writeAuditLog(context.db, {
+        leagueId,
+        userId: context.user.id,
+        action: 'mark_member_paid',
+        targetType: 'user',
+        targetId: userId,
+        details: { username: user?.username ?? null },
       });
 
       return {
@@ -681,6 +705,15 @@ builder.mutationField('markMemberUnpaid', (t) =>
         leagueId,
         userId,
         markedBy: context.user.id,
+      });
+
+      await writeAuditLog(context.db, {
+        leagueId,
+        userId: context.user.id,
+        action: 'mark_member_unpaid',
+        targetType: 'user',
+        targetId: userId,
+        details: { username: user?.username ?? null },
       });
 
       return {

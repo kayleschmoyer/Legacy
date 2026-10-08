@@ -39,6 +39,7 @@ import {
   useSwapMatchupTeamsMutation,
   useUpdateCommissionerNoteMutation,
 } from '@legacy-sports/graphql';
+import { formatCommissionerAuditAction } from '@legacy-sports/utils';
 import { StepUpModal } from '../StepUpModal';
 import { BRAND_NAVY_LIGHT, withAlpha } from '../../constants/colors';
 
@@ -1141,18 +1142,6 @@ function RecalculateScoresSection({
 
 // ── Sub-section: Audit Log ──────────────────────────────────────────────────
 
-const ACTION_LABELS: Record<string, string> = {
-  force_add: 'Force Add',
-  force_drop: 'Force Drop',
-  edit_score: 'Edit Score',
-  swap_matchup_teams: 'Swap Matchup',
-  update_lm_note: 'Update Note',
-  lock_team: 'Lock Team',
-  unlock_team: 'Unlock Team',
-  bulk_drop_players: 'Bulk Drop',
-  recalculate_scores: 'Recalculate Scores',
-};
-
 function AuditLogSection({ leagueId }: { leagueId: number }) {
   const { data, loading, refetch } = useGetCommissionerAuditLogsQuery({
     variables: { leagueId, limit: 50 },
@@ -1225,7 +1214,7 @@ function AuditLogSection({ leagueId }: { leagueId: number }) {
                   minWidth={80}
                 >
                   {log.action != null
-                    ? (ACTION_LABELS[log.action] ?? log.action)
+                    ? formatCommissionerAuditAction(log.action)
                     : '—'}
                 </Text>
                 {log.targetType && (

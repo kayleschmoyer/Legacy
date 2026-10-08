@@ -341,6 +341,33 @@ describe('Dues Resolver — Commissioner/GM Permission Guards', () => {
       expect(result.amountCents).toBe(5000);
       expect(mockDb.insert).toHaveBeenCalled();
     });
+
+    it('writes a commissioner audit row (LS-10736)', async () => {
+      mockDb.returning.mockResolvedValueOnce([duesSettingsRow]);
+
+      const resolver = getMutation('updateDuesSettings');
+      await resolver(
+        {},
+        { input: validInput },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.values).toHaveBeenCalledWith({
+        leagueId: 10,
+        userId: 1,
+        action: 'update_dues_settings',
+        targetType: 'league',
+        targetId: 10,
+        details: {
+          enabled: true,
+          amountCents: 5000,
+          reminderEnabled: false,
+          reminderDayOfWeek: null,
+        },
+        reason: null,
+      });
+    });
   });
 
   // ── markMemberPaid ──────────────────────────────────────────────────────
@@ -434,6 +461,29 @@ describe('Dues Resolver — Commissioner/GM Permission Guards', () => {
       expect(result.paid).toBe(true);
       expect(result.username).toBe('testuser');
       expect(mockDb.insert).toHaveBeenCalled();
+    });
+
+    it('writes a commissioner audit row targeting the member (LS-10736)', async () => {
+      mockDb.returning.mockResolvedValueOnce([paymentStatusRow]);
+      mockDb.limit.mockResolvedValueOnce([{ username: 'testuser' }]);
+
+      const resolver = getMutation('markMemberPaid');
+      await resolver(
+        {},
+        { leagueId: 10, userId: 2 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.values).toHaveBeenCalledWith({
+        leagueId: 10,
+        userId: 1,
+        action: 'mark_member_paid',
+        targetType: 'user',
+        targetId: 2,
+        details: { username: 'testuser' },
+        reason: null,
+      });
     });
 
     it('rejects commissioner marking themselves as paid (LS-4029)', async () => {
@@ -546,6 +596,29 @@ describe('Dues Resolver — Commissioner/GM Permission Guards', () => {
       expect(result.paid).toBe(false);
       expect(result.paidAt).toBeNull();
       expect(result.username).toBe('testuser');
+    });
+
+    it('writes a commissioner audit row targeting the member (LS-10736)', async () => {
+      mockDb.returning.mockResolvedValueOnce([unpaidRow]);
+      mockDb.limit.mockResolvedValueOnce([{ username: 'testuser' }]);
+
+      const resolver = getMutation('markMemberUnpaid');
+      await resolver(
+        {},
+        { leagueId: 10, userId: 2 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.values).toHaveBeenCalledWith({
+        leagueId: 10,
+        userId: 1,
+        action: 'mark_member_unpaid',
+        targetType: 'user',
+        targetId: 2,
+        details: { username: 'testuser' },
+        reason: null,
+      });
     });
 
     it('rejects commissioner marking themselves as unpaid (LS-4029)', async () => {

@@ -409,6 +409,32 @@ describe('updateDraftSettings — league chat system message (LS-9217, AC3)', ()
   });
 });
 
+describe('updateDraftSettings — commissioner audit log (LS-10736)', () => {
+  it('writes an update_draft_settings audit row with the changed fields', async () => {
+    const resolve = captureResolver();
+    const ctx = makeCtx({ tier: 'premium', userId: 7, leagueOwner: 7 });
+
+    await resolve(null, { input: { leagueId: 10, draftOrder: 'linear' } }, ctx);
+
+    const valuesFn = ctx.db.insert.mock.results[0].value.values as jest.Mock;
+    const auditCall = valuesFn.mock.calls.find(
+      (call: unknown[]) =>
+        (call[0] as Record<string, unknown>)?.action ===
+        'update_draft_settings',
+    );
+
+    expect(auditCall?.[0]).toEqual({
+      leagueId: 10,
+      userId: 7,
+      action: 'update_draft_settings',
+      targetType: 'draft',
+      targetId: 99,
+      details: { changes: ['order → linear'] },
+      reason: null,
+    });
+  });
+});
+
 describe('updateDraftSettings — drafts insert (LS-10318)', () => {
   // drafts.status/created_by/sport are NOT NULL with no column default, so the
   // insert path must supply them explicitly (Rollbar #288).

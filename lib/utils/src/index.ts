@@ -10,6 +10,7 @@ export {
   stripDiacritics,
   mapWithConcurrency,
 } from './lib/utils';
+export * from './lib/commissioner-audit-actions';
 export * from './lib/ErrorHandling';
 export * from './lib/disclosure-scoring';
 export * from './lib/format-draft-date';

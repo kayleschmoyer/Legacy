@@ -9,6 +9,7 @@ export * from './lib/allowed-positions';
 export * from './lib/entitlements';
 export * from './lib/DbCredentials';
 export * from './lib/DbOptions';
+export * from './lib/commissioner-audit-actions';
 export * from './lib/ErrorHandling';
 // Who Am I? scoring constants + table builder rendered by shared-components'
 // DisclosureGame and the minigames hub; missing here they are `undefined` on

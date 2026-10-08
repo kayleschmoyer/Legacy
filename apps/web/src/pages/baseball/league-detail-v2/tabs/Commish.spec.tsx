@@ -378,6 +378,35 @@ describe('CommishTab — AuditLogPanel (LS-5921)', () => {
     expect(screen.getByText('Reason: Test reason')).toBeInTheDocument();
   });
 
+  it('renders human-readable labels for settings, scoring, dues and waiver actions (LS-10736)', () => {
+    const actions: Array<[string, string]> = [
+      ['update_league_settings', 'Update League Settings'],
+      ['update_draft_settings', 'Update Draft Settings'],
+      ['update_scoring', 'Update Scoring Rules'],
+      ['update_scoring_position_bonuses', 'Update Position Bonuses'],
+      ['update_dues_settings', 'Update League Dues'],
+      ['mark_member_paid', 'Mark Dues Paid'],
+      ['mark_member_unpaid', 'Mark Dues Unpaid'],
+      ['process_waivers', 'Process Waivers'],
+    ];
+    mockAuditLogsResult = {
+      data: {
+        commissionerAuditLogs: actions.map(([action], i) => ({
+          id: i + 1,
+          action,
+          reason: null,
+          createdAt: '2024-01-15T12:00:00Z',
+        })),
+      },
+      loading: false,
+      error: undefined,
+    };
+    openAuditLog();
+    for (const [, label] of actions) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
+  });
+
   it('shows "Load more" button when returned entries equal the page size', () => {
     const entries = Array.from({ length: 25 }, (_, i) => ({
       id: i + 1,

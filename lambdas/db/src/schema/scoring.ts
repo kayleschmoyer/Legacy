@@ -15,6 +15,7 @@ import type {
   ScoringStatDefinition,
   ScoringStatGroup,
 } from '@legacy-sports/db-client';
+import { writeAuditLog } from './audit-log';
 import { checkAdminInDb } from './authorization';
 import { builder } from './builder';
 import { ENTITLEMENTS } from './entitlements';
@@ -745,6 +746,16 @@ builder.mutationField('updateLeagueScoringProfile', (t) =>
         metadata: { changedBy: username, changedByUserId: userId, changes },
       });
 
+      // Commissioner audit trail (LS-10736).
+      await writeAuditLog(context.db, {
+        leagueId: args.leagueId,
+        userId,
+        action: 'update_scoring',
+        targetType: 'league',
+        targetId: args.leagueId,
+        details: { changes },
+      });
+
       return config;
     },
   }),
@@ -919,6 +930,16 @@ builder.mutationField('updateLeagueScoringPositionBonuses', (t) =>
           changedByUserId: bonusUserId,
           changes: bonusChanges,
         },
+      });
+
+      // Commissioner audit trail (LS-10736).
+      await writeAuditLog(context.db, {
+        leagueId: args.leagueId,
+        userId: bonusUserId,
+        action: 'update_scoring_position_bonuses',
+        targetType: 'league',
+        targetId: args.leagueId,
+        details: { changes: bonusChanges },
       });
 
       return loadLeagueScoringConfig(args.leagueId);

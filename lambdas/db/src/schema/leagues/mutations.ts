@@ -3304,6 +3304,20 @@ builder.mutationField('updateLeagueSettings', (t) =>
         userId,
       });
 
+      // Commissioner audit trail (LS-10736). `fields` also covers branding
+      // edits, which are left out of the chat-facing changeDescriptions.
+      await writeAuditLog(context.db, {
+        leagueId,
+        userId,
+        action: 'update_league_settings',
+        targetType: 'league',
+        targetId: leagueId,
+        details: {
+          changes: changeDescriptions,
+          fields: Object.keys(leagueUpdate).filter((k) => k !== 'updatedAt'),
+        },
+      });
+
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any -- Pothos resolver return type mismatch
       return updatedLeague as any;
     },

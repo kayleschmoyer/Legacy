@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, H4, Spinner, Text, YStack } from 'tamagui';
 import { useGetCommissionerAuditLogsQuery } from '@legacy-sports/graphql';
+import { formatCommissionerAuditAction } from '@legacy-sports/utils';
 
 export interface CommissionerAuditLogProps {
   leagueId: number;
@@ -57,7 +58,7 @@ export function CommissionerAuditLog({
           >
             <YStack space="$1">
               <Text fontSize="$3" fontWeight="600">
-                {log.action}
+                {formatCommissionerAuditAction(log.action)}
               </Text>
               {log.reason && (
                 <Text fontSize="$2" color="$gray11">

@@ -1202,6 +1202,42 @@ describe('League Mutations', () => {
       expect(result).toEqual({ id: 1, medianGameEnabled: false });
     });
 
+    it('writes an update_league_settings commissioner audit row (LS-10736)', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.limit.mockResolvedValueOnce([{ permissionLevel: 'commissioner' }]);
+      // update returning → updated league; chat-message insert returning → row
+      mockDb.returning
+        .mockResolvedValueOnce([{ id: 1, medianGameEnabled: false }])
+        .mockResolvedValueOnce([{ id: 10, timestamp: 't' }]);
+
+      const field = schema.getMutationType()?.getFields().updateLeagueSettings;
+      if (!field?.resolve) {
+        throw new Error('updateLeagueSettings resolver not found');
+      }
+
+      await field.resolve(
+        {},
+        { input: { leagueId: 1, medianGameEnabled: false } },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.values).toHaveBeenCalledWith({
+        leagueId: 1,
+        userId: 1,
+        action: 'update_league_settings',
+        targetType: 'league',
+        targetId: 1,
+        details: {
+          changes: expect.any(Array),
+          fields: ['medianGameEnabled'],
+        },
+        reason: null,
+      });
+    });
+
     it('should NOT require entitlement to change cap sub-fields when the league cap is disabled (LS-5197)', async () => {
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
