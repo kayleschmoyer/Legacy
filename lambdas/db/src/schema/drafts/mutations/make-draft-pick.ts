@@ -201,6 +201,7 @@ builder.mutationField('makeDraftPick', (t) =>
             customEraStartYear: rules.customEraStartYear,
             customEraEndYear: rules.customEraEndYear,
             sport: rules.sport,
+            defensiveFormat: rules.defensiveFormat,
           },
         );
         if (failedRule) {

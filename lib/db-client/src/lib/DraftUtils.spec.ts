@@ -19,6 +19,8 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import {
   buildEligibilityConditions,
   DraftUserInputError,
@@ -252,6 +254,81 @@ describe('buildEligibilityConditions', () => {
     });
     expect(nfcConditions).toHaveLength(1);
     expect(nfcConditions[0].key).toBe('pool');
+  });
+
+  describe('football defensive format (LS-10828)', () => {
+    const footballSettings = {
+      playerPool: 'nfl' as const,
+      minCareerGames: 0,
+      minCareerSeasons: 0,
+      sport: 'football' as const,
+    };
+    const render = (condition: SQL) =>
+      new PgDialect().sqlToQuery(condition).sql.replace(/\s+/g, ' ');
+
+    it('drops IDP-only players from a D/ST league', () => {
+      const conditions = buildEligibilityConditions({
+        ...footballSettings,
+        defensiveFormat: 'dst',
+      });
+      expect(conditions.map((c) => c.key)).toEqual(['defensiveFormat']);
+      const sqlText = render(conditions[0].condition);
+      expect(sqlText).toContain('football_player_eligible_positions');
+      expect(sqlText).toContain("fpep.position IN ('DL', 'LB', 'DB')");
+      // A player with any non-IDP eligibility still passes.
+      expect(sqlText).toContain("fpep.position NOT IN ('DL', 'LB', 'DB')");
+      expect(conditions[0].message).toContain('D/ST');
+    });
+
+    it('treats a null format as D/ST, the column default', () => {
+      const [condition] = buildEligibilityConditions({
+        ...footballSettings,
+        defensiveFormat: null,
+      });
+      expect(condition.key).toBe('defensiveFormat');
+      expect(render(condition.condition)).toContain(
+        "fpep.position IN ('DL', 'LB', 'DB')",
+      );
+    });
+
+    it('drops team D/ST players from an IDP league, keeping DL/LB/DB', () => {
+      const [condition, ...rest] = buildEligibilityConditions({
+        ...footballSettings,
+        defensiveFormat: 'idp',
+      });
+      expect(rest).toEqual([]);
+      expect(condition.key).toBe('defensiveFormat');
+      const sqlText = render(condition.condition);
+      expect(sqlText).toContain('p.is_dst = FALSE');
+      expect(sqlText).not.toContain('DL');
+      expect(condition.message).toContain('IDP');
+    });
+
+    it('stacks after the conference pool rule', () => {
+      expect(
+        buildEligibilityConditions({
+          ...footballSettings,
+          playerPool: 'afc',
+          defensiveFormat: 'dst',
+        }).map((c) => c.key),
+      ).toEqual(['pool', 'defensiveFormat']);
+    });
+
+    it('adds no format rule when the caller omits defensiveFormat', () => {
+      expect(buildEligibilityConditions(footballSettings)).toEqual([]);
+    });
+
+    it('ignores defensiveFormat for baseball leagues', () => {
+      expect(
+        buildEligibilityConditions({
+          playerPool: 'all',
+          minCareerGames: 0,
+          minCareerSeasons: 0,
+          sport: 'baseball',
+          defensiveFormat: 'dst',
+        }),
+      ).toEqual([]);
+    });
   });
 
   it('returns no predicates when the league imposes no restrictions', () => {

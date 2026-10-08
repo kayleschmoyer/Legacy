@@ -32,6 +32,7 @@ const poolConditions = (overrides: { draftId?: number } = {}) =>
       baseballEraFilter: 'all',
       customEraStartYear: null,
       customEraEndYear: null,
+      defensiveFormat: null,
     },
   });
 
@@ -66,6 +67,47 @@ describe('buildDraftAdpPoolConditions', () => {
     const query = dialect.sqlToQuery(rosterCondition);
     expect(query.sql.replace(/\s+/g, ' ')).toContain('dp.draft_id =');
     expect(query.params).toContain(77);
+  });
+});
+
+describe('buildDraftAdpPoolConditions — defensive format (LS-10828)', () => {
+  const footballPool = (defensiveFormat: string | null) =>
+    buildDraftAdpPoolConditions({
+      draftId: 77,
+      leagueId: 42,
+      leagueSport: 'football',
+      league: {
+        sport: 'football',
+        playerPool: 'nfl',
+        minCareerGames: null,
+        minCareerSeasons: null,
+        baseballHofOnly: null,
+        baseballEraFilter: null,
+        customEraStartYear: null,
+        customEraEndYear: null,
+        defensiveFormat,
+      },
+    })
+      .map(render)
+      .join(' ');
+
+  it('keeps DL/LB/DB-only players out of a D/ST league pool', () => {
+    // The board and both pick mutations share this pool, so a D/ST league
+    // must neither list nor accept a player who can fill no slot in it.
+    const rendered = footballPool('dst');
+    expect(rendered).toContain('football_player_eligible_positions');
+    expect(rendered).toContain("fpep.position IN ('DL', 'LB', 'DB')");
+    expect(rendered).not.toContain('p.is_dst = FALSE');
+  });
+
+  it('reads a null format as D/ST', () => {
+    expect(footballPool(null)).toContain("fpep.position IN ('DL', 'LB', 'DB')");
+  });
+
+  it('keeps team D/ST players out of an IDP league pool', () => {
+    const rendered = footballPool('idp');
+    expect(rendered).toContain('p.is_dst = FALSE');
+    expect(rendered).not.toContain("fpep.position IN ('DL', 'LB', 'DB')");
   });
 });
 

@@ -65,6 +65,8 @@ export interface DraftAdpLeagueSettings {
   baseballEraFilter: string | null;
   customEraStartYear: number | null;
   customEraEndYear: number | null;
+  /** Football D/ST-vs-IDP format; `null` reads as D/ST (LS-10828). */
+  defensiveFormat: string | null;
 }
 
 /**
@@ -184,6 +186,9 @@ export function buildDraftAdpPoolConditions({
       baseballEraFilter: league?.baseballEraFilter ?? undefined,
       customEraStartYear: league?.customEraStartYear ?? null,
       customEraEndYear: league?.customEraEndYear ?? null,
+      // A D/ST league can't roster DL/LB/DB and an IDP league can't roster a
+      // team defense, so neither belongs in the pool (LS-10828).
+      defensiveFormat: league?.defensiveFormat ?? null,
     }).map(({ condition }) => condition),
   ];
 }
@@ -241,6 +246,7 @@ export async function loadDraftedPlayerAdp(
               customEraStartYear:
                 PublicSchema.mockDraftSettings.customEraStartYear,
               customEraEndYear: PublicSchema.mockDraftSettings.customEraEndYear,
+              defensiveFormat: PublicSchema.mockDraftSettings.defensiveFormat,
             })
             .from(PublicSchema.mockDraftSettings)
             .innerJoin(
@@ -264,6 +270,7 @@ export async function loadDraftedPlayerAdp(
               baseballEraFilter: PublicSchema.leagues.baseballEraFilter,
               customEraStartYear: PublicSchema.leagues.customEraStartYear,
               customEraEndYear: PublicSchema.leagues.customEraEndYear,
+              defensiveFormat: PublicSchema.leagues.defensiveFormat,
             })
             .from(PublicSchema.leagues)
             .where(eq(PublicSchema.leagues.id, leagueId))

@@ -500,7 +500,8 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       // (LS-8674: keepers are applied to rosters before the first pick, so
       // kept players are not draftable; a no-op for redraft leagues), and the
       // league's static eligibility rules (player pool, career games/seasons,
-      // Hall-of-Fame, era — LS-8071, the SAME shared builder the pick
+      // Hall-of-Fame, era, and football's D/ST-vs-IDP defensive format —
+      // LS-8071/LS-10828, the SAME shared builder the pick
       // endpoints use, so a player shown here can never be rejected by a pick
       // on eligibility, or vice-versa).
       //

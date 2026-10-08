@@ -492,6 +492,39 @@ describe('getAvailableDraftPlayers — sport-scoped player pool (LS-9470)', () =
     );
   });
 
+  // LS-10828: the D/ST-vs-IDP rule lives in the shared eligibility builder
+  // (DraftUtils.spec covers its SQL), so the board — including "Show all",
+  // which skips only the open-slot filter — inherits it as long as the format
+  // is forwarded. Both formats must reach the builder unchanged.
+  it.each(['dst', 'idp'])(
+    'forwards the %s defensive format to the eligibility builder (LS-10828)',
+    async (defensiveFormat) => {
+      const resolve = await captureResolver();
+      const db = makeDb({ ...FOOTBALL_LEAGUE, defensiveFormat });
+
+      await resolve(
+        {},
+        { draftId: 100, search: 'Kamara', openSlotsOnly: false },
+        { user: { id: 7 }, db },
+      );
+
+      expect(buildEligibilityConditions).toHaveBeenCalledWith(
+        expect.objectContaining({ sport: 'football', defensiveFormat }),
+      );
+    },
+  );
+
+  it('forwards a null defensive format so the builder reads it as D/ST (LS-10828)', async () => {
+    const resolve = await captureResolver();
+    const db = makeDb({ ...FOOTBALL_LEAGUE, defensiveFormat: null });
+
+    await resolve({}, { draftId: 100 }, { user: { id: 7 }, db });
+
+    expect(buildEligibilityConditions).toHaveBeenCalledWith(
+      expect.objectContaining({ sport: 'football', defensiveFormat: null }),
+    );
+  });
+
   // LS-9474: football positions live in their own relation. The baseball table
   // holds zero football rows, so filtering a football board against it returned
   // an empty board for every pill. Note `football_player_eligible_positions`

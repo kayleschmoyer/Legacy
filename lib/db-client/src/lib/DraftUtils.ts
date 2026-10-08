@@ -342,6 +342,14 @@ export interface LeagueEligibilitySettings {
   customEraEndYear?: number | null;
   /** Sport discriminator — when 'football', all baseball-specific filters are skipped. */
   sport?: 'baseball' | 'football';
+  /**
+   * Football defensive format, mirroring `leagues.defensive_format` (LS-10828).
+   * Omit it to apply no format rule. Otherwise `'idp'` drops team D/ST
+   * players, and any other value — including `null`, the column's legacy
+   * state, which `getDefaultRosterPositions` also reads as D/ST — drops
+   * players whose only eligible positions are DL/LB/DB. Ignored for baseball.
+   */
+  defensiveFormat?: string | null;
 }
 
 export interface EligibilityFilterResult {
@@ -364,7 +372,13 @@ export interface EligibilityFilterResult {
  * the user-facing error a pick endpoint throws when the rule fails.
  */
 export interface EligibilityCondition {
-  key: 'pool' | 'careerGames' | 'careerSeasons' | 'hofOnly' | 'era';
+  key:
+    | 'pool'
+    | 'careerGames'
+    | 'careerSeasons'
+    | 'hofOnly'
+    | 'era'
+    | 'defensiveFormat';
   condition: SQL;
   message: string;
 }
@@ -408,7 +422,8 @@ function formatEraLabel(eraFilter: string): string {
  * vice-versa. Only rules that actually apply (given the league config) are
  * returned, in display order.
  *
- * Football leagues only support the conference (AFC/NFC) player-pool rule —
+ * Football leagues only support the conference (AFC/NFC) player-pool rule
+ * and, when `defensiveFormat` is passed, the D/ST-vs-IDP rule (LS-10828) —
  * the remaining rules (career games/seasons, HoF, era) are baseball-specific
  * concepts with no football equivalent (LS-9040).
  */
@@ -416,20 +431,24 @@ export function buildEligibilityConditions(
   settings: LeagueEligibilitySettings,
 ): EligibilityCondition[] {
   if (settings.sport === 'football') {
+    const footballConditions: EligibilityCondition[] = [];
     if (settings.playerPool === 'afc' || settings.playerPool === 'nfc') {
       const conference = settings.playerPool.toUpperCase();
-      return [
-        {
-          key: 'pool',
-          condition: sql`EXISTS (
-            SELECT 1 FROM nfl_teams nt
-            WHERE nt.abbreviation = p.nfl_team AND nt.conference = ${conference}
-          )`,
-          message: `Player is not on an ${conference} team`,
-        },
-      ];
+      footballConditions.push({
+        key: 'pool',
+        condition: sql`EXISTS (
+          SELECT 1 FROM nfl_teams nt
+          WHERE nt.abbreviation = p.nfl_team AND nt.conference = ${conference}
+        )`,
+        message: `Player is not on an ${conference} team`,
+      });
     }
-    return [];
+    if (settings.defensiveFormat !== undefined) {
+      footballConditions.push(
+        defensiveFormatCondition(settings.defensiveFormat),
+      );
+    }
+    return footballConditions;
   }
 
   const conditions: EligibilityCondition[] = [];
@@ -501,6 +520,42 @@ export function buildEligibilityConditions(
   }
 
   return conditions;
+}
+
+/**
+ * A football league fields either team D/ST or individual defensive players
+ * (IDP), never both (LS-9475), so the other kind can fill no slot and must not
+ * be draftable (LS-10828). D/ST leagues drop players whose only eligible
+ * positions are DL/LB/DB — read from `football_player_eligible_positions`, the
+ * same relation the board's position filters use — and IDP leagues drop the
+ * team-defense players. Offensive players and kickers pass in both.
+ */
+function defensiveFormatCondition(
+  defensiveFormat: string | null,
+): EligibilityCondition {
+  if (defensiveFormat === 'idp') {
+    return {
+      key: 'defensiveFormat',
+      condition: sql`p.is_dst = FALSE`,
+      message:
+        'This league uses individual defensive players (IDP), so team D/ST players are not draftable.',
+    };
+  }
+  return {
+    key: 'defensiveFormat',
+    condition: sql`(
+      NOT EXISTS (
+        SELECT 1 FROM football_player_eligible_positions fpep
+        WHERE fpep.player_id = p.id AND fpep.position IN ('DL', 'LB', 'DB')
+      )
+      OR EXISTS (
+        SELECT 1 FROM football_player_eligible_positions fpep
+        WHERE fpep.player_id = p.id AND fpep.position NOT IN ('DL', 'LB', 'DB')
+      )
+    )`,
+    message:
+      'This league uses team D/ST, so individual defensive players (DL/LB/DB) are not draftable.',
+  };
 }
 
 /**

@@ -167,6 +167,7 @@ builder.mutationField('commissionerPick', (t) =>
             customEraStartYear: leaguePre.customEraStartYear,
             customEraEndYear: leaguePre.customEraEndYear,
             sport: leaguePre.sport,
+            defensiveFormat: leaguePre.defensiveFormat,
           },
         );
         if (failedRule) {

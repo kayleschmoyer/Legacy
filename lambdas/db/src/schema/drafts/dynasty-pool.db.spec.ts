@@ -159,6 +159,7 @@ describe('Dynasty draft pool + roster carryover — DB Integration Tests (LS-838
         baseballEraFilter: null,
         customEraStartYear: null,
         customEraEndYear: null,
+        defensiveFormat: null,
       },
     });
 

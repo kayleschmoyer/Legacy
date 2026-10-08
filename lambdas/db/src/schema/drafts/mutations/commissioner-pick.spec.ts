@@ -305,6 +305,60 @@ describe('commissionerPick resolver', () => {
     });
   });
 
+  it('rejects an IDP-only player in a D/ST league with the format rule message (LS-10828)', async () => {
+    const message =
+      'This league uses team D/ST, so individual defensive players (DL/LB/DB) are not draftable.';
+    mockFindFailedEligibilityRule.mockResolvedValueOnce({
+      key: 'defensiveFormat',
+      message,
+    });
+    const leagueRow = {
+      id: 1,
+      sport: 'football',
+      defensiveFormat: 'dst',
+      draftStatus: 'in-progress',
+      playerPool: 'all',
+      baseballHofOnly: false,
+      eraFilter: null,
+      minCareerGames: 0,
+      minCareerSeasons: 0,
+      maxRosterSize: 16,
+    };
+    const draftRow = {
+      id: 1,
+      league_id: 1,
+      pick_time_limit_seconds: 30,
+      selection_method: 'snake',
+    };
+
+    const db = {
+      execute: jest.fn().mockResolvedValueOnce({ rows: [draftRow] }),
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit: jest
+        .fn()
+        .mockResolvedValueOnce([{ permissionLevel: 'commissioner' }]) // membership
+        .mockResolvedValueOnce([leagueRow]) // league pre
+        .mockResolvedValueOnce([{ id: 5, position: 'DB' }]), // player
+      transaction: jest.fn(),
+    };
+
+    const ctx = { user: { id: 99 }, db, notificationService: null };
+    await expect(
+      resolve({}, { draftId: 1, playerId: 5 }, ctx, undefined),
+    ).rejects.toMatchObject({
+      message,
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
+    expect(mockFindFailedEligibilityRule).toHaveBeenCalledWith(
+      db,
+      5,
+      expect.objectContaining({ sport: 'football', defensiveFormat: 'dst' }),
+    );
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
   it('throws BAD_USER_INPUT when the player is already rostered as a keeper (LS-8674)', async () => {
     const leagueRow = {
       id: 1,

@@ -105,6 +105,10 @@ function setupResolver(options: {
   transactionError?: Error;
   /** Whether isPlayerOnRoster should report the player as already kept (LS-8674). */
   isPlayerOnRoster?: boolean;
+  /** Overrides merged onto the draft's rules (e.g. a football league's format). */
+  rules?: Record<string, unknown>;
+  /** The rule findFailedEligibilityRule reports the player failing, if any. */
+  failedEligibilityRule?: { key: string; message: string };
 }) {
   jest.resetModules();
 
@@ -152,7 +156,12 @@ function setupResolver(options: {
     gamesPerMatchup: 5,
     pitcherStartsPerMatchup: 1,
     rosterPositions: [],
+    ...options.rules,
   };
+
+  const mockFindFailedEligibilityRule = jest
+    .fn()
+    .mockResolvedValue(options.failedEligibilityRule ?? null);
 
   // Current pick info (Phase 1 & Phase 2). The seat (`participantId`) is what
   // every "whose turn is it" comparison keys on since LS-10074; `teamId` is
@@ -263,7 +272,7 @@ function setupResolver(options: {
       filterPlayerIdsByLeagueEligibility: jest
         .fn()
         .mockResolvedValue({ eligibleIds: new Set([42]) }),
-      findFailedEligibilityRule: jest.fn().mockResolvedValue(null),
+      findFailedEligibilityRule: mockFindFailedEligibilityRule,
       PublicSchema: {
         leagues: { id: 'id', draftStatus: 'draftStatus' },
         leagueMembers: {
@@ -500,6 +509,7 @@ function setupResolver(options: {
     mockNotifyOnTheClock,
     mockNotificationPublisher,
     mockSetSeatAutoPickById,
+    mockFindFailedEligibilityRule,
   };
 }
 
@@ -780,3 +790,42 @@ describe("makeDraftPick — a manager's own pick turns their auto-pick off (LS-1
 });
 
 export {};
+
+describe('makeDraftPick — defensive format eligibility (LS-10828)', () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("forwards the league's defensive format to the shared eligibility check", async () => {
+    const { resolve, ctx, mockFindFailedEligibilityRule } = setupResolver({
+      rules: { sport: 'football', defensiveFormat: 'dst' },
+    });
+
+    await resolve({}, { draftId: 1, playerId: 42 }, ctx, undefined);
+
+    expect(mockFindFailedEligibilityRule).toHaveBeenCalledWith(
+      ctx.db,
+      42,
+      expect.objectContaining({ sport: 'football', defensiveFormat: 'dst' }),
+    );
+  });
+
+  it('rejects an IDP-only player in a D/ST league before committing the pick', async () => {
+    const message =
+      'This league uses team D/ST, so individual defensive players (DL/LB/DB) are not draftable.';
+    const { resolve, ctx, mockCommitDraftPick } = setupResolver({
+      existingOwnPick: null,
+      rules: { sport: 'football', defensiveFormat: 'dst' },
+      failedEligibilityRule: { key: 'defensiveFormat', message },
+    });
+
+    await expect(
+      resolve({}, { draftId: 1, playerId: 42 }, ctx, undefined),
+    ).rejects.toMatchObject({
+      message,
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
+    expect(mockCommitDraftPick).not.toHaveBeenCalled();
+    expect(ctx.db.transaction).not.toHaveBeenCalled();
+  });
+});
