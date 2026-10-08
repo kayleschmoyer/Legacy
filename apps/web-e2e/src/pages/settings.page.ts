@@ -473,9 +473,9 @@ class ProfileSurface {
     await this.#driver.byText('Email', { exact: true }).expectVisible();
   }
 
-  /** Assert the User ID field label is visible. */
-  async expectUserIdField(): Promise<void> {
-    await this.#driver.byText('User ID').expectVisible();
+  /** Assert the internal User ID is NOT rendered (enumeration risk, LS-7233). */
+  async expectNoUserIdField(): Promise<void> {
+    await this.#driver.byText('User ID').expectHidden();
   }
 
   /** Assert the Access Level field label is visible. */

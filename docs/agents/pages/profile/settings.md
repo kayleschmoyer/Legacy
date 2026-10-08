@@ -24,7 +24,6 @@
 | Username           | `dbUsername`            | Editable                          |
 | Email              | `userEmail`             | Read-only                         |
 | Access level badge | `accessLevel`           | admin / user / none               |
-| User ID            | `user.id`               | Read-only                         |
 
 **Username editor**: Edit button → text input + Save/Cancel  
 Validation: 3–50 chars, alphanumeric + allowed special chars  

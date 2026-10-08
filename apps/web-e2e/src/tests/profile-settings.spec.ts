@@ -180,11 +180,14 @@ test.describe('Profile Settings Page @smoke', () => {
     await settingsPage.profile.expectEmailField();
   });
 
-  test('should display User ID field', async ({ page, settingsPage }) => {
+  test('should not expose the internal User ID', async ({
+    page,
+    settingsPage,
+  }) => {
     await setupProfileGraphQL(page);
     await settingsPage.profile.goto();
 
-    await settingsPage.profile.expectUserIdField();
+    await settingsPage.profile.expectNoUserIdField();
   });
 
   test('should display info banner about Google-managed profile', async ({

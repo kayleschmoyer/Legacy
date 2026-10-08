@@ -30,7 +30,7 @@ Renders user avatar (with initials fallback on image error), username, read-only
 - should display the Profile section with user information
 - should display username field
 - should display email field
-- should display User ID field
+- should not expose the internal User ID
 - should display Access Level field
 - should display info banner about Google-managed profile
 - should display page meta description
@@ -48,7 +48,7 @@ Unit / component coverage (supporting evidence only — does not make a row `cov
 - [ ] No image: the card shows the username initial; with a picture URL it renders an `<img alt=username>`
 - [ ] Image load error falls back to the initial
 - [ ] Access level shows "Administrator" / "Member" / "Limited" for admin / user / none (badge and field row)
-- [ ] Email and User ID rows are read-only (no Edit control other than the username)
+- [ ] Email row is read-only (no Edit control other than the username)
 
 ### android — `maestro/flows/profile-settings/profile-card-display.yaml` (3)
 

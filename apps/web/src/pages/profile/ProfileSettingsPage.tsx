@@ -678,10 +678,6 @@ const ProfileSettingsPage: React.FC = () => {
                   <FieldLabel>Access Level</FieldLabel>
                   <FieldValue>{getAccessLevelLabel(accessLevel)}</FieldValue>
                 </FieldRow>
-                <FieldRow>
-                  <FieldLabel>User ID</FieldLabel>
-                  <FieldValue color="$colorPress">#{user.id}</FieldValue>
-                </FieldRow>
               </YStack>
 
               {/* Read-only notice */}
