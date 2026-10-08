@@ -632,6 +632,100 @@ describe('SubscriptionSettingsScreen — step-up gate (LS-5029)', () => {
     expect(mockCreatePortal).not.toHaveBeenCalled();
   });
 
+  describe('iOS already-Premium Upgrade short-circuit (LS-7420)', () => {
+    const originalOS = Platform.OS;
+    let openUrlSpy: jest.SpyInstance;
+    let alertSpy: jest.SpyInstance<void, Parameters<typeof Alert.alert>>;
+    const freeSub = {
+      subscription: null,
+      isPremium: false,
+      tier: 'free',
+      loading: false,
+      refetch: mockRefetch,
+    };
+
+    beforeEach(() => {
+      Object.defineProperty(Platform, 'OS', { value: 'ios' });
+      mockUseSubscription.mockReturnValue(freeSub);
+      openUrlSpy = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+      alertSpy = jest.spyOn(Alert, 'alert').mockImplementation();
+    });
+
+    afterEach(() => {
+      Object.defineProperty(Platform, 'OS', { value: originalOS });
+      openUrlSpy.mockRestore();
+      alertSpy.mockRestore();
+    });
+
+    it('skips the App Store alert and opens manage-subscription when the cache turns Premium before the deferred step-up action runs', async () => {
+      let deferred: (() => void) | undefined;
+      mockRequireStepUp.mockImplementation((action: () => void) => {
+        deferred = action;
+      });
+      const mockCreateCheckout = jest.fn();
+      mockUseCheckoutSession.mockReturnValue([
+        mockCreateCheckout,
+        { loading: false },
+      ]);
+      const mockCreatePortal = jest.fn().mockResolvedValue({
+        data: { createBillingPortalSession: { url: 'https://billing/x' } },
+      });
+      mockUseBillingPortalSession.mockReturnValue([
+        mockCreatePortal,
+        { loading: false },
+      ]);
+
+      const view = render(<SubscriptionSettingsScreen />);
+      fireEvent.press(screen.getAllByText(/^Upgrade/).slice(-1)[0]);
+      expect(deferred).toBeDefined();
+
+      // The cache catches up between the tap and the step-up callback.
+      mockUseSubscription.mockReturnValue({
+        ...freeSub,
+        isPremium: true,
+        tier: 'premium',
+      });
+      view.rerender(<SubscriptionSettingsScreen />);
+
+      await act(async () => {
+        deferred?.();
+        await Promise.resolve();
+      });
+
+      expect(alertSpy).not.toHaveBeenCalledWith(
+        'Subscribe via App Store',
+        expect.anything(),
+        expect.anything(),
+      );
+      expect(mockCreateCheckout).not.toHaveBeenCalled();
+      expect(mockCreatePortal).toHaveBeenCalledTimes(1);
+      expect(openUrlSpy).toHaveBeenCalledWith('https://billing/x');
+    });
+
+    it('still shows the App Store alert and checks out on Continue for a free user', () => {
+      mockRequireStepUp.mockImplementation((action: () => void) => action());
+      const mockCreateCheckout = jest.fn().mockResolvedValue({
+        data: { createCheckoutSession: { url: null } },
+      });
+      mockUseCheckoutSession.mockReturnValue([
+        mockCreateCheckout,
+        { loading: false },
+      ]);
+
+      render(<SubscriptionSettingsScreen />);
+      fireEvent.press(screen.getAllByText(/^Upgrade/).slice(-1)[0]);
+
+      expect(alertSpy).toHaveBeenCalledWith(
+        'Subscribe via App Store',
+        expect.any(String),
+        expect.any(Array),
+      );
+      const buttons = alertSpy.mock.calls[0][2] ?? [];
+      buttons.find((b) => b.text === 'Continue')?.onPress?.();
+      expect(mockCreateCheckout).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('Android manage subscription fallback (LS-7404)', () => {
     const originalOS = Platform.OS;
     const PLAY_URL = 'https://play.google.com/store/account/subscriptions';

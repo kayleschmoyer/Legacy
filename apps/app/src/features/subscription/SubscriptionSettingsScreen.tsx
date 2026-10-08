@@ -235,6 +235,9 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
   // Upgrade button is disabled. This ref is a synchronous re-entrancy lock.
   const checkoutSubmittingRef = useRef(false);
 
+  const isPremiumRef = useRef(isPremium);
+  isPremiumRef.current = isPremium;
+
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('annual');
 
   // `checkout` is set by the `+native-intent` rewrite of the Stripe return deep
@@ -342,6 +345,14 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
 
     // iOS: Platform-aware purchase flow.
     if (Platform.OS === 'ios') {
+      // The Upgrade card renders from a cache-first `isPremium`, which can lag
+      // the server by a moment. A user who is already Premium must not get the
+      // "continuing to our website" alert, so send them to manage-subscription.
+      // Read via a ref: the step-up gate can defer this callback past a render.
+      if (isPremiumRef.current) {
+        await handleManageSubscriptionAction();
+        return;
+      }
       Alert.alert(
         'Subscribe via App Store',
         "In-App Purchase through the App Store is coming soon. For now, you'll be taken to our website to complete your subscription.",
