@@ -73,8 +73,19 @@ type GameDef = MinigameTemplate & { stat: MinigameStat };
 // see the `isNarrow` prop override below.
 const NARROW_QUERY = '(max-width: 720px)';
 
+// Read the media query synchronously on first render so a phone's first paint
+// already uses the narrow layout instead of flashing the desktop sizing
+// (LS-10758).
+function matchesNarrow(): boolean {
+  return (
+    typeof document !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia(NARROW_QUERY).matches
+  );
+}
+
 function useIsNarrow(): boolean {
-  const [narrow, setNarrow] = React.useState(false);
+  const [narrow, setNarrow] = React.useState(matchesNarrow);
   React.useEffect(() => {
     if (typeof document === 'undefined' || !window.matchMedia) return;
     const mq = window.matchMedia(NARROW_QUERY);
@@ -136,7 +147,12 @@ const GameCard: React.FC<{
       cursor="pointer"
       animation="quick"
       flex={isNarrow ? undefined : 1}
-      minWidth={isNarrow ? '100%' : 280}
+      // Narrow: a definite 100% width, not `minWidth: '100%'`. In the
+      // flex-wrap row a min-width-only card takes its max-content width (the
+      // description on one line) as its flex basis and, since Tamagui stacks
+      // don't shrink, grew ~1100px wide past the phone viewport (LS-10758).
+      width={isNarrow ? '100%' : undefined}
+      minWidth={isNarrow ? undefined : 280}
       backgroundColor="$surfaceCard"
       borderWidth={1}
       borderColor="$glassBorder"

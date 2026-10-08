@@ -124,3 +124,60 @@ test.describe('Minigames Hub card CTAs (LS-10460) @critical', () => {
     });
   }
 });
+
+// LS-10758: at phone widths (iPhone SE, 375px) the four game cards grew past
+// the right edge of the viewport — descriptions cut mid-word and CTA pills
+// off-screen, with no horizontal scroll to reach them. Each card must sit
+// inside the page's 16px gutter, with its CTA pill fully on-screen, from
+// 320px to 414px.
+test.describe('Minigames Hub cards fit phone viewports (LS-10758)', () => {
+  const CARDS = [
+    { title: 'Season Draft', cta: 'Enter Lobby' },
+    { title: 'Who Am I?', cta: 'Play Now' },
+    { title: '20 Questions', cta: 'Play Now' },
+    { title: 'Mock Draft', cta: 'Start Draft' },
+  ];
+  const GUTTER = 16;
+
+  for (const width of [320, 375, 414]) {
+    test(`every card fits within the ${width}px viewport`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 667 });
+      await mockHubQueries(page);
+      await page.goto('/games');
+
+      for (const { title, cta } of CARDS) {
+        const card = page
+          .getByRole('button')
+          .filter({ has: page.getByText(title, { exact: true }) });
+        await expect(card).toHaveCount(1);
+        const ctaLabel = card.getByText(cta, { exact: true });
+        await expect(ctaLabel).toBeVisible();
+
+        const cardBox = await card.boundingBox();
+        const ctaBox = await ctaLabel.boundingBox();
+        expect(cardBox, `${title} card box`).not.toBeNull();
+        expect(ctaBox, `${title} CTA box`).not.toBeNull();
+        if (!cardBox || !ctaBox) return;
+
+        expect(cardBox.x, `${title} card left edge`).toBeGreaterThanOrEqual(
+          GUTTER - 0.5,
+        );
+        expect(
+          cardBox.x + cardBox.width,
+          `${title} card right edge`,
+        ).toBeLessThanOrEqual(width - GUTTER + 0.5);
+        expect(
+          ctaBox.x + ctaBox.width,
+          `${title} CTA right edge`,
+        ).toBeLessThanOrEqual(width - GUTTER + 0.5);
+      }
+
+      const overflow = await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth,
+      );
+      expect(overflow, 'horizontal page overflow').toBeLessThanOrEqual(0);
+    });
+  }
+});
