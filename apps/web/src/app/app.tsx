@@ -636,6 +636,7 @@ function App() {
   useWebPushRegistration();
 
   const { pathname } = useLocation();
+  const { isAuthenticated } = useAuth();
 
   // Big-screen / TV draft-watch routes suppress the standard app chrome
   // (nav, scoreboard ticker, mobile bottom bar) so the page is a clean
@@ -1082,8 +1083,10 @@ function App() {
           </Routes>
         </Suspense>
       </YStack>
-      {/* Mobile bottom bar — fixed, hidden on desktop */}
-      {!isImmersiveRoute && (
+      {/* Mobile bottom bar — fixed, hidden on desktop. Its tabs are all
+          auth-gated, so signed-out visitors on public routes get no bar,
+          matching Navigation (LS-10766). */}
+      {!isImmersiveRoute && isAuthenticated && (
         <YStack display="flex" $gtMd={{ display: 'none' }}>
           <MobileBottomBar />
         </YStack>

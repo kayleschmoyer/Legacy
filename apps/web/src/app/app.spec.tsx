@@ -315,8 +315,9 @@ jest.mock('../components/layout/HelpMenuButton', () => ({
   HelpMenuButton: () => <button>Help</button>,
 }));
 
+const mockMobileBottomBar = jest.fn(() => null);
 jest.mock('../components/layout/MobileBottomBar', () => ({
-  MobileBottomBar: () => null,
+  MobileBottomBar: () => mockMobileBottomBar(),
 }));
 
 jest.mock('../components/layout/MobileNavDrawer', () => ({
@@ -543,6 +544,64 @@ describe('App', () => {
           configurable: true,
         });
       }
+    });
+  });
+
+  describe('MobileBottomBar (LS-10766)', () => {
+    let useAuthMock: jest.Mock;
+    let defaultAuth: unknown;
+
+    beforeEach(() => {
+      useAuthMock = (
+        jest.requireMock(
+          '@legacy-sports/shared-components/auth',
+        ) as unknown as {
+          useAuth: jest.Mock;
+        }
+      ).useAuth;
+      defaultAuth = useAuthMock();
+      mockMobileBottomBar.mockClear();
+    });
+
+    afterEach(() => {
+      useAuthMock.mockReturnValue(defaultAuth);
+    });
+
+    it.each(['/help', '/pricing', '/terms', '/privacy', '/scoreboard'])(
+      'is not rendered for signed-out visitors on %s',
+      (path) => {
+        useAuthMock.mockReturnValue({
+          isAuthenticated: false,
+          isLoading: false,
+          isImpersonating: false,
+          user: undefined,
+          logout: jest.fn(),
+        });
+
+        render(
+          <MemoryRouter
+            future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+            initialEntries={[path]}
+          >
+            <App />
+          </MemoryRouter>,
+        );
+
+        expect(mockMobileBottomBar).not.toHaveBeenCalled();
+      },
+    );
+
+    it('is rendered for signed-in users', () => {
+      render(
+        <MemoryRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          initialEntries={['/pricing']}
+        >
+          <App />
+        </MemoryRouter>,
+      );
+
+      expect(mockMobileBottomBar).toHaveBeenCalled();
     });
   });
 
