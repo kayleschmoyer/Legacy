@@ -3635,6 +3635,9 @@ export function LeagueDetailPage(): React.JSX.Element {
         content: (
           <SeasonAwardsControl
             leagueId={leagueId}
+            sport={
+              data?.league?.sport === Sport.Football ? 'football' : 'baseball'
+            }
             onSuccess={showMatchupSuccess}
             onError={(err) => {
               setMatchupErrorMessage(err.message);

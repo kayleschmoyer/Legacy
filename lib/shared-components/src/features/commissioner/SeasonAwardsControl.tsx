@@ -33,6 +33,7 @@ import {
   useOpenAwardVotingMutation,
   useUpsertLeagueSeasonAwardMutation,
 } from '@legacy-sports/graphql';
+import type { SportKind } from '../../config/sports';
 import { Checkbox } from '../../components/ToggleControls';
 import { Select } from '../../components/Select';
 import {
@@ -84,6 +85,21 @@ const SEASON_AWARD_TYPES: AwardMeta[] = [
     icon: '🏏',
   },
 ];
+
+/**
+ * Football leagues get the sport-neutral awards only until a football award
+ * set is designed (LS-10694 product decision); the server enforces the same.
+ */
+const FOOTBALL_AWARD_TYPES: ReadonlySet<string> = new Set([
+  'mvp',
+  'rookie_of_the_year',
+]);
+
+function awardTypesForSport(sport: SportKind): AwardMeta[] {
+  return sport === 'football'
+    ? SEASON_AWARD_TYPES.filter((a) => FOOTBALL_AWARD_TYPES.has(a.key))
+    : SEASON_AWARD_TYPES;
+}
 
 /**
  * Awards whose copy is about contribution to a fantasy team: recipients are
@@ -555,6 +571,8 @@ function AwardRow({
 export interface SeasonAwardsControlProps {
   leagueId: number;
   currentSeason?: number;
+  /** League sport — football leagues are offered MVP + ROY only (LS-10694). */
+  sport?: SportKind;
   onSuccess?: (message: string) => void;
   onError?: (error: Error) => void;
 }
@@ -565,16 +583,19 @@ export interface SeasonAwardsControlProps {
  * SeasonAwardsControl — Commissioner UI for assigning season-long fantasy awards.
  *
  * Commissioners select a season, then assign award recipients (MVP, Cy Young,
- * Rookie of the Year, Gold Glove, Silver Slugger) by searching for players.
+ * Rookie of the Year, Gold Glove, Silver Slugger; football leagues get MVP and
+ * Rookie of the Year only) by searching for players.
  * Awards are per-league and per-season — they reflect fantasy performance, not
  * real MLB awards.
  */
 export function SeasonAwardsControl({
   leagueId,
   currentSeason,
+  sport = 'baseball',
   onSuccess,
   onError,
 }: SeasonAwardsControlProps) {
+  const awardTypes = useMemo(() => awardTypesForSport(sport), [sport]);
   const thisYear = new Date().getFullYear();
   const [season, setSeason] = useState(currentSeason ?? thisYear);
 
@@ -594,7 +615,7 @@ export function SeasonAwardsControl({
 
   // Voting controls state
   const [selectedAwardTypes, setSelectedAwardTypes] = useState<Set<string>>(
-    () => new Set(SEASON_AWARD_TYPES.map((a) => a.key)),
+    () => new Set(awardTypes.map((a) => a.key)),
   );
   const [openingVote, setOpeningVote] = useState(false);
   const [closingVote, setClosingVote] = useState(false);
@@ -618,7 +639,11 @@ export function SeasonAwardsControl({
   });
 
   const handleOpenVoting = useCallback(async () => {
-    const types = [...selectedAwardTypes];
+    // Intersect with the sport's awards: the selection is seeded on mount and
+    // `sport` can resolve later (league data loading).
+    const types = awardTypes
+      .map((a) => a.key)
+      .filter((key) => selectedAwardTypes.has(key));
     if (types.length === 0) return;
     setOpeningVote(true);
     try {
@@ -631,7 +656,15 @@ export function SeasonAwardsControl({
     } finally {
       setOpeningVote(false);
     }
-  }, [selectedAwardTypes, leagueId, season, openVoting, onSuccess, onError]);
+  }, [
+    awardTypes,
+    selectedAwardTypes,
+    leagueId,
+    season,
+    openVoting,
+    onSuccess,
+    onError,
+  ]);
 
   const handleCloseVoting = useCallback(async () => {
     if (closingVoteRef.current) return;
@@ -778,7 +811,7 @@ export function SeasonAwardsControl({
                     vote anonymously — no one sees who voted for whom.
                   </Text>
                   <YStack gap="$2">
-                    {SEASON_AWARD_TYPES.map((meta) => (
+                    {awardTypes.map((meta) => (
                       <XStack
                         key={meta.key}
                         alignItems="center"
@@ -933,7 +966,7 @@ export function SeasonAwardsControl({
             <Text fontSize="$2" color="$gray10" fontWeight="600">
               Direct Assignment
             </Text>
-            {SEASON_AWARD_TYPES.map((meta) => (
+            {awardTypes.map((meta) => (
               <AwardRow
                 key={meta.key}
                 meta={meta}

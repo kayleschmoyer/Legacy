@@ -526,3 +526,121 @@ describe('SeasonAwardsControl — LS-10821 recipient search scoped to the league
     },
   );
 });
+
+describe('SeasonAwardsControl — LS-10694 football award set', () => {
+  const BASEBALL_ONLY = ['cy_young', 'gold_glove', 'silver_slugger'];
+
+  it('offers football leagues MVP and Rookie of the Year only', () => {
+    render(
+      <SeasonAwardsControl
+        leagueId={42}
+        currentSeason={2024}
+        sport="football"
+      />,
+    );
+
+    expect(screen.getByTestId('award-row-mvp')).toBeTruthy();
+    expect(screen.getByTestId('award-row-rookie_of_the_year')).toBeTruthy();
+    for (const key of BASEBALL_ONLY) {
+      expect(screen.queryByTestId(`award-row-${key}`)).toBeNull();
+    }
+    expect(screen.queryByText(/Cy Young/)).toBeNull();
+    expect(screen.queryByText(/Gold Glove/)).toBeNull();
+    expect(screen.queryByText(/Silver Slugger/)).toBeNull();
+  });
+
+  it('opens a football vote with only the football award types', () => {
+    const openVoting = jest.fn(() => Promise.resolve({}));
+    const graphql = jest.requireMock<typeof import('@legacy-sports/graphql')>(
+      '@legacy-sports/graphql',
+    );
+    jest
+      .mocked(graphql.useOpenAwardVotingMutation)
+      .mockImplementation(
+        () =>
+          [openVoting] as unknown as ReturnType<
+            typeof graphql.useOpenAwardVotingMutation
+          >,
+      );
+
+    render(
+      <SeasonAwardsControl
+        leagueId={42}
+        currentSeason={2024}
+        sport="football"
+      />,
+    );
+    fireEvent.click(screen.getByText('Open Voting'));
+
+    expect(openVoting).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variables: {
+          leagueId: 42,
+          season: 2024,
+          awardTypes: ['mvp', 'rookie_of_the_year'],
+        },
+      }),
+    );
+    jest
+      .mocked(graphql.useOpenAwardVotingMutation)
+      .mockImplementation(
+        () =>
+          [jest.fn()] as unknown as ReturnType<
+            typeof graphql.useOpenAwardVotingMutation
+          >,
+      );
+  });
+
+  it('drops baseball-only awards from the vote when sport resolves after mount', () => {
+    const openVoting = jest.fn(() => Promise.resolve({}));
+    const graphql = jest.requireMock<typeof import('@legacy-sports/graphql')>(
+      '@legacy-sports/graphql',
+    );
+    jest
+      .mocked(graphql.useOpenAwardVotingMutation)
+      .mockImplementation(
+        () =>
+          [openVoting] as unknown as ReturnType<
+            typeof graphql.useOpenAwardVotingMutation
+          >,
+      );
+
+    const { rerender } = render(
+      <SeasonAwardsControl leagueId={42} currentSeason={2024} />,
+    );
+    rerender(
+      <SeasonAwardsControl
+        leagueId={42}
+        currentSeason={2024}
+        sport="football"
+      />,
+    );
+    fireEvent.click(screen.getByText('Open Voting'));
+
+    expect(openVoting).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variables: {
+          leagueId: 42,
+          season: 2024,
+          awardTypes: ['mvp', 'rookie_of_the_year'],
+        },
+      }),
+    );
+    jest
+      .mocked(graphql.useOpenAwardVotingMutation)
+      .mockImplementation(
+        () =>
+          [jest.fn()] as unknown as ReturnType<
+            typeof graphql.useOpenAwardVotingMutation
+          >,
+      );
+  });
+
+  it('keeps the full baseball award set by default', () => {
+    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+
+    for (const key of BASEBALL_ONLY) {
+      expect(screen.getByTestId(`award-row-${key}`)).toBeTruthy();
+    }
+  });
+});

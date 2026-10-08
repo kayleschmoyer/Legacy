@@ -5,6 +5,7 @@
  *   - leagueSeasonAwards query: auth check, returns awards, season filter
  *   - upsertLeagueSeasonAward mutation: auth, commissioner check, validation, insert
  *   - deleteLeagueSeasonAward mutation: auth, commissioner check, delete
+ *   - football leagues: MVP + Rookie of the Year only (LS-10694)
  */
 
 import type { GraphQLSchema } from 'graphql';
@@ -514,6 +515,76 @@ describe('season-awards resolver', () => {
       ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
       expect(mockDb.insert).not.toHaveBeenCalled();
     });
+
+    it.each(['cy_young', 'gold_glove', 'silver_slugger'])(
+      'rejects baseball-only award %s in a football league (LS-10694)',
+      async (awardType) => {
+        mockDb.limit
+          .mockResolvedValueOnce([
+            {
+              leagueId: 1,
+              userId: 1,
+              teamId: null,
+              permissionLevel: 'commissioner',
+            },
+          ])
+          .mockResolvedValueOnce([
+            { playerSport: 'football', leagueSport: 'football' },
+          ]);
+
+        await expect(
+          getResolver()(
+            {},
+            { input: { ...validInput, awardType } },
+            mockContext,
+            undefined as never,
+          ),
+        ).rejects.toMatchObject({
+          message: expect.stringMatching(/not available in a football league/),
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+        expect(mockDb.insert).not.toHaveBeenCalled();
+      },
+    );
+
+    it('accepts MVP in a football league (LS-10694)', async () => {
+      const now = new Date('2024-06-01T00:00:00Z');
+      mockDb.limit
+        .mockResolvedValueOnce([
+          {
+            leagueId: 1,
+            userId: 1,
+            teamId: null,
+            permissionLevel: 'commissioner',
+          },
+        ])
+        .mockResolvedValueOnce([
+          { playerSport: 'football', leagueSport: 'football' },
+        ])
+        .mockResolvedValueOnce([{ firstName: 'Tom', lastName: 'Brady' }]);
+      mockDb.returning.mockResolvedValueOnce([
+        {
+          id: 12,
+          leagueId: 1,
+          season: 2024,
+          playerId: 42,
+          awardType: 'mvp',
+          notes: null,
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString(),
+        },
+      ]);
+
+      const result = (await getResolver()(
+        {},
+        { input: validInput },
+        mockContext,
+        undefined as never,
+      )) as { awardType: string };
+
+      expect(result.awardType).toBe('mvp');
+      expect(mockDb.insert).toHaveBeenCalled();
+    });
   });
 
   // ── deleteLeagueSeasonAward mutation ─────────────────────────────────────
@@ -774,6 +845,32 @@ describe('season-awards resolver', () => {
       expect(result.awardTypes).toEqual(['mvp', 'cy_young']);
       expect(mockDb.insert).toHaveBeenCalled();
     });
+
+    it('rejects baseball-only awards when opening a football vote (LS-10694)', async () => {
+      mockDb.limit
+        .mockResolvedValueOnce([
+          {
+            leagueId: 1,
+            userId: 1,
+            teamId: null,
+            permissionLevel: 'commissioner',
+          },
+        ])
+        .mockResolvedValueOnce([{ sport: 'football' }]);
+
+      await expect(
+        getResolver()(
+          {},
+          { leagueId: 1, season: 2024, awardTypes: ['mvp', 'cy_young'] },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({
+        message: expect.stringMatching(/not available in a football league/),
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+      expect(mockDb.insert).not.toHaveBeenCalled();
+    });
   });
 
   // ── castAwardVote mutation ─────────────────────────────────────────────────
@@ -864,6 +961,26 @@ describe('season-awards resolver', () => {
         message: expect.stringMatching(/baseball league/),
         extensions: { code: 'BAD_USER_INPUT' },
       });
+      expect(mockDb.insert).not.toHaveBeenCalled();
+    });
+
+    it('rejects a vote for a baseball-only award in a football league (LS-10694)', async () => {
+      mockDb.limit
+        .mockResolvedValueOnce([
+          { leagueId: 1, userId: 1, teamId: null, permissionLevel: 'member' },
+        ])
+        .mockResolvedValueOnce([
+          { playerSport: 'football', leagueSport: 'football' },
+        ]);
+
+      await expect(
+        getResolver()(
+          {},
+          { leagueId: 1, season: 2024, awardType: 'gold_glove', playerId: 12 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
       expect(mockDb.insert).not.toHaveBeenCalled();
     });
 

@@ -3,7 +3,7 @@
  *
  * Covers:
  *   1. Baseball league: "Draft Settings" accordion button is present.
- *   2. Football league: "Draft Settings" accordion button is absent.
+ *   2. Football league: "Draft Settings" renders with sport="football" (LS-10694).
  *   3. Football league: opening "Scoring Rules" renders the football scoring editor.
  *   4. Football league: IDP vs DST is passed through to the scoring editor.
  */
@@ -86,6 +86,7 @@ jest.mock('../../../../components/commissioner/DraftSettingsControl', () => ({
     <div
       data-testid="draft-settings-control"
       data-ispremium={String(props.isPremium)}
+      data-sport={props.sport}
     />
   ),
 }));
@@ -109,7 +110,9 @@ jest.mock(
   }),
 );
 jest.mock('@legacy-sports/shared-components/commissioner', () => ({
-  SeasonAwardsControl: () => <div data-testid="season-awards-control" />,
+  SeasonAwardsControl: (props: any) => (
+    <div data-testid="season-awards-control" data-sport={props.sport} />
+  ),
 }));
 jest.mock('../../../../features/baseball/LeagueScoringEditor', () => ({
   LeagueScoringEditor: () => <div data-testid="league-scoring-editor" />,
@@ -170,9 +173,31 @@ describe('CommishTab — football-awareness', () => {
     expect(screen.getByText('Draft Settings')).toBeInTheDocument();
   });
 
-  it('hides "Draft Settings" accordion for a football league', () => {
+  it('shows "Draft Settings" for a football league, wired with sport="football" (LS-10694)', () => {
     renderCommish({ sport: 'football' });
-    expect(screen.queryByText('Draft Settings')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Draft Settings'));
+    expect(screen.getByTestId('draft-settings-control')).toHaveAttribute(
+      'data-sport',
+      'football',
+    );
+  });
+
+  it('wires sport="baseball" into DraftSettingsControl for a baseball league', () => {
+    renderCommish({ sport: 'baseball' });
+    fireEvent.click(screen.getByText('Draft Settings'));
+    expect(screen.getByTestId('draft-settings-control')).toHaveAttribute(
+      'data-sport',
+      'baseball',
+    );
+  });
+
+  it('passes sport="football" to SeasonAwardsControl for a football league (LS-10694)', () => {
+    renderCommish({ sport: 'football' });
+    fireEvent.click(screen.getByText('Season Awards'));
+    expect(screen.getByTestId('season-awards-control')).toHaveAttribute(
+      'data-sport',
+      'football',
+    );
   });
 
   it('"Scoring Rules" accordion has no "Coming Soon" badge for a football league (LS-9042)', () => {

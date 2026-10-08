@@ -288,6 +288,7 @@ export function CommissionerScreen({
         <SeasonAwardsControl
           leagueId={leagueId}
           currentSeason={league.seasonNumber ?? new Date().getFullYear()}
+          sport={isFootball ? 'football' : 'baseball'}
           onSuccess={handleAlert('Success')}
           onError={handleError}
         />

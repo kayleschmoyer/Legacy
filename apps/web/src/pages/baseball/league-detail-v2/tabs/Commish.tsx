@@ -362,29 +362,26 @@ export const CommishTab: React.FC<CommishTabProps> = ({
         />
       ) : null,
     },
-    ...(!isFootball
-      ? [
-          {
-            id: 'draft-settings',
-            label: 'Draft Settings',
-            iconClass: 'gold' as const,
-            icon: <I.Settings size={16} />,
-            content: leagueId ? (
-              <DraftSettingsControl
-                leagueId={leagueId}
-                draftStatus={league.draftStatus}
-                playerPool={league.playerPool}
-                rosterContinuity={league.rosterContinuity}
-                eraFilter={league.eraFilter}
-                baseballHofOnly={league.baseballHofOnly}
-                customEraStartYear={league.customEraStartYear ?? undefined}
-                customEraEndYear={league.customEraEndYear ?? undefined}
-                isPremium={isPremium}
-              />
-            ) : null,
-          },
-        ]
-      : []),
+    {
+      id: 'draft-settings',
+      label: 'Draft Settings',
+      iconClass: 'gold',
+      icon: <I.Settings size={16} />,
+      content: leagueId ? (
+        <DraftSettingsControl
+          leagueId={leagueId}
+          draftStatus={league.draftStatus}
+          playerPool={league.playerPool}
+          sport={isFootball ? 'football' : 'baseball'}
+          rosterContinuity={league.rosterContinuity}
+          eraFilter={league.eraFilter}
+          baseballHofOnly={league.baseballHofOnly}
+          customEraStartYear={league.customEraStartYear ?? undefined}
+          customEraEndYear={league.customEraEndYear ?? undefined}
+          isPremium={isPremium}
+        />
+      ) : null,
+    },
     {
       id: 'dues',
       label: 'League Dues',
@@ -410,6 +407,7 @@ export const CommishTab: React.FC<CommishTabProps> = ({
         <SeasonAwardsControl
           leagueId={leagueId}
           currentSeason={league.seasonNumber ?? new Date().getFullYear()}
+          sport={isFootball ? 'football' : 'baseball'}
         />
       ) : null,
     },

@@ -34,6 +34,36 @@ const VALID_SEASON_AWARD_TYPES = new Set<string>(
 );
 
 /**
+ * Football leagues get the sport-neutral awards only until a football award
+ * set is designed (LS-10694 product decision) — Cy Young, Gold Glove and
+ * Silver Slugger are baseball-only.
+ */
+const FOOTBALL_SEASON_AWARD_TYPES = new Set<string>([
+  'mvp',
+  'rookie_of_the_year',
+]);
+
+/** Award type keys a league of the given sport may assign or vote on. */
+function seasonAwardTypesForSport(sport: string): ReadonlySet<string> {
+  return sport === 'football'
+    ? FOOTBALL_SEASON_AWARD_TYPES
+    : VALID_SEASON_AWARD_TYPES;
+}
+
+function assertAwardTypeAllowedForSport(
+  awardType: string,
+  sport: string,
+): void {
+  const allowed = seasonAwardTypesForSport(sport);
+  if (!allowed.has(awardType)) {
+    throw UserInputError(
+      `Award "${awardType}" is not available in a ${sport} league. ` +
+        `Allowed values: ${[...allowed].join(', ')}`,
+    );
+  }
+}
+
+/**
  * Rejects a recipient who doesn't exist or plays a different sport than the
  * league (LS-10821) — an NFL league can't award Babe Ruth, nor MLB Tom Brady.
  */
@@ -41,7 +71,7 @@ async function assertPlayerMatchesLeagueSport(
   db: PublicDb,
   leagueId: number,
   playerId: number,
-): Promise<void> {
+): Promise<string> {
   const [row] = await db
     .select({
       playerSport: PublicSchema.players.sport,
@@ -60,6 +90,7 @@ async function assertPlayerMatchesLeagueSport(
       `Player ${playerId} plays ${row.playerSport}, but this is a ${row.leagueSport} league`,
     );
   }
+  return row.leagueSport;
 }
 
 // ─── GraphQL object type ───────────────────────────────────────────────────────
@@ -200,7 +231,12 @@ builder.mutationField('upsertLeagueSeasonAward', (t) =>
 
       // Verify commissioner / General Manager access
       await verifyCommissionerAccess(context.db, leagueId, context.user.id);
-      await assertPlayerMatchesLeagueSport(context.db, leagueId, playerId);
+      const leagueSport = await assertPlayerMatchesLeagueSport(
+        context.db,
+        leagueId,
+        playerId,
+      );
+      assertAwardTypeAllowedForSport(awardType, leagueSport);
 
       const [row] = await context.db
         .insert(PublicSchema.leagueSeasonAwards)
@@ -542,6 +578,15 @@ builder.mutationField('openAwardVoting', (t) =>
         );
       }
 
+      const [league] = await context.db
+        .select({ sport: PublicSchema.leagues.sport })
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, leagueId))
+        .limit(1);
+      for (const at of uniqueAwardTypes) {
+        assertAwardTypeAllowedForSport(at, league?.sport ?? 'baseball');
+      }
+
       const [row] = await context.db
         .insert(PublicSchema.leagueAwardVotingPeriods)
         .values({
@@ -738,7 +783,12 @@ builder.mutationField('castAwardVote', (t) =>
         );
       }
 
-      await assertPlayerMatchesLeagueSport(context.db, leagueId, playerId);
+      const leagueSport = await assertPlayerMatchesLeagueSport(
+        context.db,
+        leagueId,
+        playerId,
+      );
+      assertAwardTypeAllowedForSport(awardType, leagueSport);
 
       // Check voting is open
       const [period] = await context.db
