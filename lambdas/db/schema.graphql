@@ -4184,6 +4184,11 @@ A player's validated MLB-official-YouTube-channel highlight video, shown as the 
 """
 type PlayerHighlightVideo {
   """
+  Clip length in seconds — the splash uses it to clamp its lead-in skip (LS-10973)
+  """
+  durationSeconds: Int
+
+  """
   players.id the video belongs to
   """
   playerId: Int

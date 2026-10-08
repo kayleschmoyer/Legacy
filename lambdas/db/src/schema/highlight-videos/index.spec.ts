@@ -89,6 +89,7 @@ jest.mock('./relevance', () => ({
 
 import { type Context } from '../builder';
 import {
+  MAX_CLIP_SECONDS,
   RESOLVE_SEARCH_BUDGET,
   resolveResolveHighlightVideos,
   resolveVerifyHighlightVideos,
@@ -130,6 +131,8 @@ function statusMap(
     embeddable?: boolean;
     madeForKids?: boolean;
     isPublic?: boolean;
+    durationSeconds?: number | null;
+    isVertical?: boolean;
   }>,
 ) {
   return new Map(
@@ -141,6 +144,10 @@ function statusMap(
         embeddable: e.embeddable ?? true,
         madeForKids: e.madeForKids ?? false,
         isPublic: e.isPublic ?? true,
+        // A splash-eligible single-play clip unless a test says otherwise.
+        durationSeconds:
+          e.durationSeconds === undefined ? 20 : e.durationSeconds,
+        isVertical: e.isVertical ?? false,
       },
     ]),
   );
@@ -190,6 +197,39 @@ describe('resolveResolveHighlightVideos', () => {
         matchMethod: 'full_name',
         madeForKids: false,
         embeddable: true,
+        durationSeconds: 20,
+      }),
+    ]);
+  });
+
+  it('skips clips longer than MAX_CLIP_SECONDS, vertical, or of unknown length (LS-10973)', async () => {
+    mockGetCandidates.mockResolvedValue([
+      makeCandidate({ playerId: 7, firstName: 'Jim', lastName: 'Thome' }),
+    ]);
+    const title = 'Jim Thome hits his 600th home run';
+    mockSearch.mockResolvedValue([
+      { videoId: 'reel', title },
+      { videoId: 'short', title },
+      { videoId: 'live', title },
+      { videoId: 'clip', title },
+    ]);
+    mockGetVideoStatuses.mockResolvedValue(
+      statusMap([
+        { videoId: 'reel', title, durationSeconds: MAX_CLIP_SECONDS + 1 },
+        { videoId: 'short', title, isVertical: true },
+        { videoId: 'live', title, durationSeconds: null },
+        { videoId: 'clip', title, durationSeconds: MAX_CLIP_SECONDS },
+      ]),
+    );
+
+    const result = await resolveResolveHighlightVideos(systemContext, null);
+
+    expect(result.playersResolved).toBe(1);
+    expect(mockUpsertResolutions).toHaveBeenCalledWith([
+      expect.objectContaining({
+        playerId: 7,
+        youtubeVideoId: 'clip',
+        durationSeconds: MAX_CLIP_SECONDS,
       }),
     ]);
   });
@@ -424,6 +464,28 @@ describe('resolveVerifyHighlightVideos', () => {
     expect(mockPurge).toHaveBeenCalledWith([2, 3]);
     expect(result.videosPurged).toBe(2);
     expect(result.stalePurged).toBe(4);
+  });
+
+  it('purges cached clips that no longer fit the splash (too long or vertical) and refreshes duration', async () => {
+    mockGetForVerification.mockResolvedValue([
+      { playerId: 1, youtubeVideoId: 'ok' },
+      { playerId: 2, youtubeVideoId: 'reel' },
+      { playerId: 3, youtubeVideoId: 'vertical' },
+    ]);
+    mockGetVideoStatuses.mockResolvedValue(
+      statusMap([
+        { videoId: 'ok', title: 'Clip', durationSeconds: 18 },
+        { videoId: 'reel', title: 'Career reel', durationSeconds: 600 },
+        { videoId: 'vertical', title: 'Short', isVertical: true },
+      ]),
+    );
+
+    await resolveVerifyHighlightVideos(systemContext);
+
+    expect(mockApplyVerifications).toHaveBeenCalledWith([
+      expect.objectContaining({ playerId: 1, durationSeconds: 18 }),
+    ]);
+    expect(mockPurge).toHaveBeenCalledWith([2, 3]);
   });
 
   it('leaves rows untouched when a videos.list chunk fails', async () => {

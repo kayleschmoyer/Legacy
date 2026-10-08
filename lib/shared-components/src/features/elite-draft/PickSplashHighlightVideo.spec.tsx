@@ -11,7 +11,12 @@
 
 import React from 'react';
 import { act, render, screen } from '@testing-library/react';
-import { PickSplashHighlightVideo } from './PickSplashHighlightVideo';
+import {
+  LEAD_IN_SKIP_SECONDS,
+  PickSplashHighlightVideo,
+  splashStartSeconds,
+  VISIBLE_WINDOW_SECONDS,
+} from './PickSplashHighlightVideo';
 
 const PLAYING = 1;
 
@@ -46,6 +51,7 @@ const video = {
   playerId: 42,
   youtubeVideoId: 'dQw4w9WgXcQ',
   videoTitle: 'Johnny Mize highlights',
+  durationSeconds: 25,
 };
 
 describe('PickSplashHighlightVideo', () => {
@@ -87,6 +93,8 @@ describe('PickSplashHighlightVideo', () => {
       mute: 1,
       playsinline: 1,
     });
+    // 25s clip → the full lead-in skip still leaves a whole visible window.
+    expect(options.playerVars.start).toBe(LEAD_IN_SKIP_SECONDS);
     // ToS minimum player size is 200×200.
     expect(options.width).toBeGreaterThanOrEqual(200);
     expect(options.height).toBeGreaterThanOrEqual(200);
@@ -149,5 +157,22 @@ describe('PickSplashHighlightVideo', () => {
     unmount();
 
     expect(createdPlayers[0].destroy).toHaveBeenCalled();
+  });
+});
+
+describe('splashStartSeconds (LS-10973)', () => {
+  it('skips the fixed lead-in on a clip long enough to keep a full window', () => {
+    expect(
+      splashStartSeconds(LEAD_IN_SKIP_SECONDS + VISIBLE_WINDOW_SECONDS),
+    ).toBe(LEAD_IN_SKIP_SECONDS);
+  });
+
+  it('pulls the start back so a short clip never runs out mid-splash', () => {
+    expect(splashStartSeconds(VISIBLE_WINDOW_SECONDS + 2)).toBe(2);
+  });
+
+  it('starts from 0 for clips shorter than the window or of unknown length', () => {
+    expect(splashStartSeconds(VISIBLE_WINDOW_SECONDS - 1)).toBe(0);
+    expect(splashStartSeconds(null)).toBe(0);
   });
 });

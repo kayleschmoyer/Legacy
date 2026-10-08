@@ -312,6 +312,7 @@ query GetHighlightVideos($playerIds: [Int!]!) {
     playerId
     youtubeVideoId
     videoTitle
+    durationSeconds
   }
 }
 

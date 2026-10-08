@@ -60,6 +60,10 @@ export interface YouTubeVideoStatus {
   embeddable: boolean;
   madeForKids: boolean;
   isPublic: boolean;
+  /** Clip length from contentDetails.duration; null when unparseable/live. */
+  durationSeconds: number | null;
+  /** Taller than wide (Shorts) — letterboxed badly in the 16:9 splash frame. */
+  isVertical: boolean;
 }
 
 interface SearchListResponse {
@@ -78,7 +82,28 @@ interface VideosListResponse {
       madeForKids?: boolean;
       privacyStatus?: string;
     };
+    contentDetails?: { duration?: string };
+    /** Only populated when the request passes maxWidth/maxHeight. */
+    player?: { embedWidth?: string | number; embedHeight?: string | number };
   }>;
+}
+
+/**
+ * Parse a YouTube contentDetails.duration (ISO 8601, e.g. "PT32S", "PT1M5S",
+ * "PT1H2M3S", "P1DT2H") to whole seconds. Null for anything unparseable —
+ * including "P0D", which YouTube reports for live streams.
+ */
+export function parseIsoDurationSeconds(
+  duration: string | undefined,
+): number | null {
+  if (!duration) return null;
+  const m = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(
+    duration,
+  );
+  if (!m) return null;
+  const [, d, h, min, sec] = m.map((v) => (v ? Number(v) : 0));
+  const total = d * 86400 + h * 3600 + min * 60 + sec;
+  return total > 0 ? total : null;
 }
 
 async function youtubeGet<T>(
@@ -102,8 +127,14 @@ export function isQuotaError(err: unknown): boolean {
 }
 
 /**
- * search.list restricted to the MLB channel for one player's highlights —
- * the quota-budgeted call (the caller counts these against the daily budget).
+ * search.list restricted to the MLB channel for one player's clips — the
+ * quota-budgeted call (the caller counts these against the daily budget).
+ *
+ * Tuned for the pick splash's ~7s video window (LS-10973): videoDuration=short
+ * (< 4 min) and no "highlights" keyword, which biases results toward
+ * multi-minute career reels; maxResults=25 widens the pool of single-play
+ * clips at no extra cost (search.list is 100 units regardless of page size).
+ * The exact ≤ MAX_CLIP_SECONDS cut happens in the resolver from videos.list.
  */
 export async function searchMlbChannelHighlights(
   playerName: string,
@@ -111,10 +142,11 @@ export async function searchMlbChannelHighlights(
   const data = await youtubeGet<SearchListResponse>('search', {
     part: 'snippet',
     channelId: MLB_CHANNEL_ID,
-    q: `${playerName} highlights`,
+    q: playerName,
     type: 'video',
     videoEmbeddable: 'true',
-    maxResults: '5',
+    videoDuration: 'short',
+    maxResults: '25',
   });
   return (data.items ?? [])
     .map((item) => ({
@@ -125,8 +157,10 @@ export async function searchMlbChannelHighlights(
 }
 
 /**
- * videos.list status + snippet for up to 50 ids per call (1 quota unit each).
- * Videos absent from the response (deleted/private) are absent from the map.
+ * videos.list status + snippet + contentDetails + player for up to 50 ids per
+ * call (1 quota unit each regardless of parts). maxWidth makes the player part
+ * report embed dimensions, which carry the video's aspect ratio. Videos absent
+ * from the response (deleted/private) are absent from the map.
  */
 export async function getVideoStatuses(
   videoIds: string[],
@@ -135,17 +169,22 @@ export async function getVideoStatuses(
   for (let i = 0; i < videoIds.length; i += VIDEOS_LIST_BATCH_SIZE) {
     const chunk = videoIds.slice(i, i + VIDEOS_LIST_BATCH_SIZE);
     const data = await youtubeGet<VideosListResponse>('videos', {
-      part: 'status,snippet',
+      part: 'status,snippet,contentDetails,player',
+      maxWidth: '480',
       id: chunk.join(','),
     });
     for (const item of data.items ?? []) {
       if (!item.id) continue;
+      const embedWidth = Number(item.player?.embedWidth ?? 0);
+      const embedHeight = Number(item.player?.embedHeight ?? 0);
       statuses.set(item.id, {
         videoId: item.id,
         title: item.snippet?.title ?? null,
         embeddable: item.status?.embeddable === true,
         madeForKids: item.status?.madeForKids === true,
         isPublic: item.status?.privacyStatus === 'public',
+        durationSeconds: parseIsoDurationSeconds(item.contentDetails?.duration),
+        isVertical: embedWidth > 0 && embedHeight > embedWidth,
       });
     }
   }

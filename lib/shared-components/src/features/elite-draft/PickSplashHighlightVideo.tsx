@@ -26,12 +26,34 @@ import type { HighlightVideoSummary } from './types';
 //  - The player is destroyed on unmount (splash exit / pick undo), so no
 //    hidden playback ever continues.
 //
+// Lead-in skip (LS-10973): the splash shows ~7s of video, and MLB single-play
+// clips open on the batter stepping in. Playback starts LEAD_IN_SKIP_SECONDS
+// in (the documented `start` player parameter), clamped so the visible
+// window never runs past the end of a short clip.
+//
 // Web-only, like the rest of the splash chrome — the native spectator screen
 // keeps its own deliberately separate announcement tree.
 // ---------------------------------------------------------------------------
 
 /** No first frame within this window → graphic fallback (spike median ~800ms). */
 export const FIRST_FRAME_TIMEOUT_MS = 2500;
+
+/** Fixed lead-in skipped on every clip so the window lands on the play. */
+export const LEAD_IN_SKIP_SECONDS = 5;
+/** Video actually visible per splash: 8s hold minus ~1s to first frame. */
+export const VISIBLE_WINDOW_SECONDS = 7;
+
+/**
+ * Where playback starts: the fixed lead-in skip, pulled back so a full
+ * visible window remains before the clip ends. Unknown length → from 0.
+ */
+export function splashStartSeconds(durationSeconds: number | null): number {
+  if (durationSeconds == null) return 0;
+  return Math.max(
+    0,
+    Math.min(LEAD_IN_SKIP_SECONDS, durationSeconds - VISIBLE_WINDOW_SECONDS),
+  );
+}
 
 /** Minimal surface of the IFrame Player API this component uses. */
 interface YTPlayer {
@@ -118,6 +140,7 @@ export function PickSplashHighlightVideo({
   const [phase, setPhase] = useState<Phase>('loading');
   const mountRef = useRef<HTMLDivElement | null>(null);
   const videoId = video?.youtubeVideoId ?? null;
+  const startSeconds = splashStartSeconds(video?.durationSeconds ?? null);
 
   useEffect(() => {
     if (!videoId) return undefined;
@@ -150,6 +173,7 @@ export function PickSplashHighlightVideo({
           mute: 1,
           playsinline: 1,
           rel: 0,
+          start: startSeconds,
         },
         events: {
           onStateChange: (event) => {
@@ -170,7 +194,7 @@ export function PickSplashHighlightVideo({
       clearTimeout(timeout);
       destroyPlayer();
     };
-  }, [videoId, firstFrameTimeoutMs]);
+  }, [videoId, startSeconds, firstFrameTimeoutMs]);
 
   if (!videoId || phase === 'fallback') {
     return fallback ?? null;

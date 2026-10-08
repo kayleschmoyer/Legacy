@@ -14,7 +14,9 @@
  *    Budget-aware: at most RESOLVE_SEARCH_BUDGET search.list calls per run
  *    (100 quota units each), prioritizing upcoming/active
  *    draft pools, then recently drafted players. Validation before caching:
- *    a full-"First Last" title match with the player as the subject
+ *    only public, embeddable, non-Made-for-Kids, horizontal clips of at
+ *    most MAX_CLIP_SECONDS qualify (LS-10973); then a full-"First Last"
+ *    title match with the player as the subject
  *    auto-accepts; a last-name-only match, or a full-name hit where the
  *    player may not be the subject (award namesakes, "passed Walter
  *    Johnson"), must pass the LLM relevance judge; otherwise the player is
@@ -22,7 +24,8 @@
  *  - Mutation verifyHighlightVideos — system-only (EventBridge, weekly).
  *    Batched videos.list (1 unit / 50 ids) re-confirms embeddable +
  *    madeForKids, refreshes titles, purges rows for deleted/private/
- *    no-longer-embeddable videos, and purges anything unverified for 30+
+ *    no-longer-embeddable videos and clips that no longer meet the splash
+ *    clip rules (too long or vertical), and purges anything unverified for 30+
  *    days (YouTube DP III.E.4.d/e cache-refresh obligation).
  *
  * ToS compliance notes: madeForKids=true videos are excluded outright
@@ -49,6 +52,7 @@ import {
   isQuotaError,
   searchMlbChannelHighlights,
   VIDEOS_LIST_BATCH_SIZE,
+  type YouTubeVideoStatus,
 } from './youtube-api';
 import { builder, type Context } from '../builder';
 import { UserInputError } from '../graphql-errors';
@@ -69,11 +73,37 @@ const MAX_QUERY_IDS = 500;
 export const RESOLVE_SEARCH_BUDGET = 75;
 /** Cache rows must be re-verified or purged within this window (DP III.E.4.d/e). */
 const CACHE_MAX_AGE_DAYS = 30;
+/**
+ * Longest clip the pick splash accepts (LS-10973). The splash holds 8s (4s
+ * when catching up) and the first frame takes ~1s, so only a short single-play
+ * clip gets to the play inside the window; career reels never do.
+ */
+export const MAX_CLIP_SECONDS = 30;
+
+/**
+ * Whether a video may be cached for (and kept serving) the pick splash. Shared
+ * by resolve and verify so the two passes can never disagree. Made-for-Kids
+ * videos are excluded outright (DP III.E.4.j); embeddable + public are
+ * mandatory; long and vertical clips don't fit the 16:9, ~7s splash window.
+ */
+export function isSplashEligible(status: YouTubeVideoStatus): boolean {
+  return (
+    status.isPublic &&
+    status.embeddable &&
+    !status.madeForKids &&
+    !status.isVertical &&
+    status.durationSeconds != null &&
+    status.durationSeconds <= MAX_CLIP_SECONDS
+  );
+}
 
 // ─── PlayerHighlightVideo ───────────────────────────────────────────────────
 
 export const PlayerHighlightVideoRef = builder.objectRef<
-  Pick<PlayerHighlightVideoRow, 'playerId' | 'youtubeVideoId' | 'videoTitle'>
+  Pick<
+    PlayerHighlightVideoRow,
+    'playerId' | 'youtubeVideoId' | 'videoTitle' | 'durationSeconds'
+  >
 >('PlayerHighlightVideo');
 
 PlayerHighlightVideoRef.implement({
@@ -94,6 +124,12 @@ PlayerHighlightVideoRef.implement({
       nullable: true,
       description: 'Video title as of the last verification pass',
       resolve: (row) => row.videoTitle,
+    }),
+    durationSeconds: t.int({
+      nullable: true,
+      description:
+        'Clip length in seconds — the splash uses it to clamp its lead-in skip (LS-10973)',
+      resolve: (row) => row.durationSeconds,
     }),
   }),
 });
@@ -174,6 +210,7 @@ async function pickValidatedVideo(
   videoId: string;
   title: string;
   matchMethod: 'full_name' | 'judge';
+  durationSeconds: number | null;
 } | null> {
   if (hits.length === 0) return null;
   // One videos.list call covers all hits — status.embeddable and
@@ -181,13 +218,17 @@ async function pickValidatedVideo(
   const statuses = await getVideoStatuses(hits.map((h) => h.videoId));
   for (const hit of hits) {
     const status = statuses.get(hit.videoId);
-    if (!status || !status.isPublic || !status.embeddable) continue;
-    // Made-for-Kids videos are excluded from resolution outright.
-    if (status.madeForKids) continue;
+    if (!status || !isSplashEligible(status)) continue;
+    const { durationSeconds } = status;
     const title = status.title ?? hit.title;
     const match = matchTitle(title, candidate.firstName, candidate.lastName);
     if (match === 'full_name') {
-      return { videoId: hit.videoId, title, matchMethod: 'full_name' };
+      return {
+        videoId: hit.videoId,
+        title,
+        matchMethod: 'full_name',
+        durationSeconds,
+      };
     }
     if (match === 'last_name' || match === 'full_name_ambiguous') {
       const relevant = await judgeRelevance({
@@ -198,7 +239,12 @@ async function pickValidatedVideo(
         mlbTeam: candidate.mlbTeam,
       });
       if (relevant) {
-        return { videoId: hit.videoId, title, matchMethod: 'judge' };
+        return {
+          videoId: hit.videoId,
+          title,
+          matchMethod: 'judge',
+          durationSeconds,
+        };
       }
     }
   }
@@ -276,6 +322,7 @@ export async function resolveResolveHighlightVideos(
           madeForKids: false,
           embeddable: true,
           matchMethod: validated.matchMethod,
+          durationSeconds: validated.durationSeconds,
         });
       } else {
         playersUnresolved++;
@@ -286,6 +333,7 @@ export async function resolveResolveHighlightVideos(
           madeForKids: null,
           embeddable: null,
           matchMethod: null,
+          durationSeconds: null,
         });
       }
     } catch (err) {
@@ -433,12 +481,7 @@ export async function resolveVerifyHighlightVideos(
         for (const row of chunk) {
           videosChecked++;
           const status = statuses.get(row.youtubeVideoId);
-          if (
-            !status ||
-            !status.isPublic ||
-            !status.embeddable ||
-            status.madeForKids
-          ) {
+          if (!status || !isSplashEligible(status)) {
             purgeIds.push(row.playerId);
           } else {
             verifications.push({
@@ -446,6 +489,7 @@ export async function resolveVerifyHighlightVideos(
               videoTitle: status.title,
               madeForKids: status.madeForKids,
               embeddable: status.embeddable,
+              durationSeconds: status.durationSeconds,
             });
           }
         }

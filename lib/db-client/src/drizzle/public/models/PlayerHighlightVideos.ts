@@ -31,6 +31,8 @@ export const playerHighlightVideos = pgTable('player_highlight_videos', {
   embeddable: boolean('embeddable'),
   /** How the match was validated: 'full_name' | 'judge'. NULL when unresolved. */
   matchMethod: varchar('match_method', { length: 10 }),
+  /** Clip length in seconds (LS-10973) — clamps the splash lead-in skip. */
+  durationSeconds: integer('duration_seconds'),
   resolvedAt: timestamp('resolved_at', { withTimezone: true })
     .notNull()
     .defaultNow(),

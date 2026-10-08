@@ -221,6 +221,8 @@ export interface HighlightVideoResolution {
   madeForKids: boolean | null;
   embeddable: boolean | null;
   matchMethod: 'full_name' | 'judge' | null;
+  /** Clip length in seconds (LS-10973); null when unresolved. */
+  durationSeconds: number | null;
 }
 
 /** Verification refresh for an already-resolved video row (LS-9113). */
@@ -229,6 +231,7 @@ export interface HighlightVideoVerification {
   videoTitle: string | null;
   madeForKids: boolean;
   embeddable: boolean;
+  durationSeconds: number | null;
 }
 
 /**
@@ -569,6 +572,7 @@ export class PlayerService {
             madeForKids: r.madeForKids,
             embeddable: r.embeddable,
             matchMethod: r.matchMethod,
+            durationSeconds: r.durationSeconds,
             resolvedAt: sql`now()`,
             lastVerifiedAt: r.youtubeVideoId != null ? sql`now()` : null,
           })),
@@ -581,6 +585,7 @@ export class PlayerService {
             madeForKids: sql`excluded.made_for_kids`,
             embeddable: sql`excluded.embeddable`,
             matchMethod: sql`excluded.match_method`,
+            durationSeconds: sql`excluded.duration_seconds`,
             resolvedAt: sql`excluded.resolved_at`,
             lastVerifiedAt: sql`excluded.last_verified_at`,
             updatedAt: sql`now()`,
@@ -626,6 +631,7 @@ export class PlayerService {
             videoTitle: v.videoTitle,
             madeForKids: v.madeForKids,
             embeddable: v.embeddable,
+            durationSeconds: v.durationSeconds,
             lastVerifiedAt: sql`now()`,
             updatedAt: sql`now()`,
           })

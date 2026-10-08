@@ -231,6 +231,8 @@ export interface HighlightVideoSummary {
   playerId: number;
   youtubeVideoId: string;
   videoTitle: string | null;
+  /** Clip length — clamps the splash lead-in skip (LS-10973). */
+  durationSeconds: number | null;
 }
 
 export interface IntelligenceRecommendation {

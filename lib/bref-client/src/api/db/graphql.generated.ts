@@ -3638,6 +3638,8 @@ export type Player = {
 /** A player's validated MLB-official-YouTube-channel highlight video, shown as the pick-splash video tier on the draft spectator page (LS-9113). Only embeddable, non-Made-for-Kids videos are ever served. */
 export type PlayerHighlightVideo = {
   __typename?: 'PlayerHighlightVideo';
+  /** Clip length in seconds — the splash uses it to clamp its lead-in skip (LS-10973) */
+  durationSeconds?: Maybe<Scalars['Int']['output']>;
   /** players.id the video belongs to */
   playerId?: Maybe<Scalars['Int']['output']>;
   /** Video title as of the last verification pass */

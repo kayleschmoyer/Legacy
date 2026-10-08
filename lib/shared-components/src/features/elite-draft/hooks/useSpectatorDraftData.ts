@@ -346,6 +346,7 @@ export function useSpectatorDraftData({
         playerId: row.playerId,
         youtubeVideoId: row.youtubeVideoId,
         videoTitle: row.videoTitle ?? null,
+        durationSeconds: row.durationSeconds ?? null,
       });
     }
     return map;
