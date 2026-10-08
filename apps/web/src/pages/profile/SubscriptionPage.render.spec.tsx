@@ -11,7 +11,13 @@
  * `SubscriptionPage.spec` basename collides in TypeScript module resolution.
  */
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
 import SubscriptionPage, {
   ACTIVATION_MAX_POLLS,
@@ -40,11 +46,13 @@ jest.mock('../../components/PageMeta', () => ({
   PageMeta: () => null,
 }));
 
+const mockLoggerError = jest.fn<void, unknown[]>();
+
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
     info: jest.fn(),
     warn: jest.fn(),
-    error: jest.fn(),
+    error: (...args: unknown[]) => mockLoggerError(...args),
     debug: jest.fn(),
   },
 }));
@@ -458,6 +466,25 @@ describe('SubscriptionPage — realtime subscription refresh (LS-7380)', () => {
     window.dispatchEvent(new Event('focus'));
 
     expect(refetch).not.toHaveBeenCalled();
+  });
+
+  it('logs instead of throwing when a focus-triggered refetch rejects (LS-7381)', async () => {
+    const refetch = jest.fn().mockRejectedValue(new Error('network down'));
+    mockUseGetMySubscriptionQuery.mockReturnValue({
+      data: { mySubscription: null },
+      loading: false,
+      refetch,
+    });
+
+    renderPage();
+    window.dispatchEvent(new Event('focus'));
+
+    await waitFor(() =>
+      expect(mockLoggerError).toHaveBeenCalledWith(
+        'SubscriptionPage: refetch after window focus failed',
+        expect.any(Error),
+      ),
+    );
   });
 });
 
