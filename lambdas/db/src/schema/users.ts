@@ -13,6 +13,7 @@ import {
   UserInputError,
 } from './graphql-errors';
 import { checkAndIncrementRateLimit } from './rate-limit';
+import { checkUsernamePolicy } from './username-policy';
 import { getJwtSecret } from '../server/context';
 
 // Create a single database service instance to reuse across all resolvers
@@ -442,6 +443,21 @@ builder.mutationField('updateUsername', (t) =>
       if (!/^[a-zA-Z0-9_.-]+$/.test(trimmed)) {
         throw UserInputError(
           'Username can only contain letters, numbers, underscores, hyphens, and periods',
+        );
+      }
+
+      // Reserved/impersonation names and profanity (LS-7240 / PRS-039).
+      const violation = checkUsernamePolicy(trimmed, {
+        isAdmin: context.user.isAdmin,
+      });
+      if (violation === 'reserved') {
+        throw UserInputError(
+          'That username is reserved. Please choose another.',
+        );
+      }
+      if (violation === 'profanity') {
+        throw UserInputError(
+          'That username is not allowed. Please choose another.',
         );
       }
 

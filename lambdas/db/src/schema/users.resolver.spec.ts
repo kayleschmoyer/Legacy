@@ -1533,6 +1533,48 @@ describe('updateUsername mutation rate limit (LS-7239)', () => {
     expect(mockCheckAndIncrementRateLimit).toHaveBeenCalledTimes(1);
     expect(mockUpdateUsername).not.toHaveBeenCalled();
   });
+
+  it.each(['admin', 'Support', 'legacy_sports', 'Adm1n'])(
+    'rejects reserved username %s without updating (LS-7240)',
+    async (username) => {
+      const resolve = getResolver();
+
+      await expect(
+        resolve({}, { username }, mockContext, undefined as never),
+      ).rejects.toThrow(/reserved/i);
+      expect(mockUpdateUsername).not.toHaveBeenCalled();
+    },
+  );
+
+  it('rejects profane usernames without updating (LS-7240)', async () => {
+    const resolve = getResolver();
+
+    await expect(
+      resolve({}, { username: 'sh1t_head' }, mockContext, undefined as never),
+    ).rejects.toThrow(/not allowed/i);
+    expect(mockUpdateUsername).not.toHaveBeenCalled();
+  });
+
+  it('allows an admin to claim a reserved username (LS-7240)', async () => {
+    mockUpdateUsername.mockResolvedValue({
+      id: 42,
+      canonicalEmail: 'user@example.com',
+      username: 'admin',
+      accessLevel: 'admin',
+      avatarUrl: null,
+    });
+    const resolve = getResolver();
+
+    const result = await resolve(
+      {},
+      { username: 'admin' },
+      { ...mockContext, user: { ...mockContext.user, isAdmin: true } },
+      undefined as never,
+    );
+
+    expect(mockUpdateUsername).toHaveBeenCalledWith(42, 'admin');
+    expect(result).toMatchObject({ username: 'admin' });
+  });
 });
 
 describe('myIdentities query', () => {
