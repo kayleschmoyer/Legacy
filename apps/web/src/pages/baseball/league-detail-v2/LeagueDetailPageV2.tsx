@@ -41,6 +41,7 @@ import { useLeagueWebSocket } from '../../../hooks/useLeagueWebSocket';
 import { useLeagueWebSocketLifecycle } from '../../../hooks/useLeagueWebSocketLifecycle';
 import { useIsPremium } from '../../../hooks/useIsPremium';
 import { PremiumGate } from '../../../components/PremiumGate';
+import { parseRouteId } from '../../../utils/parseRouteId';
 
 /** Subscribes to page-level WS events that need to refetch league-level data. */
 function LeagueWSPageHandler({
@@ -88,7 +89,10 @@ export function LeagueDetailPageV2(): React.JSX.Element {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { user, isLoading: authLoading, token: authToken } = useAuth();
-  const leagueId = id ? parseInt(id, 10) : NaN;
+  // Strict parse: `parseInt('14109abc')` is 14109, which rendered league 14109
+  // under a junk URL. A malformed id stays NaN so the league query is skipped
+  // and the "League not found" state renders (LS-10778).
+  const leagueId = parseRouteId(id) ?? NaN;
   const isAuthenticated = !authLoading && !!user;
 
   const isPremium = useIsPremium();
