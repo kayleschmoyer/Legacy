@@ -97,7 +97,8 @@ function PlayerSearchInput({
   disabled,
 }: {
   value: string;
-  onChange: (player: PlayerSearchResult) => void;
+  /** Called with the picked player, or `null` once the text is edited (LS-10825). */
+  onChange: (player: PlayerSearchResult | null) => void;
   disabled?: boolean;
 }) {
   const [query, setQuery] = useState('');
@@ -119,7 +120,9 @@ function PlayerSearchInput({
     (p: PlayerSearchResult) => {
       if (blurTimeout.current) clearTimeout(blurTimeout.current);
       onChange(p);
-      setQuery('');
+      // Keep the picked name in the field so focusing it doesn't show an
+      // empty input while a recipient is still selected (LS-10825).
+      setQuery(`${p.firstName ?? ''} ${p.lastName ?? ''}`.trim());
       setOpen(false);
     },
     [onChange],
@@ -146,6 +149,9 @@ function PlayerSearchInput({
           onChangeText={(text: string) => {
             setQuery(text);
             setOpen(true);
+            // Any edit drops the picked recipient, so Assign can't submit a
+            // player the field no longer shows (LS-10825).
+            onChange(null);
           }}
           onFocus={() => setOpen(true)}
           onBlur={handleBlur}

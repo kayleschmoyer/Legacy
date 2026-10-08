@@ -10,7 +10,7 @@
  */
 import React from 'react';
 import { SeasonAwardsControl } from './SeasonAwardsControl';
-import { act, fireEvent, render, screen } from '../../test-utils';
+import { act, fireEvent, render, screen, within } from '../../test-utils';
 
 jest.mock('@legacy-sports/graphql', () => ({
   useGetLeagueSeasonAwardsQuery: jest.fn(() => ({
@@ -159,5 +159,120 @@ describe('SeasonAwardsControl — LS-10847 consolidated web behaviour', () => {
     });
 
     expect(closeVoting).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('SeasonAwardsControl — LS-10825 clearing the recipient', () => {
+  const graphql = jest.requireMock<typeof import('@legacy-sports/graphql')>(
+    '@legacy-sports/graphql',
+  );
+
+  beforeEach(() => {
+    jest.mocked(graphql.useGetPlayersWithStatsQuery).mockImplementation(
+      () =>
+        ({
+          data: {
+            players: [
+              { id: 7, firstName: 'Babe', lastName: 'Ruth' },
+              { id: 8, firstName: 'Lou', lastName: 'Gehrig' },
+            ],
+          },
+          loading: false,
+        }) as unknown as ReturnType<typeof graphql.useGetPlayersWithStatsQuery>,
+    );
+  });
+
+  afterEach(() => {
+    jest.mocked(graphql.useGetPlayersWithStatsQuery).mockImplementation(
+      () =>
+        ({
+          data: { playersWithStats: [] },
+          loading: false,
+        }) as unknown as ReturnType<typeof graphql.useGetPlayersWithStatsQuery>,
+    );
+  });
+
+  function mvpRow() {
+    const row = screen.getByTestId('award-row-mvp');
+    const input = within(row).getByLabelText('Search for award recipient');
+    const assign = () =>
+      within(row).getByRole('button', { name: /assign award/i });
+    return { row, input, assign };
+  }
+
+  function selectPlayer(input: HTMLElement, row: HTMLElement, name: string) {
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: name.slice(0, 3) } });
+    fireEvent.click(within(row).getByText(name));
+  }
+
+  it('starts with Assign Award disabled', () => {
+    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    expect(mvpRow().assign()).toBeDisabled();
+  });
+
+  it('disables Assign Award after the selected recipient is cleared (AC1)', () => {
+    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    const { row, input, assign } = mvpRow();
+
+    selectPlayer(input, row, 'Babe Ruth');
+    expect(assign()).toBeEnabled();
+
+    fireEvent.focus(input);
+    expect(input).toHaveValue('Babe Ruth');
+    fireEvent.change(input, { target: { value: '' } });
+    fireEvent.blur(input);
+
+    expect(assign()).toBeDisabled();
+  });
+
+  it('disables Assign Award after the text is edited without picking a suggestion (AC2)', () => {
+    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    const { row, input, assign } = mvpRow();
+
+    selectPlayer(input, row, 'Babe Ruth');
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'Babe Ruthx' } });
+
+    expect(assign()).toBeDisabled();
+  });
+
+  it('re-enables Assign Award when a new suggestion is picked (AC3)', async () => {
+    const upsert = jest.fn<Promise<object>, [unknown]>(() =>
+      Promise.resolve({}),
+    );
+    jest
+      .mocked(graphql.useUpsertLeagueSeasonAwardMutation)
+      .mockImplementation(
+        () =>
+          [upsert] as unknown as ReturnType<
+            typeof graphql.useUpsertLeagueSeasonAwardMutation
+          >,
+      );
+    render(<SeasonAwardsControl leagueId={42} currentSeason={2024} />);
+    const { row, input, assign } = mvpRow();
+
+    selectPlayer(input, row, 'Babe Ruth');
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: '' } });
+    expect(assign()).toBeDisabled();
+
+    fireEvent.change(input, { target: { value: 'Lou' } });
+    fireEvent.click(within(row).getByText('Lou Gehrig'));
+    expect(assign()).toBeEnabled();
+
+    fireEvent.click(assign());
+    expect(upsert).toHaveBeenCalledWith({
+      variables: {
+        input: {
+          leagueId: 42,
+          season: 2024,
+          playerId: 8,
+          awardType: 'mvp',
+          notes: undefined,
+        },
+      },
+    });
+    expect(await within(row).findByText('Saved!')).toBeTruthy();
   });
 });
