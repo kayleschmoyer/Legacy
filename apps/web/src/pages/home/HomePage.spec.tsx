@@ -154,4 +154,37 @@ describe('HomePage onboarding gate (LS-10716)', () => {
 
     expect(screen.queryByTestId('onboarding-tutorial')).not.toBeInTheDocument();
   });
+
+  // LS-10723: the reconnect refetch (apollo-client.ts) re-runs the failed
+  // summaries query; the page must drop the error card for the leagues
+  // without the user pressing Retry, and the recovery must not be read as a
+  // new user (LS-10716).
+  it('clears the error state when the leagues query recovers after reconnect', () => {
+    mockUseSummaries.mockReturnValue({
+      data: undefined,
+      loading: false,
+      error: new Error('Network error'),
+    });
+    const { rerender } = render(<HomePage />);
+    expect(mockHomeScreen).toHaveBeenLastCalledWith(
+      expect.objectContaining({ error: true }),
+    );
+
+    mockUseSummaries.mockReturnValue({ data: undefined, loading: true });
+    rerender(<HomePage />);
+    expect(mockHomeScreen).toHaveBeenLastCalledWith(
+      expect.objectContaining({ error: false, loading: true }),
+    );
+
+    const leagues = [{ leagueId: 1, sport: 'baseball' }];
+    mockUseSummaries.mockReturnValue({
+      data: { getUserLeagueSummaries: leagues },
+      loading: false,
+    });
+    rerender(<HomePage />);
+    expect(mockHomeScreen).toHaveBeenLastCalledWith(
+      expect.objectContaining({ error: false, loading: false, leagues }),
+    );
+    expect(screen.queryByTestId('onboarding-tutorial')).not.toBeInTheDocument();
+  });
 });

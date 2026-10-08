@@ -13,15 +13,20 @@
 // apollo-client.ts is evaluated — providing a stub `createHttpLink` that
 // doesn't require global fetch.
 import {
+  ApolloClient,
+  ApolloLink,
   CombinedGraphQLErrors,
   InMemoryCache,
   Observable,
   ServerError,
 } from '@apollo/client';
+import { type DocumentNode, parse } from 'graphql';
 import { captureError } from '@legacy-sports/rollbar/web';
 import {
   decodeJwtPayload,
   errorLink,
+  refetchFailedQueries,
+  refetchFailedQueriesOnReconnect,
   syncUserProfileFromJwt,
   typePolicies,
 } from './apollo-client';
@@ -1140,5 +1145,129 @@ describe('playerSeasonBatting alias isolation', () => {
     expect(careerArc?.arcBatting).toEqual([
       { __typename: 'SeasonBatting', season: 2024, onBasePlusSlugging: 0.89 },
     ]);
+  });
+});
+
+// ─── Refetch failed queries on reconnect (LS-10723) ──────────────────────────
+//
+// Offline → the dashboard's league summaries and On This Day settle in an
+// error state; the `online` event must re-run exactly those queries (AC1) and
+// leave healthy ones alone so a reconnect never causes a refetch storm (AC2).
+
+describe('refetchFailedQueriesOnReconnect', () => {
+  const LEAGUES_QUERY = parse('query GetUserLeagueSummaries { leagues }');
+  const ON_THIS_DAY_QUERY = parse('query GetOnThisDay { onThisDay }');
+
+  /** Counts requests per operation; operations in `offline` fail like fetch does. */
+  function makeClient(offline: Set<string>) {
+    const requests: Record<string, number> = {};
+    const link = new ApolloLink(
+      (operation) =>
+        new Observable<ApolloLink.Result>((observer) => {
+          const name = operation.operationName ?? '';
+          requests[name] = (requests[name] ?? 0) + 1;
+          if (offline.has(name)) {
+            observer.error(new TypeError('Failed to fetch'));
+            return;
+          }
+          const field = name === 'GetOnThisDay' ? 'onThisDay' : 'leagues';
+          observer.next({ data: { [field]: `${name} ok` } });
+          observer.complete();
+        }),
+    );
+    const client = new ApolloClient({
+      link,
+      cache: new InMemoryCache(),
+      defaultOptions: { watchQuery: { errorPolicy: 'all' } },
+    });
+    return { client, requests };
+  }
+
+  /** Subscribes like a mounted `useQuery` and resolves once the first result settles. */
+  function watch(client: ApolloClient, query: DocumentNode) {
+    const observable = client.watchQuery({ query });
+    const results: { data: unknown; error?: unknown }[] = [];
+    const settled = new Promise<void>((resolve) => {
+      observable.subscribe((result) => {
+        if (result.loading) return;
+        results.push({ data: result.data, error: result.error });
+        resolve();
+      });
+    });
+    return { observable, results, settled };
+  }
+
+  async function flush(): Promise<void> {
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  it('refetches errored queries when the browser comes back online', async () => {
+    const offline = new Set(['GetUserLeagueSummaries', 'GetOnThisDay']);
+    const { client, requests } = makeClient(offline);
+    const leagues = watch(client, LEAGUES_QUERY);
+    const onThisDay = watch(client, ON_THIS_DAY_QUERY);
+    await Promise.all([leagues.settled, onThisDay.settled]);
+    expect(leagues.observable.getCurrentResult().error).toBeDefined();
+    expect(onThisDay.observable.getCurrentResult().error).toBeDefined();
+
+    const target = new EventTarget();
+    const stop = refetchFailedQueriesOnReconnect(client, target);
+    offline.clear();
+    target.dispatchEvent(new Event('online'));
+    await flush();
+
+    expect(requests).toEqual({ GetUserLeagueSummaries: 2, GetOnThisDay: 2 });
+    const leaguesResult = leagues.observable.getCurrentResult();
+    expect(leaguesResult.error).toBeUndefined();
+    expect(leaguesResult.data).toEqual({
+      leagues: 'GetUserLeagueSummaries ok',
+    });
+    const onThisDayResult = onThisDay.observable.getCurrentResult();
+    expect(onThisDayResult.error).toBeUndefined();
+    expect(onThisDayResult.data).toEqual({ onThisDay: 'GetOnThisDay ok' });
+    stop();
+  });
+
+  it('leaves healthy queries alone so a reconnect is not a refetch storm', async () => {
+    const offline = new Set(['GetOnThisDay']);
+    const { client, requests } = makeClient(offline);
+    const leagues = watch(client, LEAGUES_QUERY);
+    const onThisDay = watch(client, ON_THIS_DAY_QUERY);
+    await Promise.all([leagues.settled, onThisDay.settled]);
+
+    offline.clear();
+    expect(refetchFailedQueries(client)).toBe(1);
+    await flush();
+
+    expect(requests).toEqual({ GetUserLeagueSummaries: 1, GetOnThisDay: 2 });
+  });
+
+  it('does nothing on reconnect when no query had failed', async () => {
+    const { client, requests } = makeClient(new Set());
+    const leagues = watch(client, LEAGUES_QUERY);
+    await leagues.settled;
+
+    const target = new EventTarget();
+    const stop = refetchFailedQueriesOnReconnect(client, target);
+    target.dispatchEvent(new Event('online'));
+    await flush();
+
+    expect(requests).toEqual({ GetUserLeagueSummaries: 1 });
+    stop();
+  });
+
+  it('stops listening after cleanup', async () => {
+    const offline = new Set(['GetUserLeagueSummaries']);
+    const { client, requests } = makeClient(offline);
+    const leagues = watch(client, LEAGUES_QUERY);
+    await leagues.settled;
+
+    const target = new EventTarget();
+    refetchFailedQueriesOnReconnect(client, target)();
+    target.dispatchEvent(new Event('online'));
+    await flush();
+
+    expect(requests).toEqual({ GetUserLeagueSummaries: 1 });
   });
 });

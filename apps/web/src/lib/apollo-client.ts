@@ -12,6 +12,7 @@ import { ErrorLink } from '@apollo/client/link/error';
 import { RetryLink } from '@apollo/client/link/retry';
 import { setContext } from '@apollo/client/link/context';
 import type { ApolloLink } from '@apollo/client/link';
+import { LOGGER } from '@legacy-sports/logging';
 import { captureError } from '@legacy-sports/rollbar/web';
 import { CSRF_HEADER, getCsrfToken } from './csrf';
 import {
@@ -555,3 +556,46 @@ export const apolloClient = new ApolloClient({
     },
   },
 });
+
+// ─── Refetch failed queries when the connection returns (LS-10723) ─────────
+// `retryLink` only retries a request while it is in flight. Once its attempts
+// are spent offline the query settles in an error state and nothing re-runs
+// it, so the dashboard's "Unable to load your leagues" card and On This Day's
+// "Could not load historical data." stayed up after the network came back
+// until the user pressed Retry. On the browser's `online` event we refetch
+// only the active queries that are currently errored: healthy queries are
+// left alone, so a reconnect after an uneventful blip triggers no refetches.
+
+/** Refetches every active query currently in an error state; returns how many. */
+export function refetchFailedQueries(client: ApolloClient): number {
+  let refetched = 0;
+  for (const query of client.getObservableQueries('active')) {
+    if (!query.getCurrentResult().error) continue;
+    refetched += 1;
+    query.refetch().catch((caught: unknown) => {
+      // Still failing (e.g. the link came back before the network did): the
+      // query stays in its error state, so the page's own Retry still works.
+      LOGGER.warn(
+        `apollo: refetch on reconnect failed for ${query.queryName ?? 'anonymous query'}`,
+        caught instanceof Error ? caught : new Error(String(caught)),
+      );
+    });
+  }
+  return refetched;
+}
+
+/** Wires {@link refetchFailedQueries} to `online` events; returns a cleanup. */
+export function refetchFailedQueriesOnReconnect(
+  client: ApolloClient,
+  target: Pick<Window, 'addEventListener' | 'removeEventListener'> = window,
+): () => void {
+  const handleOnline = (): void => {
+    refetchFailedQueries(client);
+  };
+  target.addEventListener('online', handleOnline);
+  return () => target.removeEventListener('online', handleOnline);
+}
+
+if (typeof window !== 'undefined') {
+  refetchFailedQueriesOnReconnect(apolloClient);
+}
