@@ -306,20 +306,33 @@ jest.mock('tamagui', () => {
     Card: passthrough,
     H1: ({ children }: any) => ReactLocal.createElement('h1', null, children),
     H2: ({ children }: any) => ReactLocal.createElement('h2', null, children),
-    Input: ({ value, onChangeText, id, placeholder, disabled }: any) =>
+    Input: ({
+      value,
+      onChangeText,
+      onBlur,
+      id,
+      placeholder,
+      disabled,
+      borderColor,
+      ...rest
+    }: any) =>
       ReactLocal.createElement('input', {
         id,
         placeholder,
         disabled,
         value: value ?? '',
         onChange: (e: any) => onChangeText?.(e.target.value),
+        onBlur,
+        'aria-invalid': rest['aria-invalid'],
+        'aria-describedby': rest['aria-describedby'],
+        'data-border-color': borderColor,
       }),
     Label: ({ children }: any) =>
       ReactLocal.createElement('label', null, children),
     ScrollView: passthrough,
     styled: () => passthrough,
-    Text: ({ children }: any) =>
-      ReactLocal.createElement('span', null, children),
+    Text: ({ children, id }: any) =>
+      ReactLocal.createElement('span', { id }, children),
     XStack: passthrough,
     YStack: passthrough,
   };
@@ -2133,7 +2146,7 @@ describe('LeagueCreatePage — sticky bar surfaces all validation errors (LS-609
   it('lists the validation error message instead of a truncated "· message" summary', () => {
     renderPage('/baseball/league/create');
     // The default league name is empty, so exactly one error (leagueName) is active.
-    expect(screen.getByText('1 item need attention:')).toBeInTheDocument();
+    expect(screen.getByText('1 item needs attention:')).toBeInTheDocument();
     expect(
       screen.getByText('• League name must be 3–50 characters.'),
     ).toBeInTheDocument();
@@ -2974,6 +2987,90 @@ describe('LeagueCreatePage — ?name= sanitization (LS-6107 / CLB-051)', () => {
       'Enter your league name',
     );
     expect(input.value).toBe('My Great League');
+  });
+});
+
+describe('LeagueCreatePage — League Name error a11y (LS-10714)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+  });
+
+  const getNameInput = () =>
+    screen.getByPlaceholderText<HTMLInputElement>('Enter your league name');
+
+  it('does not mark the pristine League Name invalid on first load', () => {
+    renderPage('/baseball/league/create');
+    const input = getNameInput();
+    expect(input).toHaveAttribute('aria-invalid', 'false');
+    expect(input).toHaveAttribute('data-border-color', '$borderColor');
+    expect(input).toHaveAttribute('aria-describedby', 'league-name-hint');
+    expect(document.getElementById('league-name-error')).toBeNull();
+  });
+
+  it('marks League Name invalid and links the inline error after invalid input + blur', () => {
+    renderPage('/baseball/league/create');
+    const input = getNameInput();
+    fireEvent.change(input, { target: { value: 'ab' } });
+    // Still typing — no error yet.
+    expect(input).toHaveAttribute('aria-invalid', 'false');
+
+    fireEvent.blur(input);
+
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input).toHaveAttribute('data-border-color', '$red8');
+    expect(input.getAttribute('aria-describedby')?.split(' ')).toEqual([
+      'league-name-hint',
+      'league-name-error',
+    ]);
+    expect(document.getElementById('league-name-error')).toHaveTextContent(
+      'League name must be 3–50 characters.',
+    );
+  });
+
+  it('clears aria-invalid and the error link once the name becomes valid', () => {
+    renderPage('/baseball/league/create');
+    const input = getNameInput();
+    fireEvent.change(input, { target: { value: 'ab' } });
+    fireEvent.blur(input);
+    fireEvent.change(input, { target: { value: 'abc' } });
+
+    expect(input).toHaveAttribute('aria-invalid', 'false');
+    expect(input).toHaveAttribute('aria-describedby', 'league-name-hint');
+    expect(document.getElementById('league-name-error')).toBeNull();
+  });
+
+  it('marks the untouched League Name invalid after a submit attempt', () => {
+    renderPage('/baseball/league/create');
+    fireEvent.click(screen.getByTestId('create-league-submit'));
+
+    const input = getNameInput();
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input.getAttribute('aria-describedby')).toContain(
+      'league-name-error',
+    );
+    expect(mockCreateLeague).not.toHaveBeenCalled();
+  });
+
+  it('keeps the tag-stripped notice linked alongside the error (LS-10695)', () => {
+    renderPage('/baseball/league/create');
+    const input = getNameInput();
+    fireEvent.change(input, { target: { value: '<b>Q</b>' } });
+    fireEvent.blur(input);
+
+    expect(input.getAttribute('aria-describedby')?.split(' ')).toEqual([
+      'league-name-hint',
+      'league-name-tags-removed',
+      'league-name-error',
+    ]);
+  });
+
+  it('reads "1 item needs attention" for a single error', () => {
+    renderPage('/baseball/league/create');
+    expect(screen.getByText('1 item needs attention:')).toBeInTheDocument();
+    expect(screen.queryByText(/1 item need attention/)).not.toBeInTheDocument();
   });
 });
 

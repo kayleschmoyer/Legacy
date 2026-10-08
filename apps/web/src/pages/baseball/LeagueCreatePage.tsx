@@ -1873,6 +1873,9 @@ export function LeagueCreatePage(): React.JSX.Element {
   const [leagueNameTagsRemoved, setLeagueNameTagsRemoved] = useState(() =>
     leagueNameHasTags(searchParams.get('name') ?? ''),
   );
+  // League Name errors stay quiet until the user leaves the field or tries
+  // to submit, so a pristine form doesn't announce "invalid entry" (LS-10714).
+  const [leagueNameTouched, setLeagueNameTouched] = useState(false);
 
   const [formData, setFormData] = useState<CreateLeagueFormData>(() => {
     const initialLeagueName = sanitizeLeagueNameInput(
@@ -2022,6 +2025,7 @@ export function LeagueCreatePage(): React.JSX.Element {
       setFormData((prev) => applySportSwitch(prev, selectedSport));
       // The switch empties leagueName, so the tags-removed notice goes too.
       setLeagueNameTagsRemoved(false);
+      setLeagueNameTouched(false);
       prevSportRef.current = selectedSport;
     }
   }, [selectedSport]);
@@ -2076,6 +2080,7 @@ export function LeagueCreatePage(): React.JSX.Element {
   // (LS-6090).
   const revealValidationErrors = useCallback(
     (errors: Record<string, string>) => {
+      if (errors.leagueName) setLeagueNameTouched(true);
       const errorSectionIds = Object.keys(errors)
         .map((field) => VALIDATION_ERROR_SECTION[field])
         .filter((id): id is string => Boolean(id));
@@ -2316,6 +2321,9 @@ export function LeagueCreatePage(): React.JSX.Element {
     [formData],
   );
   const errorCount = Object.keys(validationErrors).length;
+  const leagueNameError = leagueNameTouched
+    ? validationErrors.leagueName
+    : undefined;
 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitErrorMeta, setSubmitErrorMeta] = useState<{
@@ -3262,12 +3270,14 @@ export function LeagueCreatePage(): React.JSX.Element {
                       <Input
                         id="league-name-input"
                         aria-labelledby="league-name-label"
-                        aria-describedby={
-                          leagueNameTagsRemoved
-                            ? 'league-name-hint league-name-tags-removed'
-                            : 'league-name-hint'
-                        }
-                        aria-invalid={!!validationErrors.leagueName}
+                        aria-describedby={[
+                          'league-name-hint',
+                          leagueNameTagsRemoved && 'league-name-tags-removed',
+                          leagueNameError && 'league-name-error',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                        aria-invalid={!!leagueNameError}
                         size="$4"
                         testID="create-league-name-input"
                         placeholder="Enter your league name"
@@ -3275,9 +3285,8 @@ export function LeagueCreatePage(): React.JSX.Element {
                         onChangeText={(text: string) =>
                           handleInputChange('leagueName', text)
                         }
-                        borderColor={
-                          validationErrors.leagueName ? '$red8' : '$borderColor'
-                        }
+                        onBlur={() => setLeagueNameTouched(true)}
+                        borderColor={leagueNameError ? '$red8' : '$borderColor'}
                         backgroundColor="$color1"
                         disabled={isFormDisabled}
                         aria-required="true"
@@ -3301,6 +3310,16 @@ export function LeagueCreatePage(): React.JSX.Element {
                             {LEAGUE_NAME_TAGS_REMOVED_NOTICE}
                           </Text>
                         </XStack>
+                      )}
+                      {leagueNameError && (
+                        <Text
+                          id="league-name-error"
+                          fontFamily="$body"
+                          fontSize={12}
+                          color="$red10"
+                        >
+                          {leagueNameError}
+                        </Text>
                       )}
                     </FieldRow>
                   </div>
@@ -4585,8 +4604,9 @@ export function LeagueCreatePage(): React.JSX.Element {
                           fontSize={13}
                           color="#E07A8C"
                         >
-                          {errorCount} item{errorCount > 1 ? 's' : ''} need
-                          attention:
+                          {errorCount === 1
+                            ? '1 item needs attention:'
+                            : `${errorCount} items need attention:`}
                         </Text>
                         {Object.entries(validationErrors).map(
                           ([field, message]) => (
