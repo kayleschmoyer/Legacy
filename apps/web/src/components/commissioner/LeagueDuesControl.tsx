@@ -35,6 +35,14 @@ const DAY_OF_WEEK_OPTIONS = [
   { label: 'Saturday', value: 6 },
 ] as const;
 
+/** Enter/Space activation for the custom `role="switch"` toggle rows (LS-10797). */
+const activateOnEnterOrSpace = (fn: () => void) => (e: React.KeyboardEvent) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    fn();
+  }
+};
+
 export function LeagueDuesControl({
   leagueId,
   onSuccess,
@@ -201,7 +209,18 @@ export function LeagueDuesControl({
             enabled ? withAlpha(BRAND_NAVY_LIGHT, 0.08) : '$color1'
           }
           cursor="pointer"
+          role="switch"
+          aria-checked={enabled}
+          aria-label="Enable League Dues"
+          tabIndex={0}
           onPress={handleEnabledToggle}
+          onKeyDown={activateOnEnterOrSpace(handleEnabledToggle)}
+          focusVisibleStyle={{
+            outlineWidth: 2,
+            outlineColor: '$focusRing',
+            outlineStyle: 'solid',
+            outlineOffset: 1,
+          }}
         >
           <YStack
             width={24}
@@ -271,7 +290,18 @@ export function LeagueDuesControl({
                     : '$color1'
                 }
                 cursor="pointer"
+                role="switch"
+                aria-checked={reminderEnabled}
+                aria-label="Auto-Reminders"
+                tabIndex={0}
                 onPress={handleReminderToggle}
+                onKeyDown={activateOnEnterOrSpace(handleReminderToggle)}
+                focusVisibleStyle={{
+                  outlineWidth: 2,
+                  outlineColor: '$focusRing',
+                  outlineStyle: 'solid',
+                  outlineOffset: 1,
+                }}
               >
                 <YStack
                   width={24}

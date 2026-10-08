@@ -18,6 +18,7 @@ import { useUpdateLeagueSettingsMutation } from '@legacy-sports/graphql';
 import { GAMES_PER_MATCHUP_BY_SPORT } from '../../config/sports';
 import { BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
 import { PremiumGate } from '../../components/PremiumGate';
+import { handleKeyActivate } from '../../utils/keyboardActivation';
 import {
   FaabBudgetField,
   WaiverSystemField,
@@ -512,6 +513,35 @@ export function LeagueSettingsControl({
       checkChanges,
     ],
   );
+
+  const toggleSalaryCap = useCallback(() => {
+    const nextEnabled = !salaryCapEnabled;
+    setSalaryCapEnabled(nextEnabled);
+    checkChanges(
+      gamesPerMatchup,
+      spStarts,
+      minCareerGames,
+      minCareerSeasons,
+      totalMatchups,
+      playoffEnabled,
+      playoffFormat,
+      playoffMultiWeek,
+      nextEnabled,
+      salaryCap,
+    );
+  }, [
+    gamesPerMatchup,
+    spStarts,
+    minCareerGames,
+    minCareerSeasons,
+    totalMatchups,
+    playoffEnabled,
+    playoffFormat,
+    playoffMultiWeek,
+    salaryCapEnabled,
+    salaryCap,
+    checkChanges,
+  ]);
 
   const validationError =
     gamesPerMatchup < sportBounds.min || gamesPerMatchup > sportBounds.max
@@ -1157,22 +1187,20 @@ export function LeagueSettingsControl({
                     : '$color1'
                 }
                 cursor="pointer"
-                onPress={() => {
-                  const nextEnabled = !salaryCapEnabled;
-                  setSalaryCapEnabled(nextEnabled);
-                  checkChanges(
-                    gamesPerMatchup,
-                    spStarts,
-                    minCareerGames,
-                    minCareerSeasons,
-                    totalMatchups,
-                    playoffEnabled,
-                    playoffFormat,
-                    playoffMultiWeek,
-                    nextEnabled,
-                    salaryCap,
-                  );
+                role="switch"
+                accessibilityRole="switch"
+                aria-checked={salaryCapEnabled}
+                accessibilityState={{ checked: salaryCapEnabled }}
+                aria-label="Enable Salary Cap"
+                tabIndex={0}
+                onKeyDown={handleKeyActivate(toggleSalaryCap)}
+                focusVisibleStyle={{
+                  outlineWidth: 2,
+                  outlineColor: '$focusRing',
+                  outlineStyle: 'solid',
+                  outlineOffset: 1,
                 }}
+                onPress={toggleSalaryCap}
               >
                 <YStack
                   width={24}
