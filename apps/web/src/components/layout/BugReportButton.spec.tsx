@@ -8,9 +8,12 @@
  * `tamagui`'s real `Dialog` needs a `TamaguiProvider` this project's Jest
  * setup doesn't configure (see BaseModal.spec.tsx), so Tamagui primitives are
  * swapped for plain DOM equivalents.
+ *
+ * LS-10720: a failed submit rendered the raw fetch error ("Failed to fetch")
+ * or an "HTTP 500" string; failures now map to friendly retry copy.
  */
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 import { BugReportButton } from './BugReportButton';
 
@@ -162,5 +165,80 @@ describe('BugReportButton dialog accessible names (LS-10709)', () => {
     expect(
       screen.queryByRole('button', { name: 'Dialog Close' }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('BugReportButton submit failures (LS-10720)', () => {
+  const fetchMock = jest.fn();
+
+  beforeEach(() => {
+    fetchMock.mockReset();
+    global.fetch = fetchMock;
+  });
+
+  const fillAndSubmit = () => {
+    renderDialog('bug');
+    // Under SEARCH_MIN_LENGTH, so no duplicate-search request fires.
+    fireEvent.change(screen.getByLabelText('What happened?'), {
+      target: { value: 'Broken' },
+    });
+    fireEvent.change(screen.getByLabelText('Add screenshot or video'), {
+      target: {
+        files: [new File(['png'], 'shot.png', { type: 'image/png' })],
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Submit Report' }));
+  };
+
+  it('shows friendly offline copy instead of "Failed to fetch"', async () => {
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+
+    fillAndSubmit();
+
+    expect(
+      await screen.findByText(/You appear to be offline/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Failed to fetch/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('What happened?')).toHaveValue('Broken');
+    expect(
+      screen.getByRole('button', { name: 'Remove shot.png' }),
+    ).toBeInTheDocument();
+  });
+
+  it('shows a generic retry message on a 5xx and keeps text and attachments', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({ error: 'Failed to create bug report' }),
+    });
+
+    fillAndSubmit();
+
+    expect(
+      await screen.findByText(
+        /We couldn't send your report. Please try again./,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Failed to create bug report|HTTP 500/),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText('What happened?')).toHaveValue('Broken');
+    expect(
+      screen.getByRole('button', { name: 'Remove shot.png' }),
+    ).toBeInTheDocument();
+  });
+
+  it("surfaces the proxy's 400 validation message", async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: () => Promise.resolve({ error: 'Description is too long' }),
+    });
+
+    fillAndSubmit();
+
+    expect(
+      await screen.findByText(/Description is too long/),
+    ).toBeInTheDocument();
   });
 });

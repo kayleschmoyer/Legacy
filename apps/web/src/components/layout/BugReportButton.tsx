@@ -71,6 +71,12 @@ const SEARCH_MIN_LENGTH = 10;
 /** Maximum query length sent to the backend search endpoint. */
 const SEARCH_MAX_LENGTH = 200;
 
+/** Shown when the submit request never reaches the server (LS-10720). */
+const SUBMIT_OFFLINE_MESSAGE =
+  "You appear to be offline. Your report wasn't sent — check your connection and try again.";
+/** Shown when the server rejects the submit for a non-user-facing reason. */
+const SUBMIT_FAILED_MESSAGE = "We couldn't send your report. Please try again.";
+
 /** Which kind of feedback this button collects. */
 export type ReportKind = 'bug' | 'feature';
 
@@ -378,9 +384,10 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
       ...(attachmentData.length > 0 ? { attachments: attachmentData } : {}),
     };
 
+    const csrfToken = getCsrfToken();
+    let res: Response;
     try {
-      const csrfToken = getCsrfToken();
-      const res = await fetch(`${jiraProxyUrl}/bug`, {
+      res = await fetch(`${jiraProxyUrl}/bug`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -390,30 +397,38 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
         credentials: 'include',
         body: JSON.stringify(payload),
       });
+    } catch {
+      // fetch only rejects when the request never got a response (offline,
+      // DNS, server unreachable); its "Failed to fetch" message is browser
+      // jargon, so never show it (LS-10720).
+      setSubmitState({ status: 'error', message: SUBMIT_OFFLINE_MESSAGE });
+      return;
+    }
 
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as {
-          error?: string;
-        };
-        throw new Error(body.error ?? `HTTP ${String(res.status)}`);
-      }
-
-      const data = (await res.json()) as { issueKey?: string };
-      setSubmitState({
-        status: 'success',
-        message: data.issueKey
-          ? `Thanks! Created ${data.issueKey}.`
-          : 'Thanks for the report!',
-      });
-    } catch (err) {
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      // Only the proxy's 400 validation messages are written for users;
+      // anything else (5xx, auth, routing) gets a generic retry prompt.
       setSubmitState({
         status: 'error',
         message:
-          err instanceof Error
-            ? err.message
-            : 'Something went wrong. Try again.',
+          res.status === 400 && body.error ? body.error : SUBMIT_FAILED_MESSAGE,
       });
+      return;
     }
+
+    // The report was filed even if the body is unreadable — still a success.
+    const data = (await res.json().catch(() => ({}))) as {
+      issueKey?: string;
+    };
+    setSubmitState({
+      status: 'success',
+      message: data.issueKey
+        ? `Thanks! Created ${data.issueKey}.`
+        : 'Thanks for the report!',
+    });
   }, [description, auth, attachments, copy]);
 
   const isLoading = submitState.status === 'loading';

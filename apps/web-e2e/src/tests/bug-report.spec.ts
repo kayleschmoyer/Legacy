@@ -523,13 +523,21 @@ test.describe('Bug Report Submission @regression', () => {
 
     await page.getByRole('button', { name: /submit report/i }).click();
 
-    await expect(page.getByText(/internal server error/i)).toBeVisible();
+    // 5xx bodies are internal strings, so a generic retry prompt replaces
+    // them (LS-10720).
+    await expect(
+      page.getByText("We couldn't send your report. Please try again."),
+    ).toBeVisible();
+    await expect(page.getByText(/internal server error/i)).not.toBeVisible();
 
-    // Dialog should remain open so the user can retry or copy their text
+    // Dialog should remain open with the text kept so the user can retry
     await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(textarea).toHaveValue(
+      'Draft board does not load for leagues with >12 teams.',
+    );
   });
 
-  test('network failure shows a generic error message', async ({ page }) => {
+  test('network failure shows friendly offline copy', async ({ page }) => {
     await page.route(JIRA_BUG_URL, async (route) => {
       await route.abort('failed');
     });
@@ -539,14 +547,14 @@ test.describe('Bug Report Submission @regression', () => {
 
     await page.getByRole('button', { name: /submit report/i }).click();
 
-    // route.abort('failed') throws a TypeError("Failed to fetch") in
-    // Chromium.  The component's catch block renders err.message directly
-    // since it is an Error instance, so the toast shows "Failed to fetch"
-    // rather than the generic "Something went wrong" fallback.
-    await expect(
-      page.getByText(/something went wrong|failed to fetch/i),
-    ).toBeVisible();
+    // route.abort('failed') makes fetch reject with TypeError("Failed to
+    // fetch"); that browser jargon must never reach the UI (LS-10720).
+    await expect(page.getByText(/you appear to be offline/i)).toBeVisible();
+    await expect(page.getByText(/failed to fetch/i)).not.toBeVisible();
 
     await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(textarea).toHaveValue(
+      'Crash when trying to trade a player mid-draft.',
+    );
   });
 });
