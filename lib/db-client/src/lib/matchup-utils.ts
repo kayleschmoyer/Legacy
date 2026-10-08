@@ -6,6 +6,7 @@
  *  - selectSeasonsForPlayers (season-assignment logic)
  *  - populateMatchupPlayersAndSeasons (populates matchup_players)
  *  - autoPopulateFirstMatchupLineup (assigns positions for week-1 after draft)
+ *  - syncMatchupLineupsFromTeamMembers (copies the roster lineup into weeks 2+)
  *  - createAllMatchupsForLeague (top-level orchestrator)
  *
  * These were originally spread across lambdas/db local services but are moved
@@ -1287,6 +1288,93 @@ export async function autoPopulateFirstMatchupLineup(
   return { assignedCount: assignments.size };
 }
 
+// ── syncMatchupLineupsFromTeamMembers ─────────────────────────────────────────
+
+/**
+ * Overwrite `matchup_players.positionId` for the given matchups with each
+ * player's current `team_members.positionId` — the lineup My Roster shows.
+ * Rows edited via the matchup lineup editor (`manuallyEdited`) are left alone.
+ *
+ * Changed rows are cleared first and then assigned, one UPDATE per target
+ * position, so the partial unique slot index (matchup_id, team_id,
+ * position_id) never sees two players in one slot mid-transaction.
+ *
+ * Called from createAllMatchupsForLeague after the week-1 auto-populate so
+ * weeks 2+ inherit that lineup instead of the pre-autopopulate one (LS-10737).
+ */
+export async function syncMatchupLineupsFromTeamMembers(
+  db: GenericDatabase<typeof PublicSchema>,
+  leagueId: number,
+  matchupIds: number[],
+): Promise<{ updatedCount: number }> {
+  if (matchupIds.length === 0) return { updatedCount: 0 };
+
+  const members = await db
+    .select({
+      teamId: PublicSchema.teamMembers.teamId,
+      playerId: PublicSchema.teamMembers.playerId,
+      positionId: PublicSchema.teamMembers.positionId,
+    })
+    .from(PublicSchema.teamMembers)
+    .where(eq(PublicSchema.teamMembers.leagueId, leagueId));
+
+  const memberPositions = new Map<string, number | null>();
+  for (const m of members) {
+    if (m.teamId === null) continue;
+    memberPositions.set(`${m.teamId}-${m.playerId}`, m.positionId);
+  }
+
+  const mpRows = await db
+    .select({
+      id: PublicSchema.matchupPlayers.id,
+      teamId: PublicSchema.matchupPlayers.teamId,
+      playerId: PublicSchema.matchupPlayers.playerId,
+      positionId: PublicSchema.matchupPlayers.positionId,
+      manuallyEdited: PublicSchema.matchupPlayers.manuallyEdited,
+    })
+    .from(PublicSchema.matchupPlayers)
+    .where(inArray(PublicSchema.matchupPlayers.matchupId, matchupIds));
+
+  const changedIds: number[] = [];
+  const idsByTargetPosition = new Map<number, number[]>();
+  for (const mp of mpRows) {
+    if (mp.manuallyEdited) continue;
+    const key = `${mp.teamId}-${mp.playerId}`;
+    if (!memberPositions.has(key)) continue;
+    const target = memberPositions.get(key) ?? null;
+    if (target === mp.positionId) continue;
+    changedIds.push(mp.id);
+    if (target !== null) {
+      const ids = idsByTargetPosition.get(target) ?? [];
+      ids.push(mp.id);
+      idsByTargetPosition.set(target, ids);
+    }
+  }
+
+  if (changedIds.length === 0) return { updatedCount: 0 };
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(PublicSchema.matchupPlayers)
+      .set({ positionId: null })
+      .where(inArray(PublicSchema.matchupPlayers.id, changedIds));
+    for (const [positionId, ids] of idsByTargetPosition) {
+      await tx
+        .update(PublicSchema.matchupPlayers)
+        .set({ positionId })
+        .where(inArray(PublicSchema.matchupPlayers.id, ids));
+    }
+  });
+
+  LOGGER.info('Synced matchup lineups from team_members', {
+    leagueId,
+    matchupCount: matchupIds.length,
+    updatedCount: changedIds.length,
+  });
+
+  return { updatedCount: changedIds.length };
+}
+
 // ── createAllMatchupsForLeague ────────────────────────────────────────────────
 
 /**
@@ -1420,6 +1508,35 @@ export async function createAllMatchupsForLeague(
       LOGGER.error('Failed to auto-populate first matchup lineup', errorToLog, {
         leagueId,
       });
+    }
+  }
+
+  // Weeks 2+ were populated above from the pre-autopopulate team_members
+  // positions (null right after a live draft), so they'd show an empty
+  // lineup until each week activates. Bring them in line with the week-1
+  // lineup that autoPopulateFirstMatchupLineup just mirrored onto
+  // team_members — the same source My Roster reads (LS-10737).
+  const laterWeekMatchupIds = insertedMatchups
+    .filter((m) => m.weekNumber > 1)
+    .map((m) => m.id);
+
+  if (laterWeekMatchupIds.length > 0) {
+    try {
+      await syncMatchupLineupsFromTeamMembers(
+        db,
+        leagueId,
+        laterWeekMatchupIds,
+      );
+    } catch (syncError) {
+      // Non-fatal, like the week-1 auto-populate: each week still resyncs
+      // from team_members when it activates (advanceLeagueWeekInternal).
+      const errorToLog =
+        syncError instanceof Error ? syncError : new Error(String(syncError));
+      LOGGER.error(
+        'Failed to sync later-week lineups from team_members',
+        errorToLog,
+        { leagueId },
+      );
     }
   }
 

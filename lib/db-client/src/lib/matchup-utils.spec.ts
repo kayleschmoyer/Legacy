@@ -12,11 +12,18 @@
  *
  * populateMatchupPlayersAndSeasons (smoke test):
  *  - Both teams' players from team_members are inserted into matchup_players.
+ *
+ * syncMatchupLineupsFromTeamMembers / createAllMatchupsForLeague (LS-10737):
+ *  - Weeks 2+ inherit the team_members lineup (the auto-populated week-1
+ *    lineup My Roster shows) instead of staying empty until activation.
  */
 
 import {
   autoPopulateFirstMatchupLineup,
+  createAllMatchupsForLeague,
+  MatchupService,
   populateMatchupPlayersAndSeasons,
+  syncMatchupLineupsFromTeamMembers,
 } from './matchup-utils';
 
 // ---------------------------------------------------------------------------
@@ -504,5 +511,205 @@ describe('populateMatchupPlayersAndSeasons', () => {
       (r) => r.playerId === 3001 && typeof r.season === 'number',
     );
     expect(playerSeason?.season).toBe(2005);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// syncMatchupLineupsFromTeamMembers tests (LS-10737)
+// ---------------------------------------------------------------------------
+
+describe('syncMatchupLineupsFromTeamMembers', () => {
+  it('does nothing when matchupIds is empty', async () => {
+    const { db, selectMock, transactionMock } = buildMockDb([]);
+    const result = await syncMatchupLineupsFromTeamMembers(db, 1, []);
+    expect(result.updatedCount).toBe(0);
+    expect(selectMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it('copies team_members positions onto empty future-week rows for both teams', async () => {
+    const { db, txUpdateCalls } = buildMockDb([
+      [
+        // team_members (post week-1 auto-populate)
+        { teamId: 10, playerId: 1001, positionId: 7 },
+        { teamId: 10, playerId: 1002, positionId: null }, // bench
+        { teamId: 20, playerId: 2001, positionId: 8 },
+      ],
+      [
+        // week-2 matchup_players, seeded before the auto-populate ran
+        {
+          id: 201,
+          teamId: 10,
+          playerId: 1001,
+          positionId: null,
+          manuallyEdited: false,
+        },
+        {
+          id: 202,
+          teamId: 10,
+          playerId: 1002,
+          positionId: null,
+          manuallyEdited: false,
+        },
+        {
+          id: 203,
+          teamId: 20,
+          playerId: 2001,
+          positionId: null,
+          manuallyEdited: false,
+        },
+      ],
+    ]);
+
+    const result = await syncMatchupLineupsFromTeamMembers(db, 1, [500]);
+
+    // Bench player 1002 already matches (null) — only the two starters change.
+    expect(result.updatedCount).toBe(2);
+    // Clear first, then one assignment per target position.
+    expect(txUpdateCalls.map((c) => c.setArg)).toEqual([
+      { positionId: null },
+      { positionId: 7 },
+      { positionId: 8 },
+    ]);
+  });
+
+  it('leaves manually edited rows and already-matching rows alone', async () => {
+    const { db, transactionMock } = buildMockDb([
+      [
+        { teamId: 10, playerId: 1001, positionId: 7 },
+        { teamId: 10, playerId: 1002, positionId: 9 },
+      ],
+      [
+        // explicitly moved in the matchup lineup editor — keep it
+        {
+          id: 201,
+          teamId: 10,
+          playerId: 1001,
+          positionId: 3,
+          manuallyEdited: true,
+        },
+        // already in sync
+        {
+          id: 202,
+          teamId: 10,
+          playerId: 1002,
+          positionId: 9,
+          manuallyEdited: false,
+        },
+      ],
+    ]);
+
+    const result = await syncMatchupLineupsFromTeamMembers(db, 1, [500]);
+
+    expect(result.updatedCount).toBe(0);
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it('benches a row whose player is on the bench in team_members', async () => {
+    const { db, txUpdateCalls } = buildMockDb([
+      [{ teamId: 10, playerId: 1001, positionId: null }],
+      [
+        {
+          id: 201,
+          teamId: 10,
+          playerId: 1001,
+          positionId: 4,
+          manuallyEdited: false,
+        },
+      ],
+    ]);
+
+    const result = await syncMatchupLineupsFromTeamMembers(db, 1, [500]);
+
+    expect(result.updatedCount).toBe(1);
+    expect(txUpdateCalls.map((c) => c.setArg)).toEqual([{ positionId: null }]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createAllMatchupsForLeague — future weeks inherit the lineup (LS-10737)
+// ---------------------------------------------------------------------------
+
+describe('createAllMatchupsForLeague', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('syncs every week after week 1 to the team_members lineup', async () => {
+    jest.spyOn(MatchupService, 'generateSchedule').mockResolvedValue({
+      matchups: [
+        {
+          leagueId: 1,
+          weekNumber: 1,
+          team1Id: 10,
+          team2Id: 20,
+          gamesPerMatchup: 5,
+          status: 'scheduled',
+        },
+        {
+          leagueId: 1,
+          weekNumber: 2,
+          team1Id: 10,
+          team2Id: 20,
+          gamesPerMatchup: 5,
+          status: 'scheduled',
+        },
+      ],
+      warnings: [],
+    } as unknown as Awaited<
+      ReturnType<typeof MatchupService.generateSchedule>
+    >);
+
+    const selectResults: unknown[] = [
+      [{ id: 1, totalMatchups: 2, gamesPerMatchup: 5 }], // league config
+      [], // populateMatchupPlayersAndSeasons: team_members (no players → early return)
+      [], // autoPopulateFirstMatchupLineup: league positions (none → early return)
+      [{ teamId: 10, playerId: 1001, positionId: 7 }], // sync: team_members
+      [
+        // sync: week-2 matchup_players
+        {
+          id: 201,
+          teamId: 10,
+          playerId: 1001,
+          positionId: null,
+          manuallyEdited: false,
+        },
+      ],
+    ];
+    const { db, txUpdateCalls } = buildMockDb(selectResults);
+
+    let nextMatchupId = 100;
+    const insert = jest.fn().mockImplementation(() => {
+      let row: { weekNumber: number; team1Id: number; team2Id: number };
+      const chain = {
+        values: jest.fn().mockImplementation((v: typeof row) => {
+          row = v;
+          return chain;
+        }),
+        returning: jest
+          .fn()
+          .mockImplementation(() =>
+            Promise.resolve([{ ...row, id: nextMatchupId++ }]),
+          ),
+      };
+      return chain;
+    });
+    const update = jest.fn().mockImplementation(() => {
+      const chain = {
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue(undefined),
+      };
+      return chain;
+    });
+    Object.assign(db, { insert, update });
+
+    const result = await createAllMatchupsForLeague(db, 1);
+
+    expect(result).toEqual({ matchupCount: 2, currentMatchupId: 100 });
+    // Week-2 row for player 1001 picks up the starter slot from team_members.
+    expect(txUpdateCalls.map((c) => c.setArg)).toEqual([
+      { positionId: null },
+      { positionId: 7 },
+    ]);
   });
 });
