@@ -402,6 +402,16 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
         skipReason: null,
       };
 
+      // A single-league (commissioner) advance that does nothing must say
+      // why, so the UI can show it instead of silently succeeding (LS-10804,
+      // LS-10795). The all-leagues sweep only counts skips.
+      const recordSkip = (reason: string) => {
+        if (leagueId) {
+          result.skipReason = reason;
+        }
+        result.leaguesSkipped++;
+      };
+
       try {
         // 1. Find active leagues (draft completed), filtered by leagueId if provided
         const leagueConditions = [
@@ -442,7 +452,9 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
               LOGGER.info(
                 `[autoAdvanceMatchups] League ${league.id} (${league.name}) is already ${league.weekAdvanceStatus}, skipping`,
               );
-              result.leaguesSkipped++;
+              recordSkip(
+                `Week advance is already ${league.weekAdvanceStatus}. Wait for it to finish, then refresh.`,
+              );
               continue;
             }
 
@@ -451,7 +463,9 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
               LOGGER.debug(
                 `[autoAdvanceMatchups] League ${league.id} (${league.name}) has no current week set, skipping`,
               );
-              result.leaguesSkipped++;
+              recordSkip(
+                'This league has no active week to advance. Create Week 1 matchups first.',
+              );
               continue;
             }
 
@@ -478,7 +492,9 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
               LOGGER.debug(
                 `[autoAdvanceMatchups] League ${league.id} (${league.name}) has no in-progress or completed matchups for week ${currentWeek}, skipping`,
               );
-              result.leaguesSkipped++;
+              recordSkip(
+                `Week ${currentWeek} has no in-progress matchups to advance. Select games for week ${currentWeek} first.`,
+              );
               continue;
             }
 
@@ -492,21 +508,22 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
               currentMatchups.map((m) => m.id),
             );
 
-            let allGamesComplete = true;
-            for (const matchup of currentMatchups) {
-              const selectedCount = selectedCountMap.get(matchup.id) ?? 0;
+            const notReady = currentMatchups
+              .map((m) => ({
+                id: m.id,
+                selectedCount: selectedCountMap.get(m.id) ?? 0,
+              }))
+              .find((m) => m.selectedCount < gamesPerMatchup);
 
-              if (selectedCount < gamesPerMatchup) {
-                LOGGER.info(
-                  `[autoAdvanceMatchups] League ${league.id} (${league.name}): matchup ${matchup.id} has ${selectedCount}/${gamesPerMatchup} games, not ready`,
-                );
-                allGamesComplete = false;
-                break;
-              }
-            }
-
-            if (!allGamesComplete) {
-              result.leaguesSkipped++;
+            if (notReady) {
+              LOGGER.info(
+                `[autoAdvanceMatchups] League ${league.id} (${league.name}): matchup ${notReady.id} has ${notReady.selectedCount}/${gamesPerMatchup} games, not ready`,
+              );
+              // LS-10795: a slot counts only once every rostered player has a
+              // resolved game for it, so say so rather than silently no-op.
+              recordSkip(
+                `Week ${currentWeek} can't advance yet: only ${notReady.selectedCount} of ${gamesPerMatchup} games are resolved for every rostered player. Some players' games are still being looked up — wait for game selection to finish, then try again.`,
+              );
               continue;
             }
 
@@ -590,10 +607,7 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
                 LOGGER.info(
                   `[autoAdvanceMatchups] League ${league.id} (${league.name}) playoff bracket already exists, skipping: ${reason}`,
                 );
-                if (leagueId) {
-                  result.skipReason = reason;
-                }
-                result.leaguesSkipped++;
+                recordSkip(reason);
                 continue;
               }
 

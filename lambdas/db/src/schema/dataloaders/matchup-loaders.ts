@@ -8,6 +8,7 @@ import {
   type GenericDatabase,
   getLatestScoringChangeAtByLeague,
   getScoringChangeLogByLeague,
+  getSelectedGamesCountBatch,
   PublicSchema,
   type ScoringChangeLogEntry,
   withPoolTimeoutRetry,
@@ -352,7 +353,12 @@ export const createLeagueWeekPlayerSeasonsLoader = (
 /**
  * DataLoader for selectedGamesCount per matchup
  * Key: matchupId (number)
- * Returns: count of distinct game_num values
+ * Returns: the minimum per-player count of resolved game slots — the same
+ * definition the autoAdvanceMatchups / autoSelectGames gates use
+ * (getSelectedGamesCountBatch). A matchup-wide COUNT(DISTINCT game_num)
+ * reported "1 of 1" as soon as any one player had a row, so Next Step
+ * enabled Advance League Week while the backend gate still saw 0 resolved
+ * slots and skipped the league (LS-10795).
  */
 export const createSelectedGamesCountLoader = (
   db: GenericDatabase<typeof PublicSchema>,
@@ -362,26 +368,9 @@ export const createSelectedGamesCountLoader = (
     // Wrapped in withPoolTimeoutRetry (LS-8478 pattern): this loader is on
     // the same Matchup.winProbability fan-out path as the other loaders hit
     // by the LS-10037 cluster. See LS-10043.
-    const rows = await withPoolTimeoutRetry(() =>
-      db
-        .select({
-          matchupId: PublicSchema.matchupPlayers.matchupId,
-          count: sql<number>`COUNT(DISTINCT ${PublicSchema.matchupPlayerGames.gameNum})`,
-        })
-        .from(PublicSchema.matchupPlayerGames)
-        .innerJoin(
-          PublicSchema.matchupPlayers,
-          eq(
-            PublicSchema.matchupPlayerGames.matchupPlayerId,
-            PublicSchema.matchupPlayers.id,
-          ),
-        )
-        .where(inArray(PublicSchema.matchupPlayers.matchupId, ids))
-        .groupBy(PublicSchema.matchupPlayers.matchupId),
+    const countMap = await withPoolTimeoutRetry(() =>
+      getSelectedGamesCountBatch(db, ids),
     );
-
-    const countMap = new Map<number, number>();
-    for (const row of rows) countMap.set(row.matchupId, row.count);
     return keys.map((key) => countMap.get(key) ?? 0);
   });
 

@@ -348,9 +348,20 @@ describe('createFootballScoringSettingsLoader (LS-6385, LS-6395)', () => {
 // propagated straight to the resolver. Now wrapped to match the LS-8478
 // pattern (see createLeaguePositionByIdLoader in entity-loaders.spec.ts).
 describe('createSelectedGamesCountLoader (LS-10043)', () => {
+  const buildDb = (groupBy: jest.Mock) =>
+    ({
+      select: () => ({
+        from: () => ({
+          leftJoin: () => ({
+            where: () => ({ groupBy }),
+          }),
+        }),
+      }),
+    }) as unknown as Parameters<typeof createSelectedGamesCountLoader>[0];
+
   it('retries and succeeds after a pool connection-timeout error', async () => {
     let attempt = 0;
-    const rows = [{ matchupId: 1, count: 3 }];
+    const rows = [{ matchupId: 1, matchupPlayerId: 10, count: 3 }];
     const groupBy = jest.fn(() => {
       attempt += 1;
       if (attempt === 1) {
@@ -360,17 +371,8 @@ describe('createSelectedGamesCountLoader (LS-10043)', () => {
       }
       return Promise.resolve(rows);
     });
-    const db = {
-      select: () => ({
-        from: () => ({
-          innerJoin: () => ({
-            where: () => ({ groupBy }),
-          }),
-        }),
-      }),
-    } as unknown as Parameters<typeof createSelectedGamesCountLoader>[0];
 
-    const loader = createSelectedGamesCountLoader(db);
+    const loader = createSelectedGamesCountLoader(buildDb(groupBy));
     const result = await loader.load(1);
 
     expect(groupBy).toHaveBeenCalledTimes(2);
@@ -379,20 +381,34 @@ describe('createSelectedGamesCountLoader (LS-10043)', () => {
 
   it('does not retry and rejects on a non-pool-timeout error', async () => {
     const dbErr = new Error('syntax error at or near "SELECT"');
-    const db = {
-      select: () => ({
-        from: () => ({
-          innerJoin: () => ({
-            where: () => ({ groupBy: () => Promise.reject(dbErr) }),
-          }),
-        }),
-      }),
-    } as unknown as Parameters<typeof createSelectedGamesCountLoader>[0];
+    const groupBy = jest.fn(() => Promise.reject(dbErr));
 
-    const loader = createSelectedGamesCountLoader(db);
+    const loader = createSelectedGamesCountLoader(buildDb(groupBy));
     await expect(loader.load(1)).rejects.toThrow(
       'syntax error at or near "SELECT"',
     );
+  });
+
+  // LS-10795: the count must match the autoAdvanceMatchups gate — the
+  // minimum resolved-slot count across rostered players — so one player with
+  // an unresolved (or missing) Game 1 slot keeps the matchup at 0, not 1.
+  it('reports the least-resolved player count, matching the advance gate', async () => {
+    const groupBy = jest.fn(() =>
+      Promise.resolve([
+        { matchupId: 1, matchupPlayerId: 10, count: 1 },
+        { matchupId: 1, matchupPlayerId: 11, count: 0 },
+        { matchupId: 2, matchupPlayerId: 20, count: 1 },
+        { matchupId: 2, matchupPlayerId: 21, count: '1' },
+      ]),
+    );
+
+    const loader = createSelectedGamesCountLoader(buildDb(groupBy));
+    const [first, second, missing] = await loader.loadMany([1, 2, 3]);
+
+    expect(first).toBe(0);
+    expect(second).toBe(1);
+    expect(missing).toBe(0);
+    expect(groupBy).toHaveBeenCalledTimes(1);
   });
 });
 
