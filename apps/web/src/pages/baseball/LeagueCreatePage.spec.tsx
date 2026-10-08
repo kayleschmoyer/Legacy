@@ -2994,6 +2994,78 @@ describe('LeagueCreatePage — ?name= sanitization (LS-6107 / CLB-051)', () => {
   });
 });
 
+describe('LeagueCreatePage — tag-stripping feedback (LS-10695)', () => {
+  const NOTICE = "HTML tags aren't allowed and were removed.";
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+  });
+
+  it('shows an inline notice when typed tags are stripped, keeping the name sanitized', () => {
+    renderPage('/baseball/league/create');
+    const input = screen.getByPlaceholderText<HTMLInputElement>(
+      'Enter your league name',
+    );
+    expect(screen.queryByText(NOTICE)).not.toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: '<b>QA</b>&' } });
+
+    expect(input.value).toBe('QA&');
+    expect(
+      screen.getByTestId('league-name-tags-removed-notice'),
+    ).toHaveTextContent(NOTICE);
+  });
+
+  it('keeps the notice through later clean keystrokes and clears it when the field is emptied', () => {
+    renderPage('/baseball/league/create');
+    const input = screen.getByPlaceholderText<HTMLInputElement>(
+      'Enter your league name',
+    );
+    fireEvent.change(input, { target: { value: '<b>' } });
+    expect(screen.getByText(NOTICE)).toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: 'Q' } });
+    expect(screen.getByText(NOTICE)).toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: '' } });
+    expect(screen.queryByText(NOTICE)).not.toBeInTheDocument();
+  });
+
+  it('shows the notice when a ?name= prefill had tags stripped', () => {
+    renderPage('/baseball/league/create?name=%3Cb%3EQA%3C%2Fb%3E');
+    const input = screen.getByPlaceholderText<HTMLInputElement>(
+      'Enter your league name',
+    );
+    expect(input.value).toBe('QA');
+    expect(screen.getByText(NOTICE)).toBeInTheDocument();
+  });
+
+  it('clears the notice when a sport switch resets the name', () => {
+    renderPage('/baseball/league/create');
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: '<b>QA</b>' },
+    });
+    expect(screen.getByText(NOTICE)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('sport-tab-football'));
+
+    expect(screen.queryByText(NOTICE)).not.toBeInTheDocument();
+  });
+
+  it('does not show the notice for a plain name or a lone angle bracket', () => {
+    renderPage('/baseball/league/create');
+    const input = screen.getByPlaceholderText<HTMLInputElement>(
+      'Enter your league name',
+    );
+    fireEvent.change(input, { target: { value: 'A < B League' } });
+    expect(input.value).toBe('A < B League');
+    expect(screen.queryByText(NOTICE)).not.toBeInTheDocument();
+  });
+});
+
 describe('LeagueCreatePage — premiumLoading cold-load era display (LS-6088)', () => {
   beforeEach(() => {
     jest.clearAllMocks();

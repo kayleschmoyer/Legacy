@@ -157,6 +157,16 @@ function sanitizeLeagueNameInput(raw: string): string {
   return stripInvisibleAndControlChars(raw).replace(/<[^>]*>/g, '');
 }
 
+// True when sanitizeLeagueNameInput would strip a tag-shaped substring from
+// `raw`, so the form can tell the user instead of silently dropping input
+// (LS-10695).
+function leagueNameHasTags(raw: string): boolean {
+  return /<[^>]*>/.test(stripInvisibleAndControlChars(raw));
+}
+
+const LEAGUE_NAME_TAGS_REMOVED_NOTICE =
+  "HTML tags aren't allowed and were removed.";
+
 // ── Football scoring presets (LS-4158) ──────────────────────────────────────
 // Only `receiving_rec` differs across Standard / Half-PPR / PPR. All other
 // multipliers (passing yds, rush yds, TDs, etc.) are identical.
@@ -1850,6 +1860,12 @@ export function LeagueCreatePage(): React.JSX.Element {
     [navigate, selectedSport],
   );
 
+  // Stays up until the field is emptied, so typing a tag one character at a
+  // time doesn't hide the notice on the very next keystroke (LS-10695).
+  const [leagueNameTagsRemoved, setLeagueNameTagsRemoved] = useState(() =>
+    leagueNameHasTags(searchParams.get('name') ?? ''),
+  );
+
   const [formData, setFormData] = useState<CreateLeagueFormData>(() => {
     const initialLeagueName = sanitizeLeagueNameInput(
       searchParams.get('name') ?? '',
@@ -1991,6 +2007,8 @@ export function LeagueCreatePage(): React.JSX.Element {
   useEffect(() => {
     if (prevSportRef.current !== selectedSport) {
       setFormData((prev) => applySportSwitch(prev, selectedSport));
+      // The switch empties leagueName, so the tags-removed notice goes too.
+      setLeagueNameTagsRemoved(false);
       prevSportRef.current = selectedSport;
     }
   }, [selectedSport]);
@@ -2141,6 +2159,10 @@ export function LeagueCreatePage(): React.JSX.Element {
     value: string | number | boolean | Date | undefined,
   ) => {
     setHasUnsavedChanges(true);
+    if (field === 'leagueName' && typeof value === 'string') {
+      if (leagueNameHasTags(value)) setLeagueNameTagsRemoved(true);
+      else if (value === '') setLeagueNameTagsRemoved(false);
+    }
     setFormData((prev) => {
       const sanitizedValue =
         field === 'leagueName' && typeof value === 'string'
@@ -3229,7 +3251,11 @@ export function LeagueCreatePage(): React.JSX.Element {
                       <Input
                         id="league-name-input"
                         aria-labelledby="league-name-label"
-                        aria-describedby="league-name-hint"
+                        aria-describedby={
+                          leagueNameTagsRemoved
+                            ? 'league-name-hint league-name-tags-removed'
+                            : 'league-name-hint'
+                        }
                         aria-invalid={!!validationErrors.leagueName}
                         size="$4"
                         testID="create-league-name-input"
@@ -3246,6 +3272,25 @@ export function LeagueCreatePage(): React.JSX.Element {
                         aria-required="true"
                         maxLength={MAX_LEAGUE_NAME_LENGTH}
                       />
+                      {leagueNameTagsRemoved && (
+                        <XStack
+                          role="status"
+                          aria-live="polite"
+                          gap="$2"
+                          alignItems="center"
+                          data-testid="league-name-tags-removed-notice"
+                        >
+                          <AlertCircle size={14} color={AMBER} flexShrink={0} />
+                          <Text
+                            id="league-name-tags-removed"
+                            fontFamily="$body"
+                            fontSize={12}
+                            color="$color11"
+                          >
+                            {LEAGUE_NAME_TAGS_REMOVED_NOTICE}
+                          </Text>
+                        </XStack>
+                      )}
                     </FieldRow>
                   </div>
 
