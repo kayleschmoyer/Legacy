@@ -1954,12 +1954,49 @@ builder.mutationField('verifyGooglePurchase', (t) =>
         );
       }
 
-      const tier = tierFromGoogleProductId(productId);
+      // The client-supplied productId is untrusted: derive the purchased
+      // product from Google's response so a real token for one SKU cannot be
+      // claimed as another.
+      const verifiedLineItem = googleSub.lineItems?.find((item) =>
+        GOOGLE_PLAY_PRODUCT_IDS.some((id) => id === item.productId),
+      );
+      if (!verifiedLineItem) {
+        LOGGER.warn('verifyGooglePurchase — no known product in line items', {
+          userId,
+          productId,
+        });
+        captureWarning(
+          new Error('verifyGooglePurchase — no known product in line items'),
+          { userId, productId, operation: 'verifyGooglePurchase' },
+        );
+        throw new Error(
+          'Google Play subscription has no recognized product line item',
+        );
+      }
+      const verifiedProductId = verifiedLineItem.productId;
+      if (verifiedProductId !== productId) {
+        LOGGER.warn('verifyGooglePurchase — client productId mismatch', {
+          userId,
+          clientProductId: productId,
+          verifiedProductId,
+        });
+        captureWarning(
+          new Error('verifyGooglePurchase — client productId mismatch'),
+          {
+            userId,
+            clientProductId: productId,
+            verifiedProductId,
+            operation: 'verifyGooglePurchase',
+          },
+        );
+      }
+
+      const tier = tierFromGoogleProductId(verifiedProductId);
       const status = 'active';
 
       // Record the renewal date so Android subscribers see their next billing
       // period and expiry is tracked (mirrors the Apple path).
-      const expiryTime = googleSub.lineItems?.[0]?.expiryTime;
+      const expiryTime = verifiedLineItem.expiryTime;
       const currentPeriodEnd = expiryTime ? new Date(expiryTime) : null;
 
       // Determine previous tier to apply side effects on tier change
@@ -1972,7 +2009,7 @@ builder.mutationField('verifyGooglePurchase', (t) =>
           .values({
             userId,
             googlePurchaseToken: purchaseToken,
-            googleProductId: productId,
+            googleProductId: verifiedProductId,
             status,
             tier,
             currentPeriodEnd,
@@ -1981,7 +2018,7 @@ builder.mutationField('verifyGooglePurchase', (t) =>
           .onConflictDoUpdate({
             target: InternalSchema.subscriptions.googlePurchaseToken,
             set: {
-              googleProductId: productId,
+              googleProductId: verifiedProductId,
               status,
               tier,
               currentPeriodEnd,
@@ -2006,7 +2043,7 @@ builder.mutationField('verifyGooglePurchase', (t) =>
 
       LOGGER.info('verifyGooglePurchase — subscription recorded', {
         userId,
-        productId,
+        productId: verifiedProductId,
         tier,
         status,
       });

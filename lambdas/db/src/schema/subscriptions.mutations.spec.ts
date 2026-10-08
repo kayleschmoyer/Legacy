@@ -341,7 +341,12 @@ describe('Google Play mutation validation (LS-5121)', () => {
     it('notifies via notifySubscriptionUpdated with the correct userId/tier/status on success', async () => {
       mockFetchGoogleSubscription.mockResolvedValue({
         subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
-        lineItems: [{ expiryTime: '2026-09-01T00:00:00.000Z' }],
+        lineItems: [
+          {
+            productId: 'com.legacysports.app.premium.monthly',
+            expiryTime: '2026-09-01T00:00:00.000Z',
+          },
+        ],
       });
       mockIsActiveGoogleSubscription.mockReturnValue(true);
       const mockNotifySubscriptionUpdated = jest
@@ -375,7 +380,12 @@ describe('Google Play mutation validation (LS-5121)', () => {
     it('does not notify when notificationService is not provided on the context', async () => {
       mockFetchGoogleSubscription.mockResolvedValue({
         subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
-        lineItems: [{ expiryTime: '2026-09-01T00:00:00.000Z' }],
+        lineItems: [
+          {
+            productId: 'com.legacysports.app.premium.monthly',
+            expiryTime: '2026-09-01T00:00:00.000Z',
+          },
+        ],
       });
       mockIsActiveGoogleSubscription.mockReturnValue(true);
 
@@ -685,6 +695,76 @@ describe('Google Play mutation validation (LS-5121)', () => {
       expect(captured.values()?.['currentPeriodEnd']).toBeNull();
       expect(captured.updateSet()?.['currentPeriodEnd']).toBeNull();
     });
+
+    it('verifyGooglePurchase persists the Google-reported productId, not the mismatched client claim (LS-7417)', async () => {
+      mockFetchGoogleSubscription.mockResolvedValue({
+        subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
+        lineItems: [{ productId, expiryTime: '2026-07-01T00:00:00.000Z' }],
+      });
+      mockIsActiveGoogleSubscription.mockReturnValue(true);
+      const captured = installActiveDbCapture();
+
+      const resolve = getResolver('verifyGooglePurchase');
+      const result = await resolve(
+        {},
+        {
+          purchaseToken: 'fake-token',
+          productId: 'com.legacysports.app.premium.annual',
+        },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toMatchObject({ success: true, tier: 'premium' });
+      expect(captured.values()?.['googleProductId']).toBe(productId);
+      expect(captured.updateSet()?.['googleProductId']).toBe(productId);
+    });
+
+    it('verifyGooglePurchase rejects when no line item matches a known product (LS-7417)', async () => {
+      mockFetchGoogleSubscription.mockResolvedValue({
+        subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
+        lineItems: [{ productId: 'com.legacysports.app.cheap.addon' }],
+      });
+      mockIsActiveGoogleSubscription.mockReturnValue(true);
+      const captured = installActiveDbCapture();
+
+      const resolve = getResolver('verifyGooglePurchase');
+      await expect(
+        resolve(
+          {},
+          {
+            purchaseToken: 'fake-token',
+            productId: 'com.legacysports.app.premium.annual',
+          },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('no recognized product line item');
+      expect(captured.values()).toBeUndefined();
+    });
+
+    it.each([[undefined], [[]]])(
+      'verifyGooglePurchase rejects when lineItems is %p (LS-7417)',
+      async (lineItems) => {
+        mockFetchGoogleSubscription.mockResolvedValue({
+          subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
+          lineItems,
+        });
+        mockIsActiveGoogleSubscription.mockReturnValue(true);
+        const captured = installActiveDbCapture();
+
+        const resolve = getResolver('verifyGooglePurchase');
+        await expect(
+          resolve(
+            {},
+            { purchaseToken: 'fake-token', productId },
+            mockContext,
+            undefined as never,
+          ),
+        ).rejects.toThrow('no recognized product line item');
+        expect(captured.values()).toBeUndefined();
+      },
+    );
 
     it('restoreGooglePurchases records currentPeriodEnd from lineItems expiryTime', async () => {
       const expiryTime = '2026-08-15T12:30:00.000Z';
