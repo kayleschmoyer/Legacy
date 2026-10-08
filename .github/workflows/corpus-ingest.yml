@@ -166,6 +166,10 @@ jobs:
         with:
           role-to-assume: ${{ env.CORPUS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+          # The pfa crawl runs for hours before its first S3 write; the 1h
+          # default session expired mid-run. Capped by the role's
+          # max_session_duration (terraform/main/github-actions-corpus-ingest.tf).
+          role-duration-seconds: 43200
 
       # The CLI's --dry-run never touches S3, so probe the bucket explicitly:
       # a dry run then proves the role can list and read the target corpus too.

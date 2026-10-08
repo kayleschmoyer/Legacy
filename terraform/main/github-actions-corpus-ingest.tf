@@ -22,6 +22,11 @@ resource "aws_iam_role" "corpus_ingest" {
   name        = "${local.name_prefix}-corpus-ingest"
   description = "OIDC role for the corpus-ingest workflow - corpus S3 buckets only, corpus-ingest environment only"
 
+  # 12h, matching the workflow's longest timeout (pfa). ingest-pfa-football
+  # crawls for over an hour before its first S3 write, so the 1h default
+  # expired mid-run (run 37479253481: ExpiredToken on the first HeadObject).
+  max_session_duration = 43200
+
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
