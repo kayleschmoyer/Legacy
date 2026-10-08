@@ -98,6 +98,13 @@ name: Deploy
 # Deploy (~15–25 min) — accepted over a scheduled sweeper (the repo is
 # schedule-free by policy, LS-8487) and over an event-driven cross-run sweeper
 # (it cannot bound the wait when no later push arrives).
+#
+# Supersede Gate (LS-10964) — the merge queue lands a tested batch as N
+# squash merges seconds apart; only the final one equals the tested tree. A
+# push-triggered run waits ~90 s and skips itself when main has moved on and a
+# newer Deploy run is pending, so intermediate batch commits are never
+# deployed. Safe because targets are diffed against last-deployed markers, not
+# the pushed range. See the `supersede-gate` job below.
 # =============================================================================
 
 on:
@@ -155,6 +162,93 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Supersede Gate (LS-10964) — deploy only the final commit of a merge-queue
+  # batch.
+  #
+  # The batched merge queue (.github/scripts/merge-queue-batch.js, landSet)
+  # tests up to 16 PRs together, then squash-merges them into main one after
+  # another, seconds apart: N pushes, N Deploy runs. The first one (main + PR1
+  # only, a tree never tested as a unit) used to start a production deploy at
+  # once. This job waits DEPLOY_SETTLE_SECONDS, then skips the rest of the run
+  # when main has moved past github.sha AND a newer push-triggered Deploy run is
+  # still pending or running. That newer run ships everything: every target is
+  # diffed against its last-deployed SSM marker, never against
+  # github.event.before (detect-changes below; upload-lambdas.yml's
+  # "Detect affected lambdas"; docs/ci-cd/deploy-markers.md), so a skipped
+  # run's changes cannot be dropped. `deploy-main` keeps a newer pending run
+  # alive behind this one, so one always exists after a skip.
+  #
+  # Fail-open: any API error, or main moved with no newer Deploy run in sight
+  # (e.g. a push that does not trigger workflows), deploys github.sha exactly
+  # as before. Push only: a workflow_dispatch skips this job and deploys
+  # immediately. ubuntu-latest so it never waits on the self-hosted pool.
+  #
+  # A superseded run still fires `workflow_run: [Deploy]` consumers; they
+  # recognise it from this job's name and a skipped "Detect Deploy Targets"
+  # (.github/scripts/deploy-superseded.mjs) and stand down. Renaming either
+  # job breaks that — deploy-superseded.test.mjs pins both names.
+  # ---------------------------------------------------------------------------
+  supersede-gate:
+    name: Supersede Gate
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read # list this workflow's newer runs
+      contents: read # read main's tip
+    outputs:
+      superseded: ${{ steps.check.outputs.superseded }}
+    steps:
+      - name: Settle, then skip if a newer push will deploy
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Long enough for landSet to finish a 16-PR batch (each merge is a
+          # few API calls), short enough not to matter for a single merge.
+          DEPLOY_SETTLE_SECONDS: "90"
+          # After main has moved, how long to wait for the newer push's Deploy
+          # run to appear before falling back to deploying this commit.
+          NEWER_RUN_WAIT_ATTEMPTS: "6"
+          NEWER_RUN_WAIT_SECONDS: "10"
+        run: |
+          set -uo pipefail
+          superseded=false
+          echo "Settling ${DEPLOY_SETTLE_SECONDS}s so a merge-queue batch can finish landing (LS-10964)..."
+          sleep "$DEPLOY_SETTLE_SECONDS"
+
+          tip=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha') || tip=""
+          if [ -z "$tip" ]; then
+            echo "::warning::Could not read main's tip — deploying ${GITHUB_SHA} (fail open)."
+          elif [ "$tip" = "$GITHUB_SHA" ]; then
+            echo "main is still at ${GITHUB_SHA} — deploying it."
+          else
+            echo "main moved: ${GITHUB_SHA} -> ${tip}. Looking for the newer Deploy run..."
+            workflow_id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" --jq '.workflow_id') || workflow_id=""
+            newer=""
+            if [ -n "$workflow_id" ]; then
+              for _ in $(seq 1 "$NEWER_RUN_WAIT_ATTEMPTS"); do
+                newer=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow_id}/runs?branch=main&event=push&per_page=30" \
+                  --jq "[.workflow_runs[] | select(.run_number > ${GITHUB_RUN_NUMBER} and .status != \"completed\")] | first | .html_url // empty") || newer=""
+                [ -n "$newer" ] && break
+                sleep "$NEWER_RUN_WAIT_SECONDS"
+              done
+            fi
+            if [ -n "$newer" ]; then
+              superseded=true
+              msg="Superseded: main has moved past ${GITHUB_SHA} to ${tip}. Skipping this deploy; ${newer} deploys everything since each target's last-deployed marker (LS-10964)."
+              echo "::notice title=Deploy superseded::${msg}"
+              {
+                echo "## ⏭️ Deploy superseded"
+                echo ""
+                echo "$msg"
+              } >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "::warning::main moved to ${tip} but no newer Deploy run was found — deploying ${GITHUB_SHA} (fail open)."
+            fi
+          fi
+          echo "superseded=${superseded}" >> "$GITHUB_OUTPUT"
+
   # ---------------------------------------------------------------------------
   # Deploy Watchdog (LS-10328) — see the header for the full rationale.
   # Bounds how long a child that never gets a runner can hold the `deploy-main`
@@ -260,6 +354,14 @@ jobs:
   # ---------------------------------------------------------------------------
   detect-changes:
     name: Detect Deploy Targets
+    # Every child needs this job, so skipping it skips the whole deploy when
+    # the Supersede Gate says a newer push will ship (LS-10964). `!cancelled()`
+    # keeps the gate fail-open: a gate that failed, or was skipped for a
+    # workflow_dispatch, has no `superseded` output and the deploy proceeds.
+    needs: supersede-gate
+    if: >-
+      !cancelled() &&
+      needs.supersede-gate.outputs.superseded != 'true'
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
@@ -481,8 +583,12 @@ jobs:
   # ---------------------------------------------------------------------------
   rollup-status:
     name: Rollup Status
-    needs: [detect-changes, upload-lambdas, apply-lambda-infrastructure, deploy-web, build-android, deploy-storybook]
-    if: always()
+    needs: [supersede-gate, detect-changes, upload-lambdas, apply-lambda-infrastructure, deploy-web, build-android, deploy-storybook]
+    # A superseded run (LS-10964) deployed nothing: no Discord summary, no
+    # badge change, no marker writes — the newer run reports for both.
+    if: >-
+      always() &&
+      needs.supersede-gate.outputs.superseded != 'true'
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:

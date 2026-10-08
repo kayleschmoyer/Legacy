@@ -430,7 +430,9 @@ describe('deploy.yml — Deploy Watchdog job shape (LS-10328)', () => {
   it('is not a dependency of Rollup Status or any other job (that would deadlock: rollup waits on watchdog waits on rollup)', () => {
     const rollup = parsed.jobs['rollup-status'];
     assert.equal(rollup.name, DEFAULT_TERMINAL_JOB_NAME);
-    assert.equal(rollup.if, 'always()');
+    // `always()`, plus the LS-10964 Supersede Gate clause: a superseded run
+    // skips Rollup Status, and a skipped job still reports `completed`.
+    assert.match(rollup.if, /^always\(\)/);
     for (const [id, def] of Object.entries(parsed.jobs)) {
       const needs = [].concat(def.needs ?? []);
       assert.ok(

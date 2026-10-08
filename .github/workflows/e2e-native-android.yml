@@ -102,6 +102,7 @@ jobs:
         with:
           sparse-checkout: |
             .github/scripts/full-suite-gate.mjs
+            .github/scripts/deploy-superseded.mjs
           sparse-checkout-cone-mode: false
       - name: "Decide whether to run"
         id: decide

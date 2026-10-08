@@ -20,6 +20,17 @@ All of the decisions, and the per-target path sets, live in `.github/scripts/dep
 
 Because a marker moves only on success, **any later Deploy of any kind picks up whatever an earlier one dropped** — a docs-only push after a cancelled lambda Deploy still uploads those lambdas.
 
+## Merge-queue batches (LS-10964)
+
+The batched merge queue lands a tested batch as N squash merges seconds apart, and only the last one equals the tested tree. Deploy's first job, `Supersede Gate` (push only, ubuntu-latest), waits `DEPLOY_SETTLE_SECONDS` (90) and then skips the run when main has moved past the run's commit **and** a newer push-triggered Deploy run is pending or running. The skipped run writes no markers and posts nothing. The newer run diffs against the markers, so it ships every skipped commit. If the gate cannot read main or finds no newer run, it deploys as before. `workflow_dispatch` runs skip the gate.
+
+A superseded run still concludes `success`, so it still fires every `workflow_run: [Deploy]` consumer. Those consumers detect it with `.github/scripts/deploy-superseded.mjs`: the run's `Supersede Gate` job succeeded and `Detect Deploy Targets` was skipped. When they find one, they stand down:
+
+- The full-suite lanes (`run-playwright-tests`, `cross-browser-e2e`, `run-maestro-sweep`, `e2e-native-android`) skip through `full-suite-gate.mjs`. A run skipped this way does not count toward their debounce.
+- `lambda-drift-check` and `terraform-lock-watchdog` skip their work through a `Superseded Deploy Check` job.
+
+The newer Deploy triggers all of them again. If the check cannot tell whether a run was superseded, the consumer runs as before.
+
 `force-*` dispatch inputs are unchanged: a forced target deploys from HEAD regardless of its marker and advances it on success.
 
 ## Reading the markers

@@ -2,6 +2,8 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
+import { checkRunSuperseded, triggerRunId } from './deploy-superseded.mjs';
+
 /**
  * full-suite-gate.mjs — the post-deploy debounce decision shared by the four
  * schedule-free full-suite lanes (LS-10336):
@@ -34,6 +36,14 @@ import { pathToFileURL } from 'node:url';
  * log line is the only way a later investigation can see why a run did or did
  * not execute.
  *
+ * A run triggered by a SUPERSEDED Deploy (LS-10964: the merge queue landed
+ * more of a batch, so that Deploy skipped itself and deployed nothing) is
+ * skipped before the debounce walk. It must not use up the interval testing a
+ * production that the newer Deploy has not reached yet. That check fails OPEN
+ * (any error → carry on with the normal debounce), unlike the debounce itself,
+ * so a broken lookup never changes behaviour from before LS-10964. The
+ * workflow's sparse checkout must include deploy-superseded.mjs.
+ *
  * Logging: console.* is used deliberately — this runs on a bare ubuntu-latest
  * runner from a sparse checkout of .github/scripts and cannot import workspace
  * packages. Build-time scripts are an explicit exception to the no-console rule
@@ -44,6 +54,7 @@ export const DECISION = Object.freeze({
   RUN: 'run',
   SKIP_DEBOUNCED: 'skip-debounced',
   SKIP_INCONCLUSIVE: 'skip-inconclusive',
+  SKIP_SUPERSEDED: 'skip-superseded',
 });
 
 /** ISO-8601 UTC timestamp without milliseconds, as the Actions API expects. */
@@ -119,6 +130,14 @@ export function createGhApi(exec) {
       ]);
       return out.trim();
     },
+
+    /**
+     * Was the triggering run a superseded Deploy (LS-10964)? Never throws:
+     * an error reads as "not superseded" (fail open).
+     */
+    checkTriggerSuperseded({ repo, runId }) {
+      return checkRunSuperseded({ repo, runId, exec });
+    },
   };
 }
 
@@ -160,7 +179,9 @@ function priorConclusionOf(api, repo, runId) {
  *   whose wall time is below this (a debounced run finishes in well under a
  *   minute; a real attempt takes far longer). Keeps job introspection to a
  *   handful of calls on a busy lane. Runs with missing timestamps are probed.
- * @param {{ listRuns: Function, countSentinelJobs: Function }} api
+ * @param {string|number} [opts.triggerRunId]  the Deploy run that triggered
+ *   this one (`workflow_run.id`); checked for supersession (LS-10964)
+ * @param {{ listRuns: Function, countSentinelJobs: Function, checkTriggerSuperseded?: Function }} api
  * @returns {{ decision: string, reason: string, inspected: number, foundRunId?: number|string, priorConclusion?: string, error?: string }}
  */
 export function decideFullSuiteGate(opts, api) {
@@ -172,6 +193,7 @@ export function decideFullSuiteGate(opts, api) {
     selfRunId,
     cutoff,
     minRealAttemptSeconds = 0,
+    triggerRunId: triggerId,
   } = opts;
 
   if (eventName !== 'workflow_run') {
@@ -180,6 +202,24 @@ export function decideFullSuiteGate(opts, api) {
       reason: 'Manual dispatch — always runs.',
       inspected: 0,
     };
+  }
+
+  // LS-10964: a superseded Deploy deployed nothing; the newer Deploy run will
+  // trigger this lane again. Fail open: an error or a missing id never skips.
+  if (triggerId && typeof api.checkTriggerSuperseded === 'function') {
+    let superseded;
+    try {
+      superseded = api.checkTriggerSuperseded({ repo, runId: triggerId });
+    } catch {
+      superseded = null;
+    }
+    if (superseded?.superseded === true) {
+      return {
+        decision: DECISION.SKIP_SUPERSEDED,
+        reason: `Triggering Deploy run ${triggerId} was superseded by a newer push and deployed nothing; the newer Deploy will trigger this lane.`,
+        inspected: 0,
+      };
+    }
   }
 
   let runs;
@@ -265,7 +305,9 @@ export function renderGateDecision(result, ctx) {
     const skipLabel =
       result.decision === DECISION.SKIP_DEBOUNCED
         ? `Debounced — last real attempt: ${result.priorConclusion ?? 'unknown'} (run ${result.foundRunId}), full suite NOT run`
-        : 'Skipped — gate inconclusive (gh api error), full suite NOT run';
+        : result.decision === DECISION.SKIP_SUPERSEDED
+          ? 'Skipped — triggering Deploy was superseded (deployed nothing), full suite NOT run'
+          : 'Skipped — gate inconclusive (gh api error), full suite NOT run';
     outputLines.push(`skip-label=${skipLabel}`);
   }
 
@@ -274,7 +316,9 @@ export function renderGateDecision(result, ctx) {
       ? `## ${title} — RUNNING`
       : result.decision === DECISION.SKIP_DEBOUNCED
         ? `## ${title} — SKIPPED (debounced)`
-        : `## ${title} — SKIPPED (inconclusive)`;
+        : result.decision === DECISION.SKIP_SUPERSEDED
+          ? `## ${title} — SKIPPED (superseded deploy)`
+          : `## ${title} — SKIPPED (inconclusive)`;
 
   const summaryLines = [heading, ''];
   if (note && !shouldRun) summaryLines.push(note, '');
@@ -290,6 +334,10 @@ export function renderGateDecision(result, ctx) {
     summaryLines.push(
       `- Decision: **debounced → skip** — run ${link} already made a real attempt within the last ${interval}.`,
       `- **Last real attempt: \`${result.priorConclusion ?? 'unknown'}\`** — this run's green status means *skipped*, not *passed*.`,
+    );
+  } else if (result.decision === DECISION.SKIP_SUPERSEDED) {
+    summaryLines.push(
+      `- Decision: **superseded → skip** — ${result.reason} This run does not count toward the debounce.`,
     );
   } else if (result.decision === DECISION.SKIP_INCONCLUSIVE) {
     summaryLines.push(
@@ -313,6 +361,10 @@ export function renderGateDecision(result, ctx) {
     const level = prior === 'success' ? 'notice' : 'warning';
     logLines.push(
       `::${level} title=${title} — debounced (full suite NOT run)::Last real attempt (run ${result.foundRunId}) concluded ${prior}.`,
+    );
+  } else if (result.decision === DECISION.SKIP_SUPERSEDED) {
+    logLines.push(
+      `::notice title=${title} — skipped (superseded deploy)::${result.reason.replace(/\r?\n/g, ' ')} (LS-10964)`,
     );
   } else if (result.decision === DECISION.SKIP_INCONCLUSIVE) {
     logLines.push(
@@ -369,6 +421,7 @@ function main() {
       minRealAttemptSeconds: Number(
         process.env.GATE_MIN_REAL_ATTEMPT_SECONDS ?? '0',
       ),
+      triggerRunId: triggerRunId(),
     },
     api,
   );

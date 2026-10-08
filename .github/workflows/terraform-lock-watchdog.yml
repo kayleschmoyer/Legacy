@@ -105,8 +105,35 @@ env:
   DRY_RUN: ${{ inputs.dry-run || 'false' }}
 
 jobs:
+  # LS-10964 — a superseded Deploy run (the merge queue landed more of a batch,
+  # so it skipped itself) ran no apply and cannot have orphaned a lock; the
+  # newer Deploy run triggers this workflow again when it completes. Fail
+  # open: any error or any other trigger reads as not superseded.
+  superseded-check:
+    name: Superseded Deploy Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      superseded: ${{ steps.check.outputs.superseded }}
+    steps:
+      - name: Checkout (script only)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          sparse-checkout: |
+            .github/scripts/deploy-superseded.mjs
+          sparse-checkout-cone-mode: false
+      - name: Was the triggering Deploy superseded?
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/deploy-superseded.mjs
+
   watchdog:
     name: Inspect and clear stale terraform locks
+    needs: superseded-check
+    if: >-
+      !cancelled() &&
+      needs.superseded-check.outputs.superseded != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

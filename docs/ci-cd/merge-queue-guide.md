@@ -62,6 +62,7 @@ The rules that keep this safe:
 - After landing, if `main`'s tree doesn't match the tested tree, the queue raises an alert.
 - A PR that GitHub reports as `blocked` even though every queue gate passes stays out of batches until it unblocks. This is usually a path-scoped CODEOWNER approval, and it keeps one PR from stalling every batch behind it.
 - The batch CI validates every PR against the current `main`, so it replaces the per-PR staleness guard (LS-9662).
+- Only the batch's final commit is deployed (LS-10964). Each squash merge triggers a Deploy, but every run except the last skips itself once `main` has moved on and a newer Deploy is queued. The last run ships all of the batch's changes. See [Deploy markers](deploy-markers.md#merge-queue-batches-ls-10964).
 
 #### The `merge-queue` status on your PR (LS-10620)
 

@@ -510,3 +510,95 @@ describe('gate jobs use full-suite-gate.mjs', () => {
     });
   }
 });
+
+describe('superseded triggering Deploy (LS-10964)', () => {
+  const TRIGGER = 4242;
+
+  function apiWith(checkTriggerSuperseded, extra = {}) {
+    return { ...fakeApi(extra), checkTriggerSuperseded };
+  }
+
+  it('skips without walking the debounce when the triggering Deploy was superseded', () => {
+    const asked = [];
+    const api = apiWith(
+      ({ runId }) => {
+        asked.push(runId);
+        return { superseded: true, reason: 'superseded' };
+      },
+      { listError: new Error('must not list runs') },
+    );
+    const result = decideFullSuiteGate(
+      { ...BASE_OPTS, triggerRunId: TRIGGER },
+      api,
+    );
+    assert.equal(result.decision, DECISION.SKIP_SUPERSEDED);
+    assert.deepEqual(asked, [TRIGGER]);
+    assert.deepEqual(api.probed, []);
+  });
+
+  it('runs the normal debounce when the triggering Deploy really deployed', () => {
+    const result = decideFullSuiteGate(
+      { ...BASE_OPTS, triggerRunId: TRIGGER },
+      apiWith(() => ({ superseded: false, reason: 'real deploy' })),
+    );
+    assert.equal(result.decision, DECISION.RUN);
+  });
+
+  it('fails open when the supersession check throws', () => {
+    const result = decideFullSuiteGate(
+      { ...BASE_OPTS, triggerRunId: TRIGGER },
+      apiWith(() => {
+        throw new Error('boom');
+      }),
+    );
+    assert.equal(result.decision, DECISION.RUN);
+  });
+
+  it('does not check without a triggering run id, or on a manual dispatch', () => {
+    const never = () => assert.fail('must not be called');
+    assert.equal(
+      decideFullSuiteGate(BASE_OPTS, apiWith(never)).decision,
+      DECISION.RUN,
+    );
+    assert.equal(
+      decideFullSuiteGate(
+        { ...BASE_OPTS, eventName: 'workflow_dispatch', triggerRunId: TRIGGER },
+        apiWith(never),
+      ).decision,
+      DECISION.RUN,
+    );
+  });
+
+  it('createGhApi.checkTriggerSuperseded reads the trigger run jobs and fails open', () => {
+    const superseded = createGhApi(() =>
+      JSON.stringify([
+        { name: 'Supersede Gate', conclusion: 'success' },
+        { name: 'Detect Deploy Targets', conclusion: 'skipped' },
+      ]),
+    ).checkTriggerSuperseded({ repo: REPO, runId: TRIGGER });
+    assert.equal(superseded.superseded, true);
+
+    const failing = createGhApi(() => {
+      throw RATE_LIMIT_403();
+    }).checkTriggerSuperseded({ repo: REPO, runId: TRIGGER });
+    assert.equal(failing.superseded, false);
+  });
+
+  it('renders a skip that names the superseded deploy and does not count as an attempt', () => {
+    const result = decideFullSuiteGate(
+      { ...BASE_OPTS, triggerRunId: TRIGGER },
+      apiWith(() => ({ superseded: true, reason: 'superseded' })),
+    );
+    const { outputLines, summaryLines, logLines } = renderGateDecision(result, {
+      title: 'Full-Suite Gate',
+      cutoff: BASE_OPTS.cutoff,
+      minIntervalHours: 20,
+    });
+    assert.ok(outputLines.includes('should-run=false'));
+    assert.ok(
+      outputLines.some((l) => /^skip-label=.*superseded.*NOT run/.test(l)),
+    );
+    assert.match(summaryLines[0], /SKIPPED \(superseded deploy\)/);
+    assert.ok(logLines.some((l) => l.startsWith('::notice ')));
+  });
+});

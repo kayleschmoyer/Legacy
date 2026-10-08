@@ -129,10 +129,41 @@ env:
 
 jobs:
   # ---------------------------------------------------------------------------
+  # LS-10964 — skip when the triggering Deploy was superseded. When the merge
+  # queue lands a batch, each intermediate Deploy run skips itself and
+  # deploys nothing; the newer Deploy run triggers this workflow again once
+  # it has actually deployed. Auditing in between would race that deploy.
+  # Fail open: any error, a dispatch, or an "Apply Lambda Infrastructure"
+  # trigger reads as not superseded and the checks run as before.
+  # ---------------------------------------------------------------------------
+  superseded-check:
+    name: "Superseded Deploy Check"
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      superseded: ${{ steps.check.outputs.superseded }}
+    steps:
+      - name: "Checkout (script only)"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          sparse-checkout: |
+            .github/scripts/deploy-superseded.mjs
+          sparse-checkout-cone-mode: false
+      - name: "Was the triggering Deploy superseded?"
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/deploy-superseded.mjs
+
+  # ---------------------------------------------------------------------------
   # Signal 1 — deployed version vs SSM version, per lambda
   # ---------------------------------------------------------------------------
   version-drift:
     name: "Check Lambda Version Drift"
+    needs: superseded-check
+    if: >-
+      !cancelled() &&
+      needs.superseded-check.outputs.superseded != 'true'
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     outputs:
@@ -284,6 +315,10 @@ jobs:
   # .github/scripts/deploy-markers.mjs; runbook: docs/ci-cd/deploy-markers.md.
   marker-drift:
     name: "Check Deploy Marker Drift"
+    needs: superseded-check
+    if: >-
+      !cancelled() &&
+      needs.superseded-check.outputs.superseded != 'true'
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
 
@@ -366,6 +401,10 @@ jobs:
   # ---------------------------------------------------------------------------
   skip-chain-check:
     name: "Check Recent Deploy Skip-Chains"
+    needs: superseded-check
+    if: >-
+      !cancelled() &&
+      needs.superseded-check.outputs.superseded != 'true'
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     outputs:
