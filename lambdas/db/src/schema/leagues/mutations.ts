@@ -2655,6 +2655,9 @@ const UpdateLeagueSettingsInput = builder.inputType(
       gamesPerMatchup: t.int({ required: false }),
       minCareerGames: t.int({ required: false }),
       minCareerSeasons: t.int({ required: false }),
+      // Pitcher career minimums on pitching appearances (LS-10807); 0 = off.
+      minCareerPitcherGames: t.int({ required: false }),
+      minCareerPitcherSeasons: t.int({ required: false }),
       totalMatchups: t.int({ required: false }),
       playoffEnabled: t.boolean({ required: false }),
       playoffFormat: t.string({ required: false }),
@@ -2702,6 +2705,8 @@ builder.mutationField('updateLeagueSettings', (t) =>
         gamesPerMatchup,
         minCareerGames,
         minCareerSeasons,
+        minCareerPitcherGames,
+        minCareerPitcherSeasons,
         totalMatchups,
         playoffEnabled,
         playoffFormat,
@@ -2758,6 +2763,8 @@ builder.mutationField('updateLeagueSettings', (t) =>
         gamesPerMatchup?: number;
         minCareerGames?: number;
         minCareerSeasons?: number;
+        minCareerPitcherGames?: number;
+        minCareerPitcherSeasons?: number;
         totalMatchups?: number;
         playoffEnabled?: boolean;
         playoffFormat?: string;
@@ -2938,6 +2945,61 @@ builder.mutationField('updateLeagueSettings', (t) =>
           leagueUpdate.minCareerSeasons = minCareerSeasons;
           changeDescriptions.push(
             `Min career seasons: ${oldValue} → ${minCareerSeasons}`,
+          );
+        }
+      }
+
+      if (
+        minCareerPitcherGames !== null &&
+        minCareerPitcherGames !== undefined
+      ) {
+        if (minCareerPitcherGames < 0) {
+          throw UserInputError(
+            'Minimum career pitcher games must be 0 or greater',
+          );
+        }
+
+        const current = await context.db
+          .select({
+            minCareerPitcherGames: PublicSchema.leagues.minCareerPitcherGames,
+          })
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, leagueId))
+          .limit(1);
+
+        const oldValue = current[0]?.minCareerPitcherGames ?? 0;
+        if (oldValue !== minCareerPitcherGames) {
+          leagueUpdate.minCareerPitcherGames = minCareerPitcherGames;
+          changeDescriptions.push(
+            `Min career pitcher games: ${oldValue} → ${minCareerPitcherGames}`,
+          );
+        }
+      }
+
+      if (
+        minCareerPitcherSeasons !== null &&
+        minCareerPitcherSeasons !== undefined
+      ) {
+        if (minCareerPitcherSeasons < 0) {
+          throw UserInputError(
+            'Minimum career pitcher seasons must be 0 or greater',
+          );
+        }
+
+        const current = await context.db
+          .select({
+            minCareerPitcherSeasons:
+              PublicSchema.leagues.minCareerPitcherSeasons,
+          })
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, leagueId))
+          .limit(1);
+
+        const oldValue = current[0]?.minCareerPitcherSeasons ?? 0;
+        if (oldValue !== minCareerPitcherSeasons) {
+          leagueUpdate.minCareerPitcherSeasons = minCareerPitcherSeasons;
+          changeDescriptions.push(
+            `Min career pitcher seasons: ${oldValue} → ${minCareerPitcherSeasons}`,
           );
         }
       }
@@ -3829,6 +3891,8 @@ builder.mutationField('renewLeague', (t) =>
             pitcherStartsPerMatchup: oldLeague.pitcherStartsPerMatchup,
             minCareerGames: oldLeague.minCareerGames,
             minCareerSeasons: oldLeague.minCareerSeasons,
+            minCareerPitcherGames: oldLeague.minCareerPitcherGames,
+            minCareerPitcherSeasons: oldLeague.minCareerPitcherSeasons,
             totalMatchups: oldLeague.totalMatchups,
             numberOfDivisions: oldLeague.numberOfDivisions,
             playoffEnabled: oldLeague.playoffEnabled,

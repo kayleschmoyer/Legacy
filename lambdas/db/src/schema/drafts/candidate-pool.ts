@@ -262,6 +262,8 @@ async function fetchUndraftedCandidates(
       playerPool: rules.playerPool,
       minCareerGames: rules.minCareerGames ?? 0,
       minCareerSeasons: rules.minCareerSeasons ?? 0,
+      minCareerPitcherGames: rules.minCareerPitcherGames ?? 0,
+      minCareerPitcherSeasons: rules.minCareerPitcherSeasons ?? 0,
       baseballHofOnly: rules.baseballHofOnly ?? false,
       baseballEraFilter: rules.baseballEraFilter ?? 'all',
       customEraStartYear: rules.customEraStartYear ?? null,

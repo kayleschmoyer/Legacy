@@ -162,6 +162,8 @@ builder.mutationField('commissionerPick', (t) =>
             playerPool: leaguePre.playerPool,
             minCareerGames: leaguePre.minCareerGames,
             minCareerSeasons: leaguePre.minCareerSeasons,
+            minCareerPitcherGames: leaguePre.minCareerPitcherGames,
+            minCareerPitcherSeasons: leaguePre.minCareerPitcherSeasons,
             baseballHofOnly: leaguePre.baseballHofOnly,
             baseballEraFilter: leaguePre.baseballEraFilter,
             customEraStartYear: leaguePre.customEraStartYear,

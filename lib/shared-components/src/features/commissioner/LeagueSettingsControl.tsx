@@ -34,6 +34,9 @@ export interface LeagueSettingsControlProps {
   currentSpStartsPerMatchup?: number;
   currentMinCareerGames?: number;
   currentMinCareerSeasons?: number;
+  /** Pitcher career minimums on pitching appearances (LS-10807). 0 = off. */
+  currentMinCareerPitcherGames?: number;
+  currentMinCareerPitcherSeasons?: number;
   currentTotalMatchups?: number;
   currentPlayoffEnabled?: boolean;
   currentPlayoffFormat?: string;
@@ -74,6 +77,78 @@ const MIN_CAREER_SEASONS_OPTIONS = [
   { label: '7', value: 7 },
 ] as const;
 
+type MinimumOption = { readonly label: string; readonly value: number };
+
+/**
+ * One labelled row of career-minimum choices (batters or pitchers). The
+ * aria-label prefix keeps each row's buttons distinct for assistive tech and
+ * tests, e.g. "Minimum career games: 50" vs "Minimum career games pitched: 50".
+ */
+function CareerMinimumRow({
+  label,
+  ariaPrefix,
+  options,
+  selected,
+  onSelect,
+  disabled,
+}: {
+  label: string;
+  ariaPrefix: string;
+  options: readonly MinimumOption[];
+  selected: number;
+  onSelect: (value: number) => void;
+  disabled: boolean;
+}) {
+  return (
+    <YStack gap="$1.5">
+      <Text fontSize="$2" fontWeight="600" color="$gray11">
+        {label}
+      </Text>
+      <XStack gap="$2" flexWrap="wrap">
+        {options.map((option) => {
+          const isSelected = selected === option.value;
+          return (
+            <Button
+              key={option.value}
+              size="$3"
+              theme={isSelected ? 'active' : 'alt2'}
+              backgroundColor={
+                isSelected ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray3'
+              }
+              borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
+              borderWidth={1}
+              borderRadius="$3"
+              onPress={() => onSelect(option.value)}
+              disabled={disabled}
+              opacity={disabled ? 0.5 : 1}
+              icon={isSelected ? <Check size={14} /> : undefined}
+              aria-pressed={isSelected}
+              aria-label={`${ariaPrefix}: ${option.label}`}
+              hoverStyle={
+                disabled
+                  ? undefined
+                  : {
+                      backgroundColor: isSelected
+                        ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
+                        : '$gray4',
+                    }
+              }
+            >
+              <Text
+                fontSize="$2"
+                fontWeight={isSelected ? '700' : '400'}
+                color={isSelected ? 'white' : '$color'}
+              >
+                {option.label}
+              </Text>
+            </Button>
+          );
+        })}
+      </XStack>
+    </YStack>
+  );
+}
+
 const TOTAL_MATCHUPS_OPTIONS = [
   { label: '5', value: 5 },
   { label: '8', value: 8 },
@@ -107,6 +182,8 @@ export function LeagueSettingsControl({
   currentSpStartsPerMatchup = 1,
   currentMinCareerGames = 50,
   currentMinCareerSeasons = 3,
+  currentMinCareerPitcherGames = 0,
+  currentMinCareerPitcherSeasons = 0,
   currentTotalMatchups = 10,
   currentPlayoffEnabled = true,
   currentPlayoffFormat = '4-team',
@@ -139,6 +216,21 @@ export function LeagueSettingsControl({
   const [minCareerSeasons, setMinCareerSeasons] = useState(
     currentMinCareerSeasons,
   );
+  // Pitcher minimums (LS-10807) track their own saved baseline instead of
+  // threading two more positional args through checkChanges.
+  const [pitcherBaseline, setPitcherBaseline] = useState({
+    games: currentMinCareerPitcherGames,
+    seasons: currentMinCareerPitcherSeasons,
+  });
+  const [minCareerPitcherGames, setMinCareerPitcherGames] = useState(
+    currentMinCareerPitcherGames,
+  );
+  const [minCareerPitcherSeasons, setMinCareerPitcherSeasons] = useState(
+    currentMinCareerPitcherSeasons,
+  );
+  const pitcherMinimumsChanged =
+    minCareerPitcherGames !== pitcherBaseline.games ||
+    minCareerPitcherSeasons !== pitcherBaseline.seasons;
   const [totalMatchups, setTotalMatchups] = useState(currentTotalMatchups);
   const [playoffEnabled, setPlayoffEnabled] = useState(currentPlayoffEnabled);
   const effectiveCurrentPlayoffFormat =
@@ -554,6 +646,8 @@ export function LeagueSettingsControl({
             ? `SP starts (${spStarts}) cannot exceed games per matchup (${gamesPerMatchup})`
             : null;
 
+  const isDirty = hasChanges || pitcherMinimumsChanged;
+
   const handleSave = async () => {
     if (validationError) return;
 
@@ -566,6 +660,8 @@ export function LeagueSettingsControl({
             pitcherStartsPerMatchup: spStarts,
             minCareerGames,
             minCareerSeasons,
+            minCareerPitcherGames,
+            minCareerPitcherSeasons,
             totalMatchups,
             playoffEnabled,
             playoffFormat,
@@ -579,6 +675,10 @@ export function LeagueSettingsControl({
       });
 
       setHasChanges(false);
+      setPitcherBaseline({
+        games: minCareerPitcherGames,
+        seasons: minCareerPitcherSeasons,
+      });
       onSuccess?.('League settings saved successfully!');
     } catch (err) {
       const errorMessage =
@@ -592,6 +692,8 @@ export function LeagueSettingsControl({
     setSpStarts(currentSpStartsPerMatchup);
     setMinCareerGames(currentMinCareerGames);
     setMinCareerSeasons(currentMinCareerSeasons);
+    setMinCareerPitcherGames(pitcherBaseline.games);
+    setMinCareerPitcherSeasons(pitcherBaseline.seasons);
     setTotalMatchups(currentTotalMatchups);
     setPlayoffEnabled(currentPlayoffEnabled);
     setPlayoffFormat(effectiveCurrentPlayoffFormat);
@@ -713,116 +815,75 @@ export function LeagueSettingsControl({
 
           <Separator />
 
-          {/* Min Career Games */}
+          {/* Min Career Games — separate batter / pitcher thresholds (LS-10807) */}
           <YStack gap="$2">
             <YStack gap="$1">
               <Text fontSize="$3" fontWeight="600" color="$color">
                 Minimum Career Games
               </Text>
               <Text fontSize="$2" color="$gray10">
-                Players with fewer career MLB games than this threshold are
-                excluded from the draft pool, free agent pool, and cannot hold a
-                starting roster spot. Set to "Off" to disable.
+                Players below their threshold are excluded from the draft pool
+                and free agent pool, and cannot hold a starting roster spot.
+                Batters are measured by career MLB games played; pitchers by
+                career MLB games pitched. A two-way player qualifies by meeting
+                either the batter or the pitcher minimums.
               </Text>
             </YStack>
-            <XStack gap="$2" flexWrap="wrap">
-              {MIN_CAREER_GAMES_OPTIONS.map((option) => {
-                const isSelected = minCareerGames === option.value;
-                return (
-                  <Button
-                    key={option.value}
-                    size="$3"
-                    theme={isSelected ? 'active' : 'alt2'}
-                    backgroundColor={
-                      isSelected ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray3'
-                    }
-                    borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
-                    borderWidth={1}
-                    borderRadius="$3"
-                    onPress={() => handleMinCareerGamesChange(option.value)}
-                    disabled={saving}
-                    opacity={saving ? 0.5 : 1}
-                    icon={isSelected ? <Check size={14} /> : undefined}
-                    aria-pressed={isSelected}
-                    aria-label={`Minimum career games: ${option.label}`}
-                    hoverStyle={
-                      saving
-                        ? undefined
-                        : {
-                            backgroundColor: isSelected
-                              ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
-                              : '$gray4',
-                          }
-                    }
-                  >
-                    <Text
-                      fontSize="$2"
-                      fontWeight={isSelected ? '700' : '400'}
-                      color={isSelected ? 'white' : '$color'}
-                    >
-                      {option.label}
-                    </Text>
-                  </Button>
-                );
-              })}
-            </XStack>
+            <CareerMinimumRow
+              label="Batters — games played"
+              ariaPrefix="Minimum career games"
+              options={MIN_CAREER_GAMES_OPTIONS}
+              selected={minCareerGames}
+              onSelect={handleMinCareerGamesChange}
+              disabled={saving}
+            />
+            <CareerMinimumRow
+              label="Pitchers — games pitched"
+              ariaPrefix="Minimum career games pitched"
+              options={MIN_CAREER_GAMES_OPTIONS}
+              selected={minCareerPitcherGames}
+              onSelect={setMinCareerPitcherGames}
+              disabled={saving}
+            />
           </YStack>
 
           <Separator />
 
-          {/* Min Career Seasons */}
+          {/* Min Career Seasons — separate batter / pitcher thresholds (LS-10807) */}
           <YStack gap="$2">
             <YStack gap="$1">
               <Text fontSize="$3" fontWeight="600" color="$color">
                 Minimum Career Seasons
               </Text>
               <Text fontSize="$2" color="$gray10">
-                Players with fewer distinct MLB seasons (AL/NL) than this
-                threshold are excluded from the draft pool, free agent pool, and
-                cannot hold a starting roster spot. Set to "Off" to disable.
+                Batters are measured by distinct MLB seasons (AL/NL) with a
+                batting appearance; pitchers by distinct MLB seasons with a
+                pitching appearance.
               </Text>
             </YStack>
-            <XStack gap="$2" flexWrap="wrap">
-              {MIN_CAREER_SEASONS_OPTIONS.map((option) => {
-                const isSelected = minCareerSeasons === option.value;
-                return (
-                  <Button
-                    key={option.value}
-                    size="$3"
-                    theme={isSelected ? 'active' : 'alt2'}
-                    backgroundColor={
-                      isSelected ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray3'
-                    }
-                    borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
-                    borderWidth={1}
-                    borderRadius="$3"
-                    onPress={() => handleMinCareerSeasonsChange(option.value)}
-                    disabled={saving}
-                    opacity={saving ? 0.5 : 1}
-                    icon={isSelected ? <Check size={14} /> : undefined}
-                    aria-pressed={isSelected}
-                    aria-label={`Minimum career seasons: ${option.label}`}
-                    hoverStyle={
-                      saving
-                        ? undefined
-                        : {
-                            backgroundColor: isSelected
-                              ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
-                              : '$gray4',
-                          }
-                    }
-                  >
-                    <Text
-                      fontSize="$2"
-                      fontWeight={isSelected ? '700' : '400'}
-                      color={isSelected ? 'white' : '$color'}
-                    >
-                      {option.label}
-                    </Text>
-                  </Button>
-                );
-              })}
-            </XStack>
+            <CareerMinimumRow
+              label="Batters — seasons batted"
+              ariaPrefix="Minimum career seasons"
+              options={MIN_CAREER_SEASONS_OPTIONS}
+              selected={minCareerSeasons}
+              onSelect={handleMinCareerSeasonsChange}
+              disabled={saving}
+            />
+            <CareerMinimumRow
+              label="Pitchers — seasons pitched"
+              ariaPrefix="Minimum career seasons pitched"
+              options={MIN_CAREER_SEASONS_OPTIONS}
+              selected={minCareerPitcherSeasons}
+              onSelect={setMinCareerPitcherSeasons}
+              disabled={saving}
+            />
+            {minCareerPitcherGames === 0 && minCareerPitcherSeasons === 0 ? (
+              <Text fontSize="$2" color="$gray10">
+                With both pitcher minimums Off, pitchers follow the batter
+                minimums on their batting record, so a pitcher with no MLB
+                batting record is exempt.
+              </Text>
+            ) : null}
           </YStack>
 
           <Separator />
@@ -1284,8 +1345,8 @@ export function LeagueSettingsControl({
             theme="alt2"
             size="$3"
             onPress={handleReset}
-            disabled={isLocked || !hasChanges || saving}
-            opacity={isLocked || !hasChanges ? 0.5 : 1}
+            disabled={isLocked || !isDirty || saving}
+            opacity={isLocked || !isDirty ? 0.5 : 1}
           >
             Reset
           </Button>
@@ -1295,8 +1356,8 @@ export function LeagueSettingsControl({
             pressStyle={{ backgroundColor: '$brandNavyDark' }}
             size="$3"
             onPress={() => void handleSave()}
-            disabled={isLocked || !hasChanges || saving || !!validationError}
-            opacity={isLocked || !hasChanges || !!validationError ? 0.5 : 1}
+            disabled={isLocked || !isDirty || saving || !!validationError}
+            opacity={isLocked || !isDirty || !!validationError ? 0.5 : 1}
             icon={saving ? <Spinner size="small" /> : undefined}
           >
             {saving ? 'Saving...' : 'Save Settings'}

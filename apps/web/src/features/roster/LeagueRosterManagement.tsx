@@ -25,6 +25,7 @@ import {
   LeaguePositionFragment,
   TeamMemberFragment,
 } from '@legacy-sports/graphql';
+import { isBelowCareerMinimums } from './careerMinimums';
 import type { PlayerMatchupData } from '../../pages/baseball/LeagueDetailPage';
 import { PlayerDetailModal } from '../../components/PlayerDetailModal';
 import {
@@ -342,6 +343,9 @@ interface RosterRowProps {
   matchupData?: PlayerMatchupData;
   minCareerGames?: number;
   minCareerSeasons?: number;
+  /** Pitcher career minimums (LS-10807); 0 / omitted = off. */
+  minCareerPitcherGames?: number;
+  minCareerPitcherSeasons?: number;
   onViewDetails?: (player: TeamMemberFragment) => void;
   onSetNickname?: (teamMemberId: number, nickname: string | null) => void;
   isPositionHighlighted?: boolean;
@@ -359,6 +363,8 @@ function RosterRow({
   matchupData,
   minCareerGames,
   minCareerSeasons,
+  minCareerPitcherGames,
+  minCareerPitcherSeasons,
   onViewDetails,
   onSetNickname,
   isPositionHighlighted,
@@ -368,13 +374,12 @@ function RosterRow({
 
   const isCareerIneligible = Boolean(
     assignedPlayer?.player &&
-    assignedPlayer.player.careerBatting != null && // only flag position players (batters), not pitchers
-    ((minCareerGames != null &&
-      minCareerGames > 0 &&
-      (assignedPlayer.player.careerBatting.games ?? 0) < minCareerGames) ||
-      (minCareerSeasons != null &&
-        minCareerSeasons > 0 &&
-        (assignedPlayer.player.seasonsPlayed ?? 0) < minCareerSeasons)),
+    isBelowCareerMinimums(assignedPlayer.player, {
+      minCareerGames,
+      minCareerSeasons,
+      minCareerPitcherGames,
+      minCareerPitcherSeasons,
+    }),
   );
   const category = getPositionCategory(posType);
   const colors = CATEGORY_COLORS[category];
@@ -753,6 +758,9 @@ interface RosterSectionProps {
   playerMatchupData?: ReadonlyMap<number, PlayerMatchupData>;
   minCareerGames?: number;
   minCareerSeasons?: number;
+  /** Pitcher career minimums (LS-10807); 0 / omitted = off. */
+  minCareerPitcherGames?: number;
+  minCareerPitcherSeasons?: number;
   onViewDetails?: (player: TeamMemberFragment) => void;
   onSetNickname?: (teamMemberId: number, nickname: string | null) => void;
   positionFilter?: string | null;
@@ -770,6 +778,8 @@ function RosterSection({
   playerMatchupData,
   minCareerGames,
   minCareerSeasons,
+  minCareerPitcherGames,
+  minCareerPitcherSeasons,
   onViewDetails,
   onSetNickname,
   positionFilter,
@@ -856,6 +866,8 @@ function RosterSection({
             matchupData={mData}
             minCareerGames={minCareerGames}
             minCareerSeasons={minCareerSeasons}
+            minCareerPitcherGames={minCareerPitcherGames}
+            minCareerPitcherSeasons={minCareerPitcherSeasons}
             onViewDetails={onViewDetails}
             onSetNickname={onSetNickname}
             isPositionHighlighted={
@@ -1471,6 +1483,9 @@ export interface LeagueRosterManagementProps {
   minCareerGames?: number;
   /** Minimum distinct MLB seasons a player must have to occupy a starting slot */
   minCareerSeasons?: number;
+  /** Pitcher career minimums (LS-10807); 0 / omitted = off. */
+  minCareerPitcherGames?: number;
+  minCareerPitcherSeasons?: number;
   /** Callback to set or clear a player nickname. (LS-1813) */
   onSetNickname?: (teamMemberId: number, nickname: string | null) => void;
   /** League ID for analytics. */
@@ -1490,6 +1505,8 @@ export function LeagueRosterManagement({
   teamName,
   minCareerGames,
   minCareerSeasons,
+  minCareerPitcherGames,
+  minCareerPitcherSeasons,
   onSetNickname,
   leagueId,
 }: LeagueRosterManagementProps): React.JSX.Element {
@@ -1905,6 +1922,8 @@ export function LeagueRosterManagement({
               playerMatchupData={playerMatchupData}
               minCareerGames={minCareerGames}
               minCareerSeasons={minCareerSeasons}
+              minCareerPitcherGames={minCareerPitcherGames}
+              minCareerPitcherSeasons={minCareerPitcherSeasons}
               onViewDetails={handleViewDetails}
               onSetNickname={readOnly ? undefined : onSetNickname}
               positionFilter={positionFilter}
@@ -1922,6 +1941,8 @@ export function LeagueRosterManagement({
               playerMatchupData={playerMatchupData}
               minCareerGames={minCareerGames}
               minCareerSeasons={minCareerSeasons}
+              minCareerPitcherGames={minCareerPitcherGames}
+              minCareerPitcherSeasons={minCareerPitcherSeasons}
               onViewDetails={handleViewDetails}
               onSetNickname={readOnly ? undefined : onSetNickname}
               positionFilter={positionFilter}

@@ -23,6 +23,8 @@ interface LeagueState {
     pitcherStartsPerMatchup?: number | null;
     minCareerGames?: number | null;
     minCareerSeasons?: number | null;
+    minCareerPitcherGames?: number | null;
+    minCareerPitcherSeasons?: number | null;
     totalMatchups?: number | null;
     playoffEnabled?: boolean | null;
     playoffFormat?: string | null;

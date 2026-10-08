@@ -387,6 +387,9 @@ export async function buildPlayerPool(
     playerPool: 'all' | 'nl' | 'al' | 'nfl' | 'afc' | 'nfc';
     minCareerGames: number;
     minCareerSeasons: number;
+    /** Pitcher career minimums (LS-10807); omitted = off. */
+    minCareerPitcherGames?: number;
+    minCareerPitcherSeasons?: number;
     baseballHofOnly: boolean;
     eraFilter: string;
     customEraStartYear: number | null;
@@ -401,6 +404,8 @@ export async function buildPlayerPool(
     playerPool,
     minCareerGames,
     minCareerSeasons,
+    minCareerPitcherGames,
+    minCareerPitcherSeasons,
     baseballHofOnly,
     eraFilter,
     customEraStartYear,
@@ -546,6 +551,8 @@ export async function buildPlayerPool(
       playerPool,
       minCareerGames,
       minCareerSeasons,
+      minCareerPitcherGames,
+      minCareerPitcherSeasons,
       baseballHofOnly,
       baseballEraFilter: eraFilter,
       customEraStartYear,
@@ -713,6 +720,9 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
             playerPool: PublicSchema.leagues.playerPool,
             minCareerGames: PublicSchema.leagues.minCareerGames,
             minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
+            minCareerPitcherGames: PublicSchema.leagues.minCareerPitcherGames,
+            minCareerPitcherSeasons:
+              PublicSchema.leagues.minCareerPitcherSeasons,
             baseballHofOnly: PublicSchema.leagues.baseballHofOnly,
             eraFilter: PublicSchema.leagues.baseballEraFilter,
             customEraStartYear: PublicSchema.leagues.customEraStartYear,
@@ -733,6 +743,9 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
       const playerPool = leagueConfig[0]?.playerPool ?? 'all';
       const minCareerGames = leagueConfig[0]?.minCareerGames ?? 50;
       const minCareerSeasons = leagueConfig[0]?.minCareerSeasons ?? 3;
+      const minCareerPitcherGames = leagueConfig[0]?.minCareerPitcherGames ?? 0;
+      const minCareerPitcherSeasons =
+        leagueConfig[0]?.minCareerPitcherSeasons ?? 0;
       const baseballHofOnly = leagueConfig[0]?.baseballHofOnly ?? false;
       const eraFilter = leagueConfig[0]?.eraFilter ?? 'all';
       const customEraStartYear = leagueConfig[0]?.customEraStartYear ?? null;
@@ -746,6 +759,8 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
         playerPool,
         minCareerGames,
         minCareerSeasons,
+        minCareerPitcherGames,
+        minCareerPitcherSeasons,
         baseballHofOnly,
         eraFilter,
         leagueId,
@@ -772,6 +787,8 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
           playerPool,
           minCareerGames,
           minCareerSeasons,
+          minCareerPitcherGames,
+          minCareerPitcherSeasons,
           baseballHofOnly,
           eraFilter,
           customEraStartYear,
@@ -1028,6 +1045,9 @@ async function runAuctionDraft(leagueId: number): Promise<void> {
             playerPool: PublicSchema.leagues.playerPool,
             minCareerGames: PublicSchema.leagues.minCareerGames,
             minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
+            minCareerPitcherGames: PublicSchema.leagues.minCareerPitcherGames,
+            minCareerPitcherSeasons:
+              PublicSchema.leagues.minCareerPitcherSeasons,
             baseballHofOnly: PublicSchema.leagues.baseballHofOnly,
             eraFilter: PublicSchema.leagues.baseballEraFilter,
             customEraStartYear: PublicSchema.leagues.customEraStartYear,
@@ -1159,6 +1179,8 @@ async function runAuctionDraft(leagueId: number): Promise<void> {
           playerPool: config.playerPool,
           minCareerGames: config.minCareerGames,
           minCareerSeasons: config.minCareerSeasons,
+          minCareerPitcherGames: config.minCareerPitcherGames,
+          minCareerPitcherSeasons: config.minCareerPitcherSeasons,
           baseballHofOnly: config.baseballHofOnly,
           eraFilter: config.eraFilter,
           customEraStartYear: config.customEraStartYear,

@@ -189,6 +189,8 @@ export function CommissionerScreen({
           currentSpStartsPerMatchup={league.pitcherStartsPerMatchup ?? 1}
           currentMinCareerGames={league.minCareerGames ?? 50}
           currentMinCareerSeasons={league.minCareerSeasons ?? 3}
+          currentMinCareerPitcherGames={league.minCareerPitcherGames ?? 0}
+          currentMinCareerPitcherSeasons={league.minCareerPitcherSeasons ?? 0}
           currentTotalMatchups={league.totalMatchups ?? 10}
           currentPlayoffEnabled={league.playoffEnabled ?? true}
           currentPlayoffFormat={league.playoffFormat ?? '4-team'}

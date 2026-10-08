@@ -1030,6 +1030,38 @@ describe('League Mutations', () => {
       ).rejects.toThrow('Only a commissioner can update league settings');
     });
 
+    it.each([
+      [
+        'minCareerPitcherGames',
+        'Minimum career pitcher games must be 0 or greater',
+      ],
+      [
+        'minCareerPitcherSeasons',
+        'Minimum career pitcher seasons must be 0 or greater',
+      ],
+    ])('rejects a negative %s (LS-10807)', async (field, message) => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.limit.mockResolvedValueOnce([{ permissionLevel: 'commissioner' }]);
+
+      const resolver = schema.getMutationType()?.getFields()
+        .updateLeagueSettings?.resolve;
+      if (!resolver) {
+        throw new Error('updateLeagueSettings resolver not found');
+      }
+
+      await expect(
+        resolver(
+          {},
+          { input: { leagueId: 1, [field]: -1 } },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow(message);
+      expect(mockDb.update).not.toHaveBeenCalled();
+    });
+
     it('should require salary_cap_leagues entitlement to change salaryCap on a cap-enabled league (LS-5197)', async () => {
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);

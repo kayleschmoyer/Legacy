@@ -17,6 +17,7 @@ import {
   char,
   pgEnum,
   pgView,
+  pgMaterializedView,
   jsonb,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
@@ -404,6 +405,23 @@ FROM (SELECT season_pitching.player_id,
               WHERE season_pitching.lg_id::text = ANY
                     (ARRAY ['AL'::character varying::text, 'NL'::character varying::text]))) > 0
       GROUP BY season_pitching.player_id) unnamed_subquery;`);
+
+// Career AL/NL games pitched + distinct pitching seasons (LS-10807) — backs
+// the league pitcher career-minimum eligibility rule, the pitching analogue of
+// career_batting.g / career_batting.seasons.
+export const careerPitchingAppearances = pgMaterializedView(
+  'career_pitching_appearances',
+  {
+    playerId: integer('player_id').notNull(),
+    g: bigint('g', { mode: 'number' }),
+    seasons: integer('seasons'),
+  },
+).as(sql`SELECT sp.player_id,
+       sum(sp.g)::bigint                  AS g,
+       count(DISTINCT sp.season)::integer AS seasons
+FROM season_pitching sp
+WHERE sp.lg_id::text = ANY (ARRAY['AL'::text, 'NL'::text])
+GROUP BY sp.player_id`);
 
 export const careerFieldingByPosition = pgView('career_fielding_by_position', {
   playerId: integer('player_id').references(() => players.id),

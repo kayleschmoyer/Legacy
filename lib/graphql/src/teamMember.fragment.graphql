@@ -22,5 +22,9 @@ fragment TeamMember on TeamMember {
       games
     }
     seasonsPlayed
+    careerPitching {
+      games
+    }
+    pitchingSeasonsPlayed
   }
 }

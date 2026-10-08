@@ -30,6 +30,8 @@ fragment League on League {
   gamesPerMatchup
   minCareerGames
   minCareerSeasons
+  minCareerPitcherGames
+  minCareerPitcherSeasons
   totalMatchups
   playoffEnabled
   playoffFormat

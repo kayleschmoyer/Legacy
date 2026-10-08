@@ -23,6 +23,9 @@ import type { SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import {
   buildEligibilityConditions,
+  careerGamesCondition,
+  careerMinimumConditions,
+  careerSeasonsCondition,
   DraftUserInputError,
   filterPlayerIdsByLeagueEligibility,
   findFailedEligibilityRule,
@@ -384,6 +387,80 @@ describe('buildEligibilityConditions', () => {
       customEraEndYear: null,
     });
     expect(conditions.some((c) => c.key === 'era')).toBe(false);
+  });
+});
+
+describe('careerMinimumConditions (LS-10807)', () => {
+  const dialect = new PgDialect();
+  const render = (condition: SQL | undefined) =>
+    condition ? dialect.sqlToQuery(condition) : undefined;
+
+  it('keeps the legacy batter-only predicates when no pitcher minimums are set', () => {
+    // Existing leagues: identical SQL and params to the pre-LS-10807 rule.
+    for (const pitcher of [
+      {},
+      { minCareerPitcherGames: 0, minCareerPitcherSeasons: 0 },
+    ]) {
+      const career = careerMinimumConditions({
+        minCareerGames: 50,
+        minCareerSeasons: 3,
+        ...pitcher,
+      });
+      expect(render(career.games)).toEqual(render(careerGamesCondition(50)));
+      expect(render(career.seasons)).toEqual(render(careerSeasonsCondition(3)));
+    }
+  });
+
+  it('applies no career rule when every threshold is 0', () => {
+    expect(
+      careerMinimumConditions({ minCareerGames: 0, minCareerSeasons: 0 }),
+    ).toEqual({ games: undefined, seasons: undefined });
+  });
+
+  it('switches both dimensions to the batter/pitcher split once a pitcher minimum is set', () => {
+    const career = careerMinimumConditions({
+      minCareerGames: 50,
+      minCareerSeasons: 3,
+      minCareerPitcherGames: 25,
+      minCareerPitcherSeasons: 0,
+    });
+    const games = render(career.games);
+    const seasons = render(career.seasons);
+    expect(games?.sql).toContain('career_pitching_appearances');
+    expect(games?.sql).toContain('career_batting');
+    expect(games?.params).toEqual(expect.arrayContaining([50, 3, 25, 0]));
+    // The seasons rule still applies (batter seasons = 3) under the split.
+    expect(seasons?.sql).toContain('career_pitching_appearances');
+  });
+
+  it('builds a pitcher-only rule when the batter minimums are 0', () => {
+    const career = careerMinimumConditions({
+      minCareerGames: 0,
+      minCareerSeasons: 0,
+      minCareerPitcherGames: 0,
+      minCareerPitcherSeasons: 3,
+    });
+    expect(career.games).toBeUndefined();
+    expect(render(career.seasons)?.params).toEqual(
+      expect.arrayContaining([0, 3]),
+    );
+  });
+
+  it('names both thresholds in the pick-rejection messages', () => {
+    const conditions = buildEligibilityConditions({
+      playerPool: 'all',
+      minCareerGames: 50,
+      minCareerSeasons: 3,
+      minCareerPitcherGames: 25,
+      minCareerPitcherSeasons: 2,
+      sport: 'baseball',
+    });
+    expect(conditions.find((c) => c.key === 'careerGames')?.message).toContain(
+      'batters 50, pitchers 25',
+    );
+    expect(
+      conditions.find((c) => c.key === 'careerSeasons')?.message,
+    ).toContain('batters 3, pitchers 2');
   });
 });
 

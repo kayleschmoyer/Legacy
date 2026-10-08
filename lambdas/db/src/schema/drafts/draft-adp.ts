@@ -61,6 +61,9 @@ export interface DraftAdpLeagueSettings {
   playerPool: 'all' | 'nl' | 'al' | 'nfl' | 'afc' | 'nfc' | null;
   minCareerGames: number | null;
   minCareerSeasons: number | null;
+  /** Pitcher career minimums (LS-10807); omitted (mock drafts) = off. */
+  minCareerPitcherGames?: number | null;
+  minCareerPitcherSeasons?: number | null;
   baseballHofOnly: boolean | null;
   baseballEraFilter: string | null;
   customEraStartYear: number | null;
@@ -182,6 +185,8 @@ export function buildDraftAdpPoolConditions({
       playerPool: league?.playerPool ?? 'all',
       minCareerGames: league?.minCareerGames ?? 50,
       minCareerSeasons: league?.minCareerSeasons ?? 3,
+      minCareerPitcherGames: league?.minCareerPitcherGames ?? 0,
+      minCareerPitcherSeasons: league?.minCareerPitcherSeasons ?? 0,
       baseballHofOnly: league?.baseballHofOnly ?? false,
       baseballEraFilter: league?.baseballEraFilter ?? undefined,
       customEraStartYear: league?.customEraStartYear ?? null,
@@ -266,6 +271,9 @@ export async function loadDraftedPlayerAdp(
               playerPool: PublicSchema.leagues.playerPool,
               minCareerGames: PublicSchema.leagues.minCareerGames,
               minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
+              minCareerPitcherGames: PublicSchema.leagues.minCareerPitcherGames,
+              minCareerPitcherSeasons:
+                PublicSchema.leagues.minCareerPitcherSeasons,
               baseballHofOnly: PublicSchema.leagues.baseballHofOnly,
               baseballEraFilter: PublicSchema.leagues.baseballEraFilter,
               customEraStartYear: PublicSchema.leagues.customEraStartYear,

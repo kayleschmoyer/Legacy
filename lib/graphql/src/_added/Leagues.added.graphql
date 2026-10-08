@@ -171,6 +171,8 @@ fragment AppLeague on League {
   pitcherStartsPerMatchup
   minCareerGames
   minCareerSeasons
+  minCareerPitcherGames
+  minCareerPitcherSeasons
   totalMatchups
   playoffEnabled
   playoffFormat

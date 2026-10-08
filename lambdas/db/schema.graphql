@@ -2238,6 +2238,16 @@ type League {
   maxRosterSize: Int
   medianGameEnabled: Boolean
   minCareerGames: Int
+
+  """
+  Minimum career MLB games pitched for pitchers (LS-10807). 0 = off: pitchers follow the batter minimums.
+  """
+  minCareerPitcherGames: Int
+
+  """
+  Minimum distinct MLB seasons with a pitching appearance for pitchers (LS-10807). 0 = off.
+  """
+  minCareerPitcherSeasons: Int
   minCareerSeasons: Int
   minSalary: Int
   name: String
@@ -4168,6 +4178,11 @@ type Player {
   nflTeam: String
 
   """
+  Number of distinct MLB seasons (AL/NL) with a pitching appearance — the pitcher career-minimum seasons measure (LS-10807)
+  """
+  pitchingSeasonsPlayed: Int
+
+  """
   The player's primary historical baseball era, derived from the midpoint of their MLB career. Values: Dead Ball Era | Golden Age | Expansion Era | Free Agency Era | Steroid Era | Modern Era
   """
   primaryEra: String
@@ -5055,6 +5070,8 @@ type Query {
     customEraEndYear: Int
     customEraStartYear: Int
     minCareerGames: Int
+    minCareerPitcherGames: Int
+    minCareerPitcherSeasons: Int
     minCareerSeasons: Int
     playerPool: String
     sport: String!
@@ -6389,6 +6406,8 @@ input UpdateLeagueSettingsInput {
   luxuryTaxThreshold: Int
   medianGameEnabled: Boolean
   minCareerGames: Int
+  minCareerPitcherGames: Int
+  minCareerPitcherSeasons: Int
   minCareerSeasons: Int
   minSalary: Int
   pitcherStartsPerMatchup: Int

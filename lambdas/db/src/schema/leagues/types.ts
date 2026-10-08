@@ -111,6 +111,8 @@ export const League = builder.objectRef<{
   gamesPerMatchup?: number;
   minCareerGames?: number;
   minCareerSeasons?: number;
+  minCareerPitcherGames?: number;
+  minCareerPitcherSeasons?: number;
   totalMatchups?: number;
   playoffEnabled?: boolean;
   playoffFormat?: string;
@@ -230,6 +232,16 @@ League.implement({
     gamesPerMatchup: t.exposeInt('gamesPerMatchup', { nullable: true }),
     minCareerGames: t.exposeInt('minCareerGames', { nullable: true }),
     minCareerSeasons: t.exposeInt('minCareerSeasons', { nullable: true }),
+    minCareerPitcherGames: t.exposeInt('minCareerPitcherGames', {
+      nullable: true,
+      description:
+        'Minimum career MLB games pitched for pitchers (LS-10807). 0 = off: pitchers follow the batter minimums.',
+    }),
+    minCareerPitcherSeasons: t.exposeInt('minCareerPitcherSeasons', {
+      nullable: true,
+      description:
+        'Minimum distinct MLB seasons with a pitching appearance for pitchers (LS-10807). 0 = off.',
+    }),
     totalMatchups: t.exposeInt('totalMatchups', { nullable: true }),
     playoffEnabled: t.exposeBoolean('playoffEnabled', { nullable: true }),
     playoffFormat: t.exposeString('playoffFormat', { nullable: true }),

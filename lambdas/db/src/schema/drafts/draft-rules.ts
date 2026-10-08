@@ -49,6 +49,8 @@ export interface DraftRules {
   baseballHofOnly: LeagueRow['baseballHofOnly'];
   minCareerGames: LeagueRow['minCareerGames'];
   minCareerSeasons: LeagueRow['minCareerSeasons'];
+  minCareerPitcherGames: LeagueRow['minCareerPitcherGames'];
+  minCareerPitcherSeasons: LeagueRow['minCareerPitcherSeasons'];
   gamesPerMatchup: LeagueRow['gamesPerMatchup'];
   pitcherStartsPerMatchup: LeagueRow['pitcherStartsPerMatchup'];
   /**
@@ -118,6 +120,8 @@ export async function loadDraftRules(
         baseballHofOnly: PublicSchema.leagues.baseballHofOnly,
         minCareerGames: PublicSchema.leagues.minCareerGames,
         minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
+        minCareerPitcherGames: PublicSchema.leagues.minCareerPitcherGames,
+        minCareerPitcherSeasons: PublicSchema.leagues.minCareerPitcherSeasons,
         gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
         pitcherStartsPerMatchup: PublicSchema.leagues.pitcherStartsPerMatchup,
       },
@@ -171,6 +175,9 @@ export async function loadDraftRules(
       baseballHofOnly: mock.hofOnly,
       minCareerGames: mock.minCareerGames,
       minCareerSeasons: mock.minCareerSeasons,
+      // Mock drafts have no pitcher minimums (LS-10807): batter rule only.
+      minCareerPitcherGames: 0,
+      minCareerPitcherSeasons: 0,
       // A mock draft never plays a matchup; these only scale the projected
       // per-matchup value the board ranks by, so use a new league's defaults.
       gamesPerMatchup: GAMES_PER_MATCHUP_BY_SPORT[row.sport].default,
@@ -216,6 +223,8 @@ export async function loadDraftRules(
     baseballHofOnly: league.baseballHofOnly,
     minCareerGames: league.minCareerGames,
     minCareerSeasons: league.minCareerSeasons,
+    minCareerPitcherGames: league.minCareerPitcherGames,
+    minCareerPitcherSeasons: league.minCareerPitcherSeasons,
     gamesPerMatchup: league.gamesPerMatchup,
     pitcherStartsPerMatchup: league.pitcherStartsPerMatchup,
     isMock: false,

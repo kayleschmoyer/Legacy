@@ -130,6 +130,14 @@ export const leagues = pgTable(
       .default(1),
     minCareerGames: integer('min_career_games').notNull().default(50),
     minCareerSeasons: integer('min_career_seasons').notNull().default(3),
+    // Pitcher career minimums, judged on pitching appearances (LS-10807).
+    // 0 = off; while both are 0 the batter thresholds apply exactly as before.
+    minCareerPitcherGames: integer('min_career_pitcher_games')
+      .notNull()
+      .default(0),
+    minCareerPitcherSeasons: integer('min_career_pitcher_seasons')
+      .notNull()
+      .default(0),
     totalMatchups: integer('total_matchups').notNull().default(10),
     numberOfDivisions: integer('number_of_divisions').notNull().default(2),
     // Playoff settings

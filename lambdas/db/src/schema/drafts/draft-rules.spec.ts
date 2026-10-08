@@ -214,6 +214,8 @@ describe('loadDraftRules — mock branch (LS-10076)', () => {
       baseballHofOnly: false,
       minCareerGames: 10,
       minCareerSeasons: 1,
+      minCareerPitcherGames: 0,
+      minCareerPitcherSeasons: 0,
       // A mock draft never plays a matchup; these only scale the projected
       // per-matchup value the board ranks by, so they take a new league's
       // defaults.

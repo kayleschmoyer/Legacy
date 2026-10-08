@@ -1785,6 +1785,10 @@ export type League = {
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
   medianGameEnabled?: Maybe<Scalars['Boolean']['output']>;
   minCareerGames?: Maybe<Scalars['Int']['output']>;
+  /** Minimum career MLB games pitched for pitchers (LS-10807). 0 = off: pitchers follow the batter minimums. */
+  minCareerPitcherGames?: Maybe<Scalars['Int']['output']>;
+  /** Minimum distinct MLB seasons with a pitching appearance for pitchers (LS-10807). 0 = off. */
+  minCareerPitcherSeasons?: Maybe<Scalars['Int']['output']>;
   minCareerSeasons?: Maybe<Scalars['Int']['output']>;
   minSalary?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
@@ -3634,6 +3638,8 @@ export type Player = {
   mlbTeam?: Maybe<Scalars['String']['output']>;
   /** Current NFL team abbreviation for football players (LS-6334). Null for non-football players. */
   nflTeam?: Maybe<Scalars['String']['output']>;
+  /** Number of distinct MLB seasons (AL/NL) with a pitching appearance — the pitcher career-minimum seasons measure (LS-10807) */
+  pitchingSeasonsPlayed?: Maybe<Scalars['Int']['output']>;
   /** The player's primary historical baseball era, derived from the midpoint of their MLB career. Values: Dead Ball Era | Golden Age | Expansion Era | Free Agency Era | Steroid Era | Modern Era */
   primaryEra?: Maybe<Scalars['String']['output']>;
   /** Fantasy scoring data (only populated when using scoring-based sort) */
@@ -4646,6 +4652,8 @@ export type QueryPreviewEligiblePlayerCountArgs = {
   customEraEndYear?: InputMaybe<Scalars['Int']['input']>;
   customEraStartYear?: InputMaybe<Scalars['Int']['input']>;
   minCareerGames?: InputMaybe<Scalars['Int']['input']>;
+  minCareerPitcherGames?: InputMaybe<Scalars['Int']['input']>;
+  minCareerPitcherSeasons?: InputMaybe<Scalars['Int']['input']>;
   minCareerSeasons?: InputMaybe<Scalars['Int']['input']>;
   playerPool?: InputMaybe<Scalars['String']['input']>;
   sport: Scalars['String']['input'];
@@ -5783,6 +5791,8 @@ export type UpdateLeagueSettingsInput = {
   luxuryTaxThreshold?: InputMaybe<Scalars['Int']['input']>;
   medianGameEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   minCareerGames?: InputMaybe<Scalars['Int']['input']>;
+  minCareerPitcherGames?: InputMaybe<Scalars['Int']['input']>;
+  minCareerPitcherSeasons?: InputMaybe<Scalars['Int']['input']>;
   minCareerSeasons?: InputMaybe<Scalars['Int']['input']>;
   minSalary?: InputMaybe<Scalars['Int']['input']>;
   pitcherStartsPerMatchup?: InputMaybe<Scalars['Int']['input']>;
@@ -7343,6 +7353,8 @@ export type CreateLeagueAndTeamsMutation = {
       gamesPerMatchup?: number | null;
       minCareerGames?: number | null;
       minCareerSeasons?: number | null;
+      minCareerPitcherGames?: number | null;
+      minCareerPitcherSeasons?: number | null;
       totalMatchups?: number | null;
       playoffEnabled?: boolean | null;
       playoffFormat?: string | null;
@@ -7426,6 +7438,8 @@ export type GetUserLeaguesQuery = {
     gamesPerMatchup?: number | null;
     minCareerGames?: number | null;
     minCareerSeasons?: number | null;
+    minCareerPitcherGames?: number | null;
+    minCareerPitcherSeasons?: number | null;
     totalMatchups?: number | null;
     playoffEnabled?: boolean | null;
     playoffFormat?: string | null;
@@ -7508,6 +7522,8 @@ export type GetMyLeaguesQuery = {
     gamesPerMatchup?: number | null;
     minCareerGames?: number | null;
     minCareerSeasons?: number | null;
+    minCareerPitcherGames?: number | null;
+    minCareerPitcherSeasons?: number | null;
     totalMatchups?: number | null;
     playoffEnabled?: boolean | null;
     playoffFormat?: string | null;
@@ -7608,6 +7624,8 @@ export type StartDraftMutation = {
     gamesPerMatchup?: number | null;
     minCareerGames?: number | null;
     minCareerSeasons?: number | null;
+    minCareerPitcherGames?: number | null;
+    minCareerPitcherSeasons?: number | null;
     totalMatchups?: number | null;
     playoffEnabled?: boolean | null;
     playoffFormat?: string | null;
@@ -7791,6 +7809,8 @@ export type StartSeasonMutation = {
     gamesPerMatchup?: number | null;
     minCareerGames?: number | null;
     minCareerSeasons?: number | null;
+    minCareerPitcherGames?: number | null;
+    minCareerPitcherSeasons?: number | null;
     totalMatchups?: number | null;
     playoffEnabled?: boolean | null;
     playoffFormat?: string | null;
@@ -7865,6 +7885,8 @@ export type AppLeagueFragment = {
   pitcherStartsPerMatchup?: number | null;
   minCareerGames?: number | null;
   minCareerSeasons?: number | null;
+  minCareerPitcherGames?: number | null;
+  minCareerPitcherSeasons?: number | null;
   totalMatchups?: number | null;
   playoffEnabled?: boolean | null;
   playoffFormat?: string | null;
@@ -7931,6 +7953,8 @@ export type CreateLeagueMutation = {
       pitcherStartsPerMatchup?: number | null;
       minCareerGames?: number | null;
       minCareerSeasons?: number | null;
+      minCareerPitcherGames?: number | null;
+      minCareerPitcherSeasons?: number | null;
       totalMatchups?: number | null;
       playoffEnabled?: boolean | null;
       playoffFormat?: string | null;
@@ -9961,8 +9985,13 @@ export type UpdateTeamMemberPositionMutation = {
       nflTeam?: string | null;
       jerseyNumber?: number | null;
       seasonsPlayed?: number | null;
+      pitchingSeasonsPlayed?: number | null;
       careerBatting?: {
         __typename?: 'CareerBatting';
+        games?: number | null;
+      } | null;
+      careerPitching?: {
+        __typename?: 'CareerPitching';
         games?: number | null;
       } | null;
     } | null;
@@ -10001,8 +10030,13 @@ export type SwapTeamMemberPositionsMutation = {
       nflTeam?: string | null;
       jerseyNumber?: number | null;
       seasonsPlayed?: number | null;
+      pitchingSeasonsPlayed?: number | null;
       careerBatting?: {
         __typename?: 'CareerBatting';
+        games?: number | null;
+      } | null;
+      careerPitching?: {
+        __typename?: 'CareerPitching';
         games?: number | null;
       } | null;
     } | null;
@@ -10105,8 +10139,13 @@ export type SetNicknameMutation = {
       nflTeam?: string | null;
       jerseyNumber?: number | null;
       seasonsPlayed?: number | null;
+      pitchingSeasonsPlayed?: number | null;
       careerBatting?: {
         __typename?: 'CareerBatting';
+        games?: number | null;
+      } | null;
+      careerPitching?: {
+        __typename?: 'CareerPitching';
         games?: number | null;
       } | null;
     } | null;
@@ -10994,6 +11033,8 @@ export type UpdateLeagueSettingsMutation = {
     pitcherStartsPerMatchup?: number | null;
     minCareerGames?: number | null;
     minCareerSeasons?: number | null;
+    minCareerPitcherGames?: number | null;
+    minCareerPitcherSeasons?: number | null;
     totalMatchups?: number | null;
     playoffEnabled?: boolean | null;
     playoffFormat?: string | null;
@@ -12246,6 +12287,8 @@ export type GetLeagueByIdQuery = {
     gamesPerMatchup?: number | null;
     minCareerGames?: number | null;
     minCareerSeasons?: number | null;
+    minCareerPitcherGames?: number | null;
+    minCareerPitcherSeasons?: number | null;
     totalMatchups?: number | null;
     playoffEnabled?: boolean | null;
     playoffFormat?: string | null;
@@ -12380,8 +12423,13 @@ export type GetLeagueTradeBlockQuery = {
       nflTeam?: string | null;
       jerseyNumber?: number | null;
       seasonsPlayed?: number | null;
+      pitchingSeasonsPlayed?: number | null;
       careerBatting?: {
         __typename?: 'CareerBatting';
+        games?: number | null;
+      } | null;
+      careerPitching?: {
+        __typename?: 'CareerPitching';
         games?: number | null;
       } | null;
     } | null;
@@ -13099,8 +13147,13 @@ export type GetTeamMembersQuery = {
       nflTeam?: string | null;
       jerseyNumber?: number | null;
       seasonsPlayed?: number | null;
+      pitchingSeasonsPlayed?: number | null;
       careerBatting?: {
         __typename?: 'CareerBatting';
+        games?: number | null;
+      } | null;
+      careerPitching?: {
+        __typename?: 'CareerPitching';
         games?: number | null;
       } | null;
     } | null;
@@ -13466,6 +13519,8 @@ export type LeagueFragment = {
   gamesPerMatchup?: number | null;
   minCareerGames?: number | null;
   minCareerSeasons?: number | null;
+  minCareerPitcherGames?: number | null;
+  minCareerPitcherSeasons?: number | null;
   totalMatchups?: number | null;
   playoffEnabled?: boolean | null;
   playoffFormat?: string | null;
@@ -15299,6 +15354,8 @@ export type RenewLeagueMutation = {
     gamesPerMatchup?: number | null;
     minCareerGames?: number | null;
     minCareerSeasons?: number | null;
+    minCareerPitcherGames?: number | null;
+    minCareerPitcherSeasons?: number | null;
     totalMatchups?: number | null;
     playoffEnabled?: boolean | null;
     playoffFormat?: string | null;
@@ -15971,8 +16028,13 @@ export type SetTradeBlockMutation = {
       nflTeam?: string | null;
       jerseyNumber?: number | null;
       seasonsPlayed?: number | null;
+      pitchingSeasonsPlayed?: number | null;
       careerBatting?: {
         __typename?: 'CareerBatting';
+        games?: number | null;
+      } | null;
+      careerPitching?: {
+        __typename?: 'CareerPitching';
         games?: number | null;
       } | null;
     } | null;
@@ -16086,8 +16148,13 @@ export type TeamMemberFragment = {
     nflTeam?: string | null;
     jerseyNumber?: number | null;
     seasonsPlayed?: number | null;
+    pitchingSeasonsPlayed?: number | null;
     careerBatting?: {
       __typename?: 'CareerBatting';
+      games?: number | null;
+    } | null;
+    careerPitching?: {
+      __typename?: 'CareerPitching';
       games?: number | null;
     } | null;
   } | null;
@@ -17234,6 +17301,8 @@ export const AppLeagueFragmentDoc = gql`
     pitcherStartsPerMatchup
     minCareerGames
     minCareerSeasons
+    minCareerPitcherGames
+    minCareerPitcherSeasons
     totalMatchups
     playoffEnabled
     playoffFormat
@@ -18051,6 +18120,8 @@ export const LeagueFragmentDoc = gql`
     gamesPerMatchup
     minCareerGames
     minCareerSeasons
+    minCareerPitcherGames
+    minCareerPitcherSeasons
     totalMatchups
     playoffEnabled
     playoffFormat
@@ -18551,6 +18622,10 @@ export const TeamMemberFragmentDoc = gql`
         games
       }
       seasonsPlayed
+      careerPitching {
+        games
+      }
+      pitchingSeasonsPlayed
     }
   }
 `;
@@ -28296,6 +28371,8 @@ export const UpdateLeagueSettings = gql`
       pitcherStartsPerMatchup
       minCareerGames
       minCareerSeasons
+      minCareerPitcherGames
+      minCareerPitcherSeasons
       totalMatchups
       playoffEnabled
       playoffFormat

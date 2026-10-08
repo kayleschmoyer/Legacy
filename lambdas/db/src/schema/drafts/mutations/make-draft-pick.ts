@@ -196,6 +196,8 @@ builder.mutationField('makeDraftPick', (t) =>
             playerPool: rules.playerPool,
             minCareerGames: rules.minCareerGames,
             minCareerSeasons: rules.minCareerSeasons,
+            minCareerPitcherGames: rules.minCareerPitcherGames,
+            minCareerPitcherSeasons: rules.minCareerPitcherSeasons,
             baseballHofOnly: rules.baseballHofOnly,
             baseballEraFilter: rules.baseballEraFilter,
             customEraStartYear: rules.customEraStartYear,

@@ -191,8 +191,8 @@ export async function bulkUpsertPitchingSeason(
 }
 
 /**
- * Refresh the career_batting, career_fielding, and career_pitching materialized
- * views.
+ * Refresh the career_batting, career_fielding, career_pitching and
+ * career_pitching_appearances materialized views.
  *
  * Should be called once per SQS batch after career stats have been written to the
  * underlying season_batting / season_fielding / season_pitching base tables.
@@ -211,6 +211,9 @@ export async function refreshCareerStats(db: PublicDb): Promise<void> {
   );
   await db.execute(
     sql`REFRESH MATERIALIZED VIEW CONCURRENTLY public.career_pitching`,
+  );
+  await db.execute(
+    sql`REFRESH MATERIALIZED VIEW CONCURRENTLY public.career_pitching_appearances`,
   );
 }
 

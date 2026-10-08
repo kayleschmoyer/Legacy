@@ -22,6 +22,7 @@ import {
   createGameBattingLoader,
   createGameFieldingLoader,
   createGamePitchingLoader,
+  createPitchingSeasonsPlayedLoader,
   createSeasonBattingLoader,
   createSeasonFieldingLoader,
   createSeasonPitchingLoader,
@@ -65,6 +66,7 @@ import {
 export {
   createCareerBattingLoader,
   createBattingSeasonsPlayedLoader,
+  createPitchingSeasonsPlayedLoader,
   createGameBattingLoader,
   createGamePitchingLoader,
   createGameFieldingLoader,
@@ -110,6 +112,7 @@ export const createLoaders = (db: GenericDatabase<typeof PublicSchema>) => ({
   careerFootballDefense: createCareerFootballDefenseLoader(db),
   careerFootballDefenseIdp: createCareerFootballDefenseIdpLoader(db),
   battingSeasonsPlayed: createBattingSeasonsPlayedLoader(db),
+  pitchingSeasonsPlayed: createPitchingSeasonsPlayedLoader(db),
   careerYearRange: createCareerYearRangeLoader(db),
   matchupMessages: createMatchupMessagesLoader(db),
   playoffMatchupsByBracket: createPlayoffMatchupsByBracketLoader(db),

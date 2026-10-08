@@ -2888,6 +2888,16 @@ export function LeagueDetailPage(): React.JSX.Element {
               ? undefined
               : (league.minCareerSeasons ?? 3)
           }
+          minCareerPitcherGames={
+            isViewingHistoricalRosterWeek
+              ? undefined
+              : (league.minCareerPitcherGames ?? 0)
+          }
+          minCareerPitcherSeasons={
+            isViewingHistoricalRosterWeek
+              ? undefined
+              : (league.minCareerPitcherSeasons ?? 0)
+          }
           onSetNickname={
             rosterIsReadOnly
               ? undefined
@@ -3538,6 +3548,8 @@ export function LeagueDetailPage(): React.JSX.Element {
             currentSpStartsPerMatchup={league.pitcherStartsPerMatchup ?? 1}
             currentMinCareerGames={league.minCareerGames ?? 50}
             currentMinCareerSeasons={league.minCareerSeasons ?? 3}
+            currentMinCareerPitcherGames={league.minCareerPitcherGames ?? 0}
+            currentMinCareerPitcherSeasons={league.minCareerPitcherSeasons ?? 0}
             currentTotalMatchups={league.totalMatchups ?? 10}
             currentPlayoffEnabled={league.playoffEnabled ?? true}
             currentPlayoffFormat={league.playoffFormat ?? '4-team'}

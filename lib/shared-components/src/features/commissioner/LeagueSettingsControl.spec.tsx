@@ -494,3 +494,72 @@ describe('LeagueSettingsControl — Waiver System (LS-6305)', () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe('LeagueSettingsControl — pitcher career minimums (LS-10807)', () => {
+  beforeEach(() => {
+    mockUpdateLeagueSettings.mockClear();
+  });
+
+  it('shows separate batter and pitcher rows and discloses the exemption while pitchers are Off', () => {
+    render(<LeagueSettingsControl {...defaultProps} />);
+
+    expect(screen.getByText('Batters — games played')).toBeInTheDocument();
+    expect(screen.getByText('Pitchers — games pitched')).toBeInTheDocument();
+    expect(screen.getByText('Batters — seasons batted')).toBeInTheDocument();
+    expect(screen.getByText('Pitchers — seasons pitched')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Minimum career games pitched: Off' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(
+      screen.getByText(/a pitcher with no MLB batting record is exempt/),
+    ).toBeInTheDocument();
+  });
+
+  it('enables Save on a pitcher-only change and saves both pitcher minimums', async () => {
+    render(<LeagueSettingsControl {...defaultProps} leagueId={9} />);
+
+    const saveButton = screen.getByRole('button', { name: 'Save Settings' });
+    expect(saveButton).toBeDisabled();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Minimum career games pitched: 25' }),
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Minimum career seasons pitched: 3' }),
+    );
+    expect(
+      screen.queryByText(/a pitcher with no MLB batting record is exempt/),
+    ).not.toBeInTheDocument();
+    expect(saveButton).toBeEnabled();
+    fireEvent.click(saveButton);
+
+    await screen.findByRole('button', { name: 'Save Settings' });
+    const call = mockUpdateLeagueSettings.mock.calls[0][0];
+    expect(call.variables.input.leagueId).toBe(9);
+    expect(call.variables.input.minCareerPitcherGames).toBe(25);
+    expect(call.variables.input.minCareerPitcherSeasons).toBe(3);
+    // Batter minimums are untouched by the pitcher rows.
+    expect(call.variables.input.minCareerGames).toBe(50);
+    expect(call.variables.input.minCareerSeasons).toBe(3);
+  });
+
+  it('Reset restores the saved pitcher minimums', () => {
+    render(
+      <LeagueSettingsControl
+        {...defaultProps}
+        currentMinCareerPitcherGames={50}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Minimum career games pitched: Off' }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Reset/ }));
+    expect(
+      screen.getByRole('button', { name: 'Minimum career games pitched: 50' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(
+      screen.getByRole('button', { name: 'Save Settings' }),
+    ).toBeDisabled();
+  });
+});

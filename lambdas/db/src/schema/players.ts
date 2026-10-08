@@ -303,6 +303,14 @@ PlayerRef.implement({
         return context.loaders.battingSeasonsPlayed.load(parent.id);
       },
     }),
+    pitchingSeasonsPlayed: t.int({
+      description:
+        'Number of distinct MLB seasons (AL/NL) with a pitching appearance — the pitcher career-minimum seasons measure (LS-10807)',
+      nullable: true,
+      resolve: async (parent, _args, context) => {
+        return context.loaders.pitchingSeasonsPlayed.load(parent.id);
+      },
+    }),
     careerAchievements: t.field({
       description:
         'Career honours and awards sourced from Baseball Reference (All-Star, Gold Glove, etc.)',
@@ -421,6 +429,8 @@ builder.queryField('players', (t) =>
 
       let minCareerGames: number | undefined;
       let minCareerSeasons: number | undefined;
+      let minCareerPitcherGames: number | undefined;
+      let minCareerPitcherSeasons: number | undefined;
       let leagueEraFilter: string | undefined;
       let leagueHofOnly: boolean | undefined;
       let leagueCustomEraStartYear: number | undefined;
@@ -433,6 +443,9 @@ builder.queryField('players', (t) =>
           .select({
             minCareerGames: PublicSchema.leagues.minCareerGames,
             minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
+            minCareerPitcherGames: PublicSchema.leagues.minCareerPitcherGames,
+            minCareerPitcherSeasons:
+              PublicSchema.leagues.minCareerPitcherSeasons,
             eraFilter: PublicSchema.leagues.baseballEraFilter,
             baseballHofOnly: PublicSchema.leagues.baseballHofOnly,
             customEraStartYear: PublicSchema.leagues.customEraStartYear,
@@ -446,6 +459,8 @@ builder.queryField('players', (t) =>
         if (leagueSettings) {
           minCareerGames = leagueSettings.minCareerGames ?? 50;
           minCareerSeasons = leagueSettings.minCareerSeasons ?? 3;
+          minCareerPitcherGames = leagueSettings.minCareerPitcherGames ?? 0;
+          minCareerPitcherSeasons = leagueSettings.minCareerPitcherSeasons ?? 0;
           leagueEraFilter = leagueSettings.eraFilter ?? 'all';
           leagueHofOnly = leagueSettings.baseballHofOnly ?? false;
           leagueCustomEraStartYear =
@@ -467,6 +482,8 @@ builder.queryField('players', (t) =>
           fullNameLike: args.search || undefined,
           minCareerGames,
           minCareerSeasons,
+          minCareerPitcherGames,
+          minCareerPitcherSeasons,
           baseballEraFilter: leagueEraFilter,
           baseballHofOnly: leagueHofOnly,
           customEraStartYear: leagueCustomEraStartYear,

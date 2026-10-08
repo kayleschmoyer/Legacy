@@ -179,6 +179,8 @@ mutation UpdateLeagueSettings($input: UpdateLeagueSettingsInput!) {
     pitcherStartsPerMatchup
     minCareerGames
     minCareerSeasons
+    minCareerPitcherGames
+    minCareerPitcherSeasons
     totalMatchups
     playoffEnabled
     playoffFormat

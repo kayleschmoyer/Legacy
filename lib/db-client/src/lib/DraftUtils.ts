@@ -328,10 +328,20 @@ export interface LeagueEligibilitySettings {
    * requires a corresponding DB migration.
    */
   playerPool: 'all' | 'nl' | 'al' | 'nfl' | 'afc' | 'nfc';
-  /** Minimum total career games (batting + pitching) a player must have */
+  /** Minimum career AL/NL batting games (`career_batting.g`) */
   minCareerGames: number;
-  /** Minimum distinct seasons a player must have appeared in */
+  /** Minimum distinct AL/NL batting seasons (`career_batting.seasons`) */
   minCareerSeasons: number;
+  /**
+   * Minimum career AL/NL games pitched (LS-10807). 0 / omitted = off. While
+   * both pitcher minimums are off, the batter minimums apply exactly as before
+   * (pure pitchers with no batting row pass); once either is set, pitchers are
+   * judged on pitching and position players on batting — see
+   * {@link careerMinimumConditions}.
+   */
+  minCareerPitcherGames?: number;
+  /** Minimum distinct AL/NL seasons with a pitching appearance (LS-10807). */
+  minCareerPitcherSeasons?: number;
   /** When true, restrict to Hall of Fame players only */
   baseballHofOnly?: boolean;
   /** Era filter ('all' or named era or 'custom') */
@@ -470,21 +480,27 @@ export function buildEligibilityConditions(
     });
   }
 
-  // Minimum career games (career_batting.g — pure pitchers pass automatically).
-  if (settings.minCareerGames > 0) {
+  // Minimum career games / seasons (batter thresholds on career_batting,
+  // pitcher thresholds on career_pitching_appearances — LS-10807).
+  const career = careerMinimumConditions(settings);
+  if (career.games) {
     conditions.push({
       key: 'careerGames',
-      condition: careerGamesCondition(settings.minCareerGames),
-      message: `Player does not meet the minimum career games requirement (${settings.minCareerGames})`,
+      condition: career.games,
+      message: `Player does not meet the minimum career games requirement (${formatCareerMinimum(
+        settings.minCareerGames,
+        settings.minCareerPitcherGames,
+      )})`,
     });
   }
-
-  // Minimum career seasons (distinct AL / NL batting seasons).
-  if (settings.minCareerSeasons > 0) {
+  if (career.seasons) {
     conditions.push({
       key: 'careerSeasons',
-      condition: careerSeasonsCondition(settings.minCareerSeasons),
-      message: `Player does not meet the minimum career seasons requirement (${settings.minCareerSeasons})`,
+      condition: career.seasons,
+      message: `Player does not meet the minimum career seasons requirement (${formatCareerMinimum(
+        settings.minCareerSeasons,
+        settings.minCareerPitcherSeasons,
+      )})`,
     });
   }
 
@@ -659,6 +675,135 @@ export function careerSeasonsCondition(minCareerSeasons: number): SQL {
   )`;
 }
 
+/** The four career thresholds, with the optional pitcher pair defaulted to 0. */
+interface CareerMinimums {
+  batterGames: number;
+  batterSeasons: number;
+  pitcherGames: number;
+  pitcherSeasons: number;
+}
+
+function resolveCareerMinimums(
+  settings: Pick<
+    LeagueEligibilitySettings,
+    | 'minCareerGames'
+    | 'minCareerSeasons'
+    | 'minCareerPitcherGames'
+    | 'minCareerPitcherSeasons'
+  >,
+): CareerMinimums {
+  return {
+    batterGames: settings.minCareerGames,
+    batterSeasons: settings.minCareerSeasons,
+    pitcherGames: settings.minCareerPitcherGames ?? 0,
+    pitcherSeasons: settings.minCareerPitcherSeasons ?? 0,
+  };
+}
+
+/** "50" for a batter-only rule, "batters 50, pitchers 25" once pitchers have one. */
+function formatCareerMinimum(
+  batter: number,
+  pitcher: number | undefined,
+): string {
+  return pitcher ? `batters ${batter}, pitchers ${pitcher}` : String(batter);
+}
+
+/**
+ * SQL condition for one career dimension under separate batter and pitcher
+ * thresholds (LS-10807). Each player is classified from their AL/NL
+ * appearances:
+ *
+ *  - position player — never pitched: batter threshold on `career_batting`;
+ *  - pure pitcher — pitched, and every batting game (if any) was one they
+ *    pitched in: pitcher threshold on `career_pitching_appearances`. Old-era
+ *    pitchers who batted are pitchers, not two-way players;
+ *  - two-way player — pitched AND batted in more games than they pitched:
+ *    eligible if they pass EITHER the full batter set (games and seasons) or
+ *    the full pitcher set;
+ *  - no MLB batting or pitching row at all — passes, as before.
+ *
+ * One hash anti-join over career_batting FULL JOIN
+ * career_pitching_appearances (every player with any AL/NL batting or
+ * pitching row), keyed on the coalesced player id. Verified on dev RDS
+ * (EXPLAIN ANALYZE, full baseball pool, 50/3 batters + 25/3 pitchers):
+ * ~47ms, vs ~29ms for the legacy batter-only pair. Splitting it into a
+ * batting-side and a pitcher-only anti-join instead let the planner
+ * underestimate the pitcher side and pick a nested-loop anti join (~2.8s).
+ */
+function roleSplitCareerCondition(
+  dimension: 'games' | 'seasons',
+  m: CareerMinimums,
+): SQL {
+  const batterPass =
+    dimension === 'games'
+      ? sql`cb.g >= ${m.batterGames}`
+      : sql`cb.seasons >= ${m.batterSeasons}`;
+  const pitcherPass =
+    dimension === 'games'
+      ? sql`COALESCE(cpa.g, 0) >= ${m.pitcherGames}`
+      : sql`COALESCE(cpa.seasons, 0) >= ${m.pitcherSeasons}`;
+  const twoWayPass = sql`(
+    (cb.g >= ${m.batterGames} AND cb.seasons >= ${m.batterSeasons})
+    OR (cpa.g >= ${m.pitcherGames} AND cpa.seasons >= ${m.pitcherSeasons})
+  )`;
+  return sql`NOT EXISTS (
+    SELECT 1 FROM career_batting cb
+    FULL JOIN career_pitching_appearances cpa ON cpa.player_id = cb.player_id
+    WHERE COALESCE(cb.player_id, cpa.player_id) = p.id
+      AND NOT COALESCE(
+        CASE
+          WHEN cb.player_id IS NULL THEN ${pitcherPass}
+          WHEN COALESCE(cpa.g, 0) = 0 THEN ${batterPass}
+          WHEN cb.g <= cpa.g THEN ${pitcherPass}
+          ELSE ${twoWayPass}
+        END,
+        FALSE
+      )
+  )`;
+}
+
+/**
+ * The league's career games / seasons predicates, or undefined for a
+ * dimension that doesn't apply. Single source of truth for the draft board,
+ * pick endpoints, batch eligibility filter and FA pool.
+ *
+ * While both pitcher minimums are 0 (the default), the legacy batter-only
+ * predicates are returned unchanged, so existing leagues behave exactly as
+ * before (LS-10807 AC). Once either pitcher minimum is set, both dimensions
+ * switch to {@link roleSplitCareerCondition}.
+ */
+export function careerMinimumConditions(
+  settings: Pick<
+    LeagueEligibilitySettings,
+    | 'minCareerGames'
+    | 'minCareerSeasons'
+    | 'minCareerPitcherGames'
+    | 'minCareerPitcherSeasons'
+  >,
+): { games?: SQL; seasons?: SQL } {
+  const m = resolveCareerMinimums(settings);
+  if (m.pitcherGames <= 0 && m.pitcherSeasons <= 0) {
+    return {
+      games:
+        m.batterGames > 0 ? careerGamesCondition(m.batterGames) : undefined,
+      seasons:
+        m.batterSeasons > 0
+          ? careerSeasonsCondition(m.batterSeasons)
+          : undefined,
+    };
+  }
+  return {
+    games:
+      m.batterGames > 0 || m.pitcherGames > 0
+        ? roleSplitCareerCondition('games', m)
+        : undefined,
+    seasons:
+      m.batterSeasons > 0 || m.pitcherSeasons > 0
+        ? roleSplitCareerCondition('seasons', m)
+        : undefined,
+  };
+}
+
 /**
  * Batch-filter a set of player IDs by league eligibility settings.
  *
@@ -753,14 +898,16 @@ export async function filterPlayerIdsByLeagueEligibility(
     );
   }
 
+  const career = careerMinimumConditions(settings);
+
   // 2. Minimum career games
-  if (settings.minCareerGames > 0 && currentIds.length > 0) {
+  if (career.games && currentIds.length > 0) {
     const rows = await db.execute(
       sql`
         SELECT p.id AS player_id
         FROM players p
         WHERE p.id = ANY(${sql.param(currentIds)}::integer[])
-          AND ${careerGamesCondition(settings.minCareerGames)}
+          AND ${career.games}
       `,
     );
 
@@ -772,13 +919,13 @@ export async function filterPlayerIdsByLeagueEligibility(
     excludedByCareerGames = before - currentIds.length;
 
     LOGGER.info(
-      `Min career games filter (≥${settings.minCareerGames}): ${before} → ${currentIds.length} (excluded ${excludedByCareerGames})`,
+      `Min career games filter (≥${formatCareerMinimum(settings.minCareerGames, settings.minCareerPitcherGames)}): ${before} → ${currentIds.length} (excluded ${excludedByCareerGames})`,
     );
   }
 
   // 3. Minimum career seasons
-  if (settings.minCareerSeasons > 0 && currentIds.length > 0) {
-    // LS-10552: same predicate as the draft board (careerSeasonsCondition),
+  if (career.seasons && currentIds.length > 0) {
+    // LS-10552: same predicate as the draft board (careerMinimumConditions),
     // reading the precomputed career_batting.seasons instead of re-counting
     // distinct season_batting seasons per batch (LS-4693's grouped CTE).
     const rows = await db.execute(
@@ -786,7 +933,7 @@ export async function filterPlayerIdsByLeagueEligibility(
         SELECT p.id AS player_id
         FROM players p
         WHERE p.id = ANY(${sql.param(currentIds)}::integer[])
-          AND ${careerSeasonsCondition(settings.minCareerSeasons)}
+          AND ${career.seasons}
       `,
     );
 
@@ -798,7 +945,7 @@ export async function filterPlayerIdsByLeagueEligibility(
     excludedByCareerSeasons = before - currentIds.length;
 
     LOGGER.info(
-      `Min career seasons filter (≥${settings.minCareerSeasons}): ${before} → ${currentIds.length} (excluded ${excludedByCareerSeasons})`,
+      `Min career seasons filter (≥${formatCareerMinimum(settings.minCareerSeasons, settings.minCareerPitcherSeasons)}): ${before} → ${currentIds.length} (excluded ${excludedByCareerSeasons})`,
     );
   }
 

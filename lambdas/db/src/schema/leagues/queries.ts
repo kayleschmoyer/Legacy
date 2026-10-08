@@ -130,6 +130,9 @@ builder.queryField('league', (t) =>
             gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
             minCareerGames: PublicSchema.leagues.minCareerGames,
             minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
+            minCareerPitcherGames: PublicSchema.leagues.minCareerPitcherGames,
+            minCareerPitcherSeasons:
+              PublicSchema.leagues.minCareerPitcherSeasons,
             totalMatchups: PublicSchema.leagues.totalMatchups,
             playoffEnabled: PublicSchema.leagues.playoffEnabled,
             playoffFormat: PublicSchema.leagues.playoffFormat,
@@ -243,6 +246,8 @@ builder.queryField('league', (t) =>
           gamesPerMatchup: league.gamesPerMatchup ?? undefined,
           minCareerGames: league.minCareerGames,
           minCareerSeasons: league.minCareerSeasons,
+          minCareerPitcherGames: league.minCareerPitcherGames,
+          minCareerPitcherSeasons: league.minCareerPitcherSeasons,
           totalMatchups: league.totalMatchups,
           playoffEnabled: league.playoffEnabled,
           playoffFormat: league.playoffFormat ?? undefined,
@@ -1745,6 +1750,8 @@ builder.queryField('previewEligiblePlayerCount', (t) =>
       customEraEndYear: t.arg.int({ required: false }),
       minCareerGames: t.arg.int({ required: false }),
       minCareerSeasons: t.arg.int({ required: false }),
+      minCareerPitcherGames: t.arg.int({ required: false }),
+      minCareerPitcherSeasons: t.arg.int({ required: false }),
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
@@ -1774,6 +1781,8 @@ builder.queryField('previewEligiblePlayerCount', (t) =>
         playerPool,
         minCareerGames: args.minCareerGames ?? 50,
         minCareerSeasons: args.minCareerSeasons ?? 3,
+        minCareerPitcherGames: args.minCareerPitcherGames ?? 0,
+        minCareerPitcherSeasons: args.minCareerPitcherSeasons ?? 0,
         baseballHofOnly: args.baseballHofOnly ?? false,
         baseballEraFilter: args.baseballEraFilter ?? undefined,
         customEraStartYear: args.customEraStartYear ?? null,

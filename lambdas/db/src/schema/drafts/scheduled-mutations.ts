@@ -359,6 +359,8 @@ export async function runAutoPickLockedTransaction(params: {
           playerPool: rules.playerPool,
           minCareerGames: rules.minCareerGames,
           minCareerSeasons: rules.minCareerSeasons,
+          minCareerPitcherGames: rules.minCareerPitcherGames,
+          minCareerPitcherSeasons: rules.minCareerPitcherSeasons,
           baseballHofOnly: rules.baseballHofOnly,
           eraFilter: rules.baseballEraFilter,
         },

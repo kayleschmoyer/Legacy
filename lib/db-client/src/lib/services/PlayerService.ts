@@ -12,6 +12,7 @@ import {
 } from 'drizzle-orm';
 import { DbOptions } from '@legacy-sports/utils/node';
 import {
+  careerMinimumConditions,
   filterPlayerIdsByLeagueEligibility,
   getPresetEraRange,
 } from '../DraftUtils';
@@ -109,6 +110,13 @@ export interface PlayerFilters {
   minCareerGames?: number;
   /** Minimum distinct MLB seasons in which the player appeared */
   minCareerSeasons?: number;
+  /**
+   * League pitcher career minimums (LS-10807). When either is > 0 the league
+   * career rule ({@link careerMinimumConditions}) replaces the per-position
+   * minCareerGames / minCareerSeasons filters in the league-scoped listing.
+   */
+  minCareerPitcherGames?: number;
+  minCareerPitcherSeasons?: number;
   /**
    * Restrict the pool to players whose careers overlapped with the given
    * baseball era. 'all' (default) imposes no restriction.
@@ -428,6 +436,8 @@ export class PlayerService {
           playerPool: PublicSchema.leagues.playerPool,
           minCareerGames: PublicSchema.leagues.minCareerGames,
           minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
+          minCareerPitcherGames: PublicSchema.leagues.minCareerPitcherGames,
+          minCareerPitcherSeasons: PublicSchema.leagues.minCareerPitcherSeasons,
           baseballHofOnly: PublicSchema.leagues.baseballHofOnly,
           baseballEraFilter: PublicSchema.leagues.baseballEraFilter,
           customEraStartYear: PublicSchema.leagues.customEraStartYear,
@@ -474,6 +484,8 @@ export class PlayerService {
               playerPool: league.playerPool,
               minCareerGames: league.minCareerGames ?? 0,
               minCareerSeasons: league.minCareerSeasons ?? 0,
+              minCareerPitcherGames: league.minCareerPitcherGames ?? 0,
+              minCareerPitcherSeasons: league.minCareerPitcherSeasons ?? 0,
               baseballHofOnly: league.baseballHofOnly ?? false,
               baseballEraFilter: league.baseballEraFilter ?? 'all',
               customEraStartYear: league.customEraStartYear ?? null,
@@ -1026,7 +1038,26 @@ export class PlayerService {
           queryOptions.filters?.position ?? '',
         );
 
+        // League pitcher minimums set (LS-10807): apply the league's
+        // role-split career rule — the same predicates as the draft board
+        // and FA pool — instead of the per-position filters below.
+        const leagueCareer =
+          (queryOptions.filters?.minCareerPitcherGames ?? 0) > 0 ||
+          (queryOptions.filters?.minCareerPitcherSeasons ?? 0) > 0
+            ? careerMinimumConditions({
+                minCareerGames: queryOptions.filters?.minCareerGames ?? 0,
+                minCareerSeasons: queryOptions.filters?.minCareerSeasons ?? 0,
+                minCareerPitcherGames:
+                  queryOptions.filters?.minCareerPitcherGames,
+                minCareerPitcherSeasons:
+                  queryOptions.filters?.minCareerPitcherSeasons,
+              })
+            : null;
+        if (leagueCareer?.games) rawConditions.push(leagueCareer.games);
+        if (leagueCareer?.seasons) rawConditions.push(leagueCareer.seasons);
+
         if (
+          !leagueCareer &&
           queryOptions.filters?.minCareerGames !== undefined &&
           queryOptions.filters.minCareerGames > 0
         ) {
@@ -1042,6 +1073,7 @@ export class PlayerService {
         }
 
         if (
+          !leagueCareer &&
           queryOptions.filters?.minCareerSeasons !== undefined &&
           queryOptions.filters.minCareerSeasons > 0
         ) {

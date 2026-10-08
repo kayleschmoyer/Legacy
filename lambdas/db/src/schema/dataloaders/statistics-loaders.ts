@@ -78,6 +78,27 @@ export const createBattingSeasonsPlayedLoader = (
   });
 
 /**
+ * DataLoader for count of distinct AL/NL seasons with a pitching appearance
+ * (LS-10807) — read from career_pitching_appearances, the same relation the
+ * league pitcher career-minimum rule uses.
+ */
+export const createPitchingSeasonsPlayedLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<number, number>(async (keys) => {
+    const rows = await db
+      .select({
+        playerId: PublicSchema.careerPitchingAppearances.playerId,
+        seasons: PublicSchema.careerPitchingAppearances.seasons,
+      })
+      .from(PublicSchema.careerPitchingAppearances)
+      .where(inArray(PublicSchema.careerPitchingAppearances.playerId, keys));
+
+    const map = new Map(rows.map((r) => [r.playerId, r.seasons ?? 0]));
+    return keys.map((key) => map.get(key) ?? 0);
+  });
+
+/**
  * DataLoader for player career year range (min/max season year across AL/NL batting).
  *
  * Used to compute a player's "primary era" for display on player cards and the

@@ -4,8 +4,7 @@
  * Queries: freeAgents, teamWaiverClaims, teamWaiverPriority
  */
 import {
-  careerGamesCondition,
-  careerSeasonsCondition,
+  careerMinimumConditions,
   PublicSchema,
 } from '@legacy-sports/db-client';
 import { and, eq, inArray, lt, sql } from 'drizzle-orm';
@@ -40,6 +39,8 @@ builder.queryField('freeAgents', (t) =>
         .select({
           minCareerGames: PublicSchema.leagues.minCareerGames,
           minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
+          minCareerPitcherGames: PublicSchema.leagues.minCareerPitcherGames,
+          minCareerPitcherSeasons: PublicSchema.leagues.minCareerPitcherSeasons,
           playerPool: PublicSchema.leagues.playerPool,
           sport: PublicSchema.leagues.sport,
         })
@@ -86,16 +87,15 @@ builder.queryField('freeAgents', (t) =>
       const leagueSport = (league.sport ?? 'baseball') as string;
       sqlConditions.push(sql`p.sport = ${leagueSport}`);
 
-      // Apply career minimums
-      const minCareerGames = league.minCareerGames ?? 50;
-      if (minCareerGames > 0) {
-        sqlConditions.push(careerGamesCondition(minCareerGames));
-      }
-
-      const minCareerSeasons = league.minCareerSeasons ?? 3;
-      if (minCareerSeasons > 0) {
-        sqlConditions.push(careerSeasonsCondition(minCareerSeasons));
-      }
+      // Apply career minimums (batter + pitcher thresholds, LS-10807)
+      const career = careerMinimumConditions({
+        minCareerGames: league.minCareerGames ?? 50,
+        minCareerSeasons: league.minCareerSeasons ?? 3,
+        minCareerPitcherGames: league.minCareerPitcherGames ?? 0,
+        minCareerPitcherSeasons: league.minCareerPitcherSeasons ?? 0,
+      });
+      if (career.games) sqlConditions.push(career.games);
+      if (career.seasons) sqlConditions.push(career.seasons);
 
       const joinClause = sql.join(joinClauses, sql` `);
       const whereClause =

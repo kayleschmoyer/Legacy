@@ -223,6 +223,8 @@ describe('previewEligiblePlayerCount (LS-6089)', () => {
       playerPool: 'all',
       minCareerGames: 50,
       minCareerSeasons: 3,
+      minCareerPitcherGames: 0,
+      minCareerPitcherSeasons: 0,
       baseballHofOnly: false,
       baseballEraFilter: 'custom',
       customEraStartYear: 1942,
