@@ -37,12 +37,12 @@ export const HELP_FAQ_ITEMS: HelpFaqItem[] = [
   {
     question: 'How do I create a fantasy baseball league?',
     answer:
-      'Navigate to Baseball → Create League from the top navigation. Fill in your league name, choose your scoring settings, and set the number of teams. Once created, you can invite others using the league invite code found in the League Settings tab.',
+      "Navigate to Baseball → Create League from the top navigation. Fill in your league name, choose your scoring settings, and set the number of teams. Once created, you can invite others with the invite link or code on the Invite Friends card in your league's Overview tab.",
   },
   {
     question: 'How do I invite teammates to join my league?',
     answer:
-      'Open your league page and go to the Settings tab. Copy the invite code or share the invite link directly. Players can join via Baseball → Join League and entering the code, or by clicking your shared link.',
+      'Open your league page and find the Invite Friends card on the Overview tab (visible to the league commissioner). Copy the invite code or share the invite link directly. Players can join via Baseball → Join League and entering the code, or by clicking your shared link.',
   },
   {
     question: 'How does the draft work?',
@@ -52,7 +52,7 @@ export const HELP_FAQ_ITEMS: HelpFaqItem[] = [
   {
     question: 'How is my team score calculated?',
     answer:
-      "Scores are calculated from archived MLB box-score statistics loaded when games are selected for your matchup. Each counting stat (H, HR, RBI, R, SB, etc.) is multiplied by a configurable point value defined in your league's scoring profile. You can view the exact scoring breakdown in your league's Settings tab.",
+      "Scores are calculated from archived MLB box-score statistics loaded when games are selected for your matchup. Each counting stat (H, HR, RBI, R, SB, etc.) is multiplied by a configurable point value defined in your league's scoring profile. You can view the exact scoring breakdown under Scoring on your league's Overview tab.",
   },
   {
     question: 'How do I add or drop players?',
@@ -61,7 +61,7 @@ export const HELP_FAQ_ITEMS: HelpFaqItem[] = [
   {
     question: 'How do I view matchup results?',
     answer:
-      'Click on your league and select the Matchups tab. Current and historical matchup scores are shown there. You can also click into any matchup for a player-by-player breakdown.',
+      'Click on your league and select the Matchup tab (Matchups in the mobile app). Current and historical matchup scores are shown there. You can also click into any matchup for a player-by-player breakdown.',
   },
   {
     question: 'Why are my player statistics not updating?',
@@ -69,9 +69,9 @@ export const HELP_FAQ_ITEMS: HelpFaqItem[] = [
       'Player statistics come from archived historical box scores and are loaded when games are selected for your matchup. If stats appear missing after a game has been selected, the system may still be loading data from our historical data source. This usually completes within minutes. If stats are still missing after an hour, try refreshing the page or contact support.',
   },
   {
-    question: 'How do I change my display name or avatar?',
+    question: 'How do I change my username or avatar?',
     answer:
-      'Go to Profile → Settings from the user menu. You can update your display name and other profile details there.',
+      'Go to Profile Settings from the user menu. You can update your username and avatar there.',
   },
 ];
 

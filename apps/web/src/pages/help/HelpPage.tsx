@@ -87,7 +87,7 @@ const TUTORIAL_PREVIEW_STEPS = [
   {
     n: '02',
     title: 'Build your roster',
-    desc: 'Draft 23 across all positions',
+    desc: 'Draft a full roster across all positions',
     time: '~ 25s',
   },
   {
