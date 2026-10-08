@@ -594,7 +594,12 @@ function Header({
       </XStack>
 
       {counters.length > 0 && (
-        <XStack alignItems="center" gap="$3" flexWrap="wrap">
+        <XStack
+          alignItems="center"
+          gap="$3"
+          flexWrap="wrap"
+          data-testid="scoreboard-counters"
+        >
           {counters}
         </XStack>
       )}
@@ -653,6 +658,10 @@ export function ScoreboardContainer({
   const { liveGames, upcomingGames, finalGames, postponedGames } =
     partitionScoreboardGames(games);
   const isAnyGameLive = liveGames.length > 0;
+  // There is no NFL feed yet, so any games/lastUpdated the host still holds
+  // (e.g. Apollo keeps the last MLB result while the query is skipped) belong
+  // to another sport — never summarise them under the NFL heading (LS-10729).
+  const isNfl = sport === 'nfl';
 
   return (
     <YStack
@@ -669,15 +678,15 @@ export function ScoreboardContainer({
         sport={sport}
         onSportChange={onSportChange}
         disabledSports={disabledSports}
-        liveCount={liveGames.length}
-        upcomingCount={upcomingGames.length}
-        finalCount={finalGames.length}
-        lastUpdated={lastUpdated}
-        isAnyGameLive={isAnyGameLive}
+        liveCount={isNfl ? 0 : liveGames.length}
+        upcomingCount={isNfl ? 0 : upcomingGames.length}
+        finalCount={isNfl ? 0 : finalGames.length}
+        lastUpdated={isNfl ? null : lastUpdated}
+        isAnyGameLive={!isNfl && isAnyGameLive}
         dateNav={dateNav}
       />
 
-      {sport === 'nfl' ? (
+      {isNfl ? (
         <NflComingSoonView />
       ) : (
         <>

@@ -185,6 +185,49 @@ describe('ScoreboardContainer', () => {
     expect(queryByTestId('game-card-1001')).toBeNull();
   });
 
+  it('hides MLB counters and the Updated row when NFL is selected (LS-10729)', () => {
+    const { queryByTestId, queryByText } = renderContainer({
+      sport: 'nfl',
+      games: [
+        makeGame(1001, 'Live'),
+        makeGame(1002, 'Preview'),
+        makeGame(1003, 'Final'),
+      ],
+      lastUpdated: '2026-04-01T18:00:00.000Z',
+    });
+    expect(queryByTestId('scoreboard-counters')).toBeNull();
+    expect(queryByTestId('scoreboard-last-updated')).toBeNull();
+    expect(queryByText(/Auto-refreshing/)).toBeNull();
+  });
+
+  it('restores the counters and Updated row when switching back from NFL', () => {
+    const games = [makeGame(1002, 'Preview'), makeGame(1003, 'Final')];
+    const lastUpdated = '2026-04-01T18:00:00.000Z';
+    const { queryByTestId, getByTestId, rerender } = renderContainer({
+      sport: 'nfl',
+      games,
+      lastUpdated,
+    });
+    expect(queryByTestId('scoreboard-counters')).toBeNull();
+
+    rerender(
+      <ScoreboardContainer
+        date="2026-04-01"
+        sport="mlb"
+        onSportChange={() => undefined}
+        games={games}
+        lastUpdated={lastUpdated}
+        dateNav={dateNav}
+      />,
+    );
+    const counters = getByTestId('scoreboard-counters').textContent;
+    expect(counters).toContain('Upcoming');
+    expect(counters).toContain('Final');
+    expect(getByTestId('scoreboard-last-updated').textContent).toContain(
+      'Updated',
+    );
+  });
+
   it('uses NFL section labels instead of MLB labels when NFL is selected', () => {
     const { getByTestId } = renderContainer({ sport: 'nfl' });
     const eyebrow = getByTestId('scoreboard-eyebrow').textContent;
