@@ -79,21 +79,13 @@ describe('partitionScoreboardGames', () => {
 
 describe('shouldPollScoreboard', () => {
   it('polls when any game is live, regardless of date', () => {
-    expect(shouldPollScoreboard([makeGame(1, 'Live')], '2000-01-01')).toBe(
-      true,
-    );
+    expect(shouldPollScoreboard([makeGame(1, 'Live')])).toBe(true);
   });
 
-  it('polls for upcoming games only when the date is today', () => {
-    const upcoming = [makeGame(1, 'Preview')];
-    expect(shouldPollScoreboard(upcoming, todayISO())).toBe(true);
-    expect(shouldPollScoreboard(upcoming, '2000-01-01')).toBe(false);
-  });
-
-  it('does not poll when all games are final', () => {
-    expect(shouldPollScoreboard([makeGame(1, 'Final')], todayISO())).toBe(
-      false,
-    );
+  it('does not poll when no game is live (LS-10721)', () => {
+    expect(
+      shouldPollScoreboard([makeGame(1, 'Final'), makeGame(2, 'Preview')]),
+    ).toBe(false);
   });
 });
 

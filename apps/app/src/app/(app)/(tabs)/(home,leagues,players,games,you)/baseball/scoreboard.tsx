@@ -22,7 +22,7 @@ export default function ScoreboardScreen(): React.JSX.Element {
   const [date, setDate] = useState(todayISO());
   const [sport, setSport] = useState<SportKey>('all');
 
-  const { data, loading, error, startPolling, stopPolling } =
+  const { data, loading, error, startPolling, stopPolling, refetch } =
     useGetScoreboardQuery({
       variables: { date },
       fetchPolicy: 'cache-and-network',
@@ -35,7 +35,14 @@ export default function ScoreboardScreen(): React.JSX.Element {
 
   const games: ScoreboardGame[] = data?.scoreboard?.games ?? [];
 
-  useScoreboardLivePolling({ games, date, startPolling, stopPolling });
+  useScoreboardLivePolling({
+    games,
+    date,
+    startPolling,
+    stopPolling,
+    refetch,
+    enabled: sport !== 'nfl',
+  });
 
   return (
     <SafeScreen>

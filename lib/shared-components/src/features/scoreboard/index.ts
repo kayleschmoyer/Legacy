@@ -5,7 +5,9 @@ export {
 export { SportFilter, type SportKey } from './SportFilter';
 export { SportGlyph, type SportGlyphProps } from './SportGlyph';
 export {
+  nextScoreboardRefetchDelayMs,
   partitionScoreboardGames,
+  SCOREBOARD_PREGAME_RECHECK_MS,
   shouldPollScoreboard,
   type PartitionedGames,
 } from './partition';

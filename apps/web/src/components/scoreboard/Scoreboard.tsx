@@ -201,7 +201,7 @@ export function Scoreboard() {
   const [date, setDate] = useScoreboardDateParam();
   const [sport, setSport] = React.useState<SportKey>('all');
 
-  const { data, loading, error, startPolling, stopPolling } =
+  const { data, loading, error, startPolling, stopPolling, refetch } =
     useGetScoreboardQuery({
       variables: { date },
       fetchPolicy: 'cache-and-network',
@@ -221,7 +221,14 @@ export function Scoreboard() {
   // so a direct assignment works without a runtime mapping step.
   const games: ScoreboardGame[] = data?.scoreboard?.games ?? [];
 
-  useScoreboardLivePolling({ games, date, startPolling, stopPolling });
+  useScoreboardLivePolling({
+    games,
+    date,
+    startPolling,
+    stopPolling,
+    refetch,
+    enabled: sport !== 'nfl',
+  });
 
   return (
     <ScoreboardContainer

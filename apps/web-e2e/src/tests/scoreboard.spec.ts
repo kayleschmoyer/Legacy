@@ -606,7 +606,7 @@ test.describe('Scoreboard — sport filter @regression', () => {
     // Deliberately use a non-live game (status 'Final', not 'Live') here even
     // though gamePk 1001 mirrors MOCK_LIVE_GAME. `shouldPollScoreboard`
     // (lib/shared-components/src/features/scoreboard/partition.ts) starts a
-    // 6s Apollo live-poll whenever any game is 'Live', and under CI load a
+    // 15s Apollo live-poll whenever any game is 'Live', and under CI load a
     // test can take long enough to reach the NFL click near that poll
     // boundary — racing the in-flight poll tick against the `skip: true`
     // re-render and firing a second GetScoreboard just after the switch.

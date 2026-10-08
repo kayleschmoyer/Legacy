@@ -95,13 +95,26 @@ const mockGames = [
 // Overridable per test; reset to the all-Final slate in beforeEach.
 let mockScoreboardGames: Array<Record<string, unknown>> = mockGames;
 
+const mockScoreboardQueryOptions: unknown[] = [];
+const mockUseScoreboardLivePolling = jest.fn();
+
+jest.mock('@legacy-sports/shared-components/scoreboard', () => ({
+  todayISO: () => '2026-10-06',
+  useScoreboardLivePolling: (options: unknown): void => {
+    mockUseScoreboardLivePolling(options);
+  },
+}));
+
 jest.mock('@legacy-sports/graphql', () => ({
-  useGetScoreboardQuery: () => ({
-    data: { scoreboard: { games: mockScoreboardGames } },
-    startPolling: jest.fn(),
-    stopPolling: jest.fn(),
-    refetch: jest.fn(),
-  }),
+  useGetScoreboardQuery: (options: unknown) => {
+    mockScoreboardQueryOptions.push(options);
+    return {
+      data: { scoreboard: { games: mockScoreboardGames } },
+      startPolling: jest.fn(),
+      stopPolling: jest.fn(),
+      refetch: jest.fn(),
+    };
+  },
 }));
 
 // ─── Layout stubs ─────────────────────────────────────────────────────────────
@@ -162,6 +175,8 @@ afterAll(() => {
 
 beforeEach(() => {
   mockScoreboardGames = mockGames;
+  mockScoreboardQueryOptions.length = 0;
+  mockUseScoreboardLivePolling.mockClear();
   resizeCallbacks = [];
   (globalThis as { ResizeObserver?: unknown }).ResizeObserver =
     MockResizeObserver;
@@ -179,6 +194,28 @@ function chipLinks() {
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
+
+describe('ScoreboardTicker data sharing (LS-10721)', () => {
+  it("queries today's explicit date so it shares the /scoreboard page's cache entry", () => {
+    render(<ScoreboardTicker />);
+
+    expect(mockScoreboardQueryOptions[0]).toMatchObject({
+      variables: { date: '2026-10-06' },
+    });
+  });
+
+  it('hands polling to the shared scoreboard poller for that date', () => {
+    render(<ScoreboardTicker />);
+
+    expect(mockUseScoreboardLivePolling).toHaveBeenCalledWith(
+      expect.objectContaining({
+        date: '2026-10-06',
+        games: mockGames,
+        enabled: true,
+      }),
+    );
+  });
+});
 
 describe('ScoreboardTicker overflow-only marquee (LS-10425)', () => {
   it('renders each game once, static, when the chips fit the strip', () => {

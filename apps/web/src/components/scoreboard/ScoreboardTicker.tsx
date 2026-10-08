@@ -4,6 +4,10 @@ import { styled, Text, XStack } from 'tamagui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { useGetScoreboardQuery } from '@legacy-sports/graphql';
 import {
+  todayISO,
+  useScoreboardLivePolling,
+} from '@legacy-sports/shared-components/scoreboard';
+import {
   NAV_HEIGHT_PX,
   TICKER_HEIGHT_PX,
   TICKER_Z_INDEX,
@@ -12,7 +16,6 @@ import { FONT_DISPLAY } from '../../constants/typography';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const LIVE_POLL_MS = 15_000;
 const BIG_SHOULDERS = FONT_DISPLAY;
 
 /** Scale scroll speed with game count so 3 games and 15 games both feel natural. */
@@ -302,11 +305,16 @@ function Separator() {
 /**
  * ScoreboardTicker — a horizontally auto-scrolling strip fixed just below the
  * nav bar showing today's MLB scores. Hidden when no games are returned.
- * Auto-polls every 15 seconds while any game is live.
+ * Auto-polls while any game is live, sharing one poller with the /scoreboard
+ * page (LS-10721).
  */
 export function ScoreboardTicker() {
   const { isAuthenticated } = useAuth();
+  // Same explicit date as the /scoreboard page, so both share one cache entry
+  // and loading the page issues a single GetScoreboard request (LS-10721).
+  const date = todayISO();
   const { data, startPolling, stopPolling, refetch } = useGetScoreboardQuery({
+    variables: { date },
     fetchPolicy: 'cache-and-network',
     // Preserve cached games on poll errors so a transient 504 (e.g. while the
     // window is unfocused) does not wipe `data` and make the ticker
@@ -355,29 +363,20 @@ export function ScoreboardTicker() {
   }, [refetch]);
 
   const games: TickerGame[] = data?.scoreboard?.games ?? [];
-  const isAnyGameLive = games.some((g) => g.status === 'Live');
-  // Also poll while upcoming games exist — games can transition from Upcoming
-  // → Live without triggering a re-fetch otherwise. The ticker always shows
-  // today's schedule, so no date guard is needed here.
-  const isAnyGameUpcoming = games.some(
-    (g) => g.status !== 'Live' && g.status !== 'Final',
-  );
-  const shouldPoll = isAnyGameLive || isAnyGameUpcoming;
+  useScoreboardLivePolling({
+    games: data?.scoreboard?.games ?? [],
+    date,
+    startPolling,
+    stopPolling,
+    refetch,
+    enabled: isAuthenticated,
+  });
 
   // Detect reduced-motion preference once on mount (synchronous so there is no
   // flash of the animated layout before switching to the static one).
   const prefersReducedMotion =
     typeof window !== 'undefined' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  useEffect(() => {
-    if (shouldPoll) {
-      startPolling(LIVE_POLL_MS);
-    } else {
-      stopPolling();
-    }
-    return () => stopPolling();
-  }, [shouldPoll, startPolling, stopPolling]);
 
   const [paused, setPaused] = useState(false);
   const viewportRef = useRef<HTMLDivElement>(null);
