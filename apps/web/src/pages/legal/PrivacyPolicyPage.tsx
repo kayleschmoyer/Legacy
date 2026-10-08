@@ -11,6 +11,7 @@ import { styled, Text } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
 import { CookieSettingsButton } from '../../consent/ConsentManager';
 import { BRAND_GOLD } from '../../constants/colors';
+import { useThemeContext } from '../../context/ThemeContext';
 
 const Container = styled(YStack, {
   maxWidth: 800,
@@ -43,30 +44,76 @@ const BodyText = styled(Paragraph, {
   lineHeight: 24,
 });
 
+/**
+ * Horizontal scroll region for the processors table (LS-10763). The table is
+ * wider than a phone viewport and the app shell clips x-overflow, so the table
+ * scrolls inside its own region instead. It is focusable so keyboard users can
+ * scroll it with the arrow keys.
+ */
+const tableScrollStyle: React.CSSProperties = {
+  overflowX: 'auto',
+  width: '100%',
+};
+
 const tableStyle: React.CSSProperties = {
   width: '100%',
+  // Keeps the four columns readable on phones; the region above scrolls.
+  minWidth: 640,
   borderCollapse: 'collapse',
   fontSize: 13,
 };
 
-const thStyle: React.CSSProperties = {
-  fontWeight: 600,
-  textAlign: 'left',
-  padding: '8px 12px 8px 0',
-  borderBottom: '2px solid #333',
-  color: '#e5e5e5',
-};
+/**
+ * Table colours per theme (LS-10730). Dark keeps its original raw values so
+ * the dark table is unchanged; light reads the Tamagui theme CSS variables so
+ * the text stays readable on the light page.
+ */
+const TABLE_PALETTE = {
+  dark: {
+    heading: '#e5e5e5',
+    cell: '#a3a3a3',
+    headingBorder: '2px solid #333',
+    rowBorder: '1px solid #333',
+    link: BRAND_GOLD,
+  },
+  light: {
+    heading: 'var(--color12)',
+    cell: 'var(--color11)',
+    headingBorder: '2px solid var(--borderColor)',
+    rowBorder: '1px solid var(--outlineSubtle)',
+    link: 'var(--goldText)',
+  },
+} as const;
 
-const tdStyle: React.CSSProperties = {
-  color: '#a3a3a3',
-  padding: '8px 12px 8px 0',
-  borderBottom: '1px solid #333',
-  verticalAlign: 'top',
-  lineHeight: '20px',
-};
+type TablePalette = (typeof TABLE_PALETTE)[keyof typeof TABLE_PALETTE];
+
+function tableCellStyles(palette: TablePalette) {
+  const th: React.CSSProperties = {
+    fontWeight: 600,
+    textAlign: 'left',
+    padding: '8px 12px 8px 0',
+    borderBottom: palette.headingBorder,
+    color: palette.heading,
+  };
+  const td: React.CSSProperties = {
+    color: palette.cell,
+    padding: '8px 12px 8px 0',
+    borderBottom: palette.rowBorder,
+    verticalAlign: 'top',
+    lineHeight: '20px',
+  };
+  const link: React.CSSProperties = { color: palette.link };
+  return { th, td, link };
+}
 
 export default function PrivacyPolicyPage() {
   const navigate = useNavigate();
+  const { resolvedTheme } = useThemeContext();
+  const {
+    th: thStyle,
+    td: tdStyle,
+    link: linkStyle,
+  } = tableCellStyles(TABLE_PALETTE[resolvedTheme]);
 
   return (
     <Container>
@@ -172,202 +219,210 @@ export default function PrivacyPolicyPage() {
           practices of third-party services.
         </BodyText>
 
-        <table style={tableStyle}>
-          <thead>
-            <tr>
-              <th scope="col" style={thStyle}>
-                Service
-              </th>
-              <th scope="col" style={thStyle}>
-                Purpose
-              </th>
-              <th scope="col" style={thStyle}>
-                Data Shared
-              </th>
-              <th scope="col" style={thStyle}>
-                Privacy Policy
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td style={tdStyle}>Google</td>
-              <td style={tdStyle}>Authentication (Sign in with Google)</td>
-              <td style={tdStyle}>Email address, name, profile picture</td>
-              <td style={tdStyle}>
-                <a
-                  href="https://policies.google.com/privacy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: BRAND_GOLD }}
-                >
-                  policies.google.com/privacy
-                </a>
-              </td>
-            </tr>
-            <tr>
-              <td style={tdStyle}>Discord</td>
-              <td style={tdStyle}>Authentication (Sign in with Discord)</td>
-              <td style={tdStyle}>Discord username, email address</td>
-              <td style={tdStyle}>
-                <a
-                  href="https://discord.com/privacy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: BRAND_GOLD }}
-                >
-                  discord.com/privacy
-                </a>
-              </td>
-            </tr>
-            <tr>
-              <td style={tdStyle}>Stripe</td>
-              <td style={tdStyle}>
-                Payment processing and subscription billing
-              </td>
-              <td style={tdStyle}>
-                Name, email address, payment card details, billing address
-              </td>
-              <td style={tdStyle}>
-                <a
-                  href="https://stripe.com/privacy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: BRAND_GOLD }}
-                >
-                  stripe.com/privacy
-                </a>
-              </td>
-            </tr>
-            <tr>
-              <td style={tdStyle}>Rollbar</td>
-              <td style={tdStyle}>Error monitoring and crash reporting</td>
-              <td style={tdStyle}>
-                Stack traces, device info, may include user identifiers in error
-                context
-              </td>
-              <td style={tdStyle}>
-                <a
-                  href="https://rollbar.com/privacy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: BRAND_GOLD }}
-                >
-                  rollbar.com/privacy
-                </a>
-              </td>
-            </tr>
-            <tr>
-              <td style={tdStyle}>Expo (expo-notifications)</td>
-              <td style={tdStyle}>Push notification delivery</td>
-              <td style={tdStyle}>Device push token</td>
-              <td style={tdStyle}>
-                <a
-                  href="https://expo.dev/privacy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: BRAND_GOLD }}
-                >
-                  expo.dev/privacy
-                </a>
-              </td>
-            </tr>
-            <tr>
-              <td style={tdStyle}>Apple (App Store / IAP)</td>
-              <td style={tdStyle}>In-app purchase processing (iOS)</td>
-              <td style={tdStyle}>Purchase receipts, Apple customer ID</td>
-              <td style={tdStyle}>
-                <a
-                  href="https://www.apple.com/legal/privacy/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: BRAND_GOLD }}
-                >
-                  apple.com/legal/privacy
-                </a>
-              </td>
-            </tr>
-            <tr>
-              <td style={tdStyle}>Google (Google Play Billing)</td>
-              <td style={tdStyle}>In-app purchase processing (Android)</td>
-              <td style={tdStyle}>Purchase receipts, Google customer ID</td>
-              <td style={tdStyle}>
-                <a
-                  href="https://policies.google.com/privacy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: BRAND_GOLD }}
-                >
-                  policies.google.com/privacy
-                </a>
-              </td>
-            </tr>
-            <tr>
-              <td style={tdStyle}>
-                Google Analytics 4 (Google LLC; measurement ID G-DHBXH3R106)
-              </td>
-              <td style={tdStyle}>
-                Usage analytics: which pages and features are used, so we can
-                improve the Service. Only with your consent in the EEA, UK and
-                Switzerland; see section 5.
-              </td>
-              <td style={tdStyle}>
-                Pages viewed and in-app events (for example, starting a mock
-                draft); a pseudonymous browser ID (_ga cookie); when signed in,
-                your account ID, plan type, account age, number of leagues and
-                main sport; device and browser type; approximate location
-                derived from your IP address (Google Analytics 4 does not log or
-                store IP addresses). Google Analytics deletes this data
-                automatically when our data-retention period ends.
-              </td>
-              <td style={tdStyle}>
-                <a
-                  href="https://policies.google.com/privacy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: BRAND_GOLD }}
-                >
-                  policies.google.com/privacy
-                </a>
-                <br />
-                Opt out: Cookie settings, or the{' '}
-                <a
-                  href="https://tools.google.com/dlpage/gaoptout"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: BRAND_GOLD }}
-                >
-                  Google Analytics opt-out add-on
-                </a>
-              </td>
-            </tr>
-            <tr>
-              <td style={tdStyle}>GrowthBook</td>
-              <td style={tdStyle}>
-                Feature flags and experiments: deciding which features, and
-                which version of a feature, you see.
-              </td>
-              <td style={tdStyle}>
-                Your browser downloads feature settings from GrowthBook&apos;s
-                content delivery network, which receives your IP address and
-                browser details as part of that request. Feature decisions are
-                made in your browser, and the settings are cached in local
-                storage. With analytics consent, which version of an experiment
-                you saw is sent to Google Analytics (not to GrowthBook).
-              </td>
-              <td style={tdStyle}>
-                <a
-                  href="https://www.growthbook.io/privacy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: BRAND_GOLD }}
-                >
-                  growthbook.io/privacy
-                </a>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div
+          role="region"
+          aria-label="Third-party services"
+          tabIndex={0}
+          style={tableScrollStyle}
+        >
+          <table style={tableStyle}>
+            <thead>
+              <tr>
+                <th scope="col" style={thStyle}>
+                  Service
+                </th>
+                <th scope="col" style={thStyle}>
+                  Purpose
+                </th>
+                <th scope="col" style={thStyle}>
+                  Data Shared
+                </th>
+                <th scope="col" style={thStyle}>
+                  Privacy Policy
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style={tdStyle}>Google</td>
+                <td style={tdStyle}>Authentication (Sign in with Google)</td>
+                <td style={tdStyle}>Email address, name, profile picture</td>
+                <td style={tdStyle}>
+                  <a
+                    href="https://policies.google.com/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={linkStyle}
+                  >
+                    policies.google.com/privacy
+                  </a>
+                </td>
+              </tr>
+              <tr>
+                <td style={tdStyle}>Discord</td>
+                <td style={tdStyle}>Authentication (Sign in with Discord)</td>
+                <td style={tdStyle}>Discord username, email address</td>
+                <td style={tdStyle}>
+                  <a
+                    href="https://discord.com/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={linkStyle}
+                  >
+                    discord.com/privacy
+                  </a>
+                </td>
+              </tr>
+              <tr>
+                <td style={tdStyle}>Stripe</td>
+                <td style={tdStyle}>
+                  Payment processing and subscription billing
+                </td>
+                <td style={tdStyle}>
+                  Name, email address, payment card details, billing address
+                </td>
+                <td style={tdStyle}>
+                  <a
+                    href="https://stripe.com/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={linkStyle}
+                  >
+                    stripe.com/privacy
+                  </a>
+                </td>
+              </tr>
+              <tr>
+                <td style={tdStyle}>Rollbar</td>
+                <td style={tdStyle}>Error monitoring and crash reporting</td>
+                <td style={tdStyle}>
+                  Stack traces, device info, may include user identifiers in
+                  error context
+                </td>
+                <td style={tdStyle}>
+                  <a
+                    href="https://rollbar.com/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={linkStyle}
+                  >
+                    rollbar.com/privacy
+                  </a>
+                </td>
+              </tr>
+              <tr>
+                <td style={tdStyle}>Expo (expo-notifications)</td>
+                <td style={tdStyle}>Push notification delivery</td>
+                <td style={tdStyle}>Device push token</td>
+                <td style={tdStyle}>
+                  <a
+                    href="https://expo.dev/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={linkStyle}
+                  >
+                    expo.dev/privacy
+                  </a>
+                </td>
+              </tr>
+              <tr>
+                <td style={tdStyle}>Apple (App Store / IAP)</td>
+                <td style={tdStyle}>In-app purchase processing (iOS)</td>
+                <td style={tdStyle}>Purchase receipts, Apple customer ID</td>
+                <td style={tdStyle}>
+                  <a
+                    href="https://www.apple.com/legal/privacy/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={linkStyle}
+                  >
+                    apple.com/legal/privacy
+                  </a>
+                </td>
+              </tr>
+              <tr>
+                <td style={tdStyle}>Google (Google Play Billing)</td>
+                <td style={tdStyle}>In-app purchase processing (Android)</td>
+                <td style={tdStyle}>Purchase receipts, Google customer ID</td>
+                <td style={tdStyle}>
+                  <a
+                    href="https://policies.google.com/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={linkStyle}
+                  >
+                    policies.google.com/privacy
+                  </a>
+                </td>
+              </tr>
+              <tr>
+                <td style={tdStyle}>
+                  Google Analytics 4 (Google LLC; measurement ID G-DHBXH3R106)
+                </td>
+                <td style={tdStyle}>
+                  Usage analytics: which pages and features are used, so we can
+                  improve the Service. Only with your consent in the EEA, UK and
+                  Switzerland; see section 5.
+                </td>
+                <td style={tdStyle}>
+                  Pages viewed and in-app events (for example, starting a mock
+                  draft); a pseudonymous browser ID (_ga cookie); when signed
+                  in, your account ID, plan type, account age, number of leagues
+                  and main sport; device and browser type; approximate location
+                  derived from your IP address (Google Analytics 4 does not log
+                  or store IP addresses). Google Analytics deletes this data
+                  automatically when our data-retention period ends.
+                </td>
+                <td style={tdStyle}>
+                  <a
+                    href="https://policies.google.com/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={linkStyle}
+                  >
+                    policies.google.com/privacy
+                  </a>
+                  <br />
+                  Opt out: Cookie settings, or the{' '}
+                  <a
+                    href="https://tools.google.com/dlpage/gaoptout"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={linkStyle}
+                  >
+                    Google Analytics opt-out add-on
+                  </a>
+                </td>
+              </tr>
+              <tr>
+                <td style={tdStyle}>GrowthBook</td>
+                <td style={tdStyle}>
+                  Feature flags and experiments: deciding which features, and
+                  which version of a feature, you see.
+                </td>
+                <td style={tdStyle}>
+                  Your browser downloads feature settings from GrowthBook&apos;s
+                  content delivery network, which receives your IP address and
+                  browser details as part of that request. Feature decisions are
+                  made in your browser, and the settings are cached in local
+                  storage. With analytics consent, which version of an
+                  experiment you saw is sent to Google Analytics (not to
+                  GrowthBook).
+                </td>
+                <td style={tdStyle}>
+                  <a
+                    href="https://www.growthbook.io/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={linkStyle}
+                  >
+                    growthbook.io/privacy
+                  </a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </Section>
 
       <Section>

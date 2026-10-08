@@ -720,6 +720,13 @@
       "lib/shared-components/src/features/consent/**",
       "apps/web-e2e/playwright.config.ts"
     ],
+    "apps/web-e2e/src/tests/privacy-policy-table.spec.ts": [
+      "apps/web/src/pages/legal/**",
+      "apps/web/src/context/ThemeContext.tsx",
+      "lib/tamagui-config/**",
+      "lib/design-tokens/**",
+      "apps/web-e2e/playwright.config.ts"
+    ],
     "apps/web-e2e/src/tests/mock-draft-room.spec.ts": [
       "apps/web/src/pages/draft/**",
       "apps/web/src/components/MockDraftBoard.tsx",
