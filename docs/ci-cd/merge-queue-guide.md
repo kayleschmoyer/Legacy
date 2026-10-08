@@ -44,23 +44,28 @@ Ready PRs that target `main` are tested together and landed as a set. The logic 
 1. **Build.** Up to **16** ready PRs, lowest PR number first, are merged on top of the current `main` tip into a temporary branch `mq/test/<id>`. The branch's tip commit records the set's metadata: base SHA, PRs and their tested head SHAs.
 2. **Test.** The CI Orchestrator is dispatched on that branch with `base_sha` set to the `main` tip, so the run covers everything the PRs change together. Its CI Gate status on the batch tip is the batch verdict.
 3. **Land.** When the gate is green and `main` hasn't moved, the queue squash-merges each PR through the merge API, in order. Each PR keeps its own commit on `main`, so you can revert it on its own. After landing, the queue checks that `main`'s tree equals the tested tree.
-4. **Bisect.** When a batch of N > 1 fails, the queue splits it into two halves and tests both at once on the current `main`:
+4. **Confirm.** A red batch is never acted on straight away. The queue re-runs only its failed jobs once; only a second red counts. A flaky test therefore costs one partial re-run, not a bisection or an ejection.
+5. **Bisect.** When a confirmed-red batch of N > 1 fails, the queue splits it into two halves and tests both at once on the current `main`:
    - The first green half lands.
-   - If both halves are green, the failure came from how they interact. The first half lands and the second is retested on the new `main`.
-   - A single PR that fails is **ejected**: the queue removes its `merge-when-ready` label and leaves a comment linking the failed run.
-   - PRs whose changes textually conflict with each other are split the same way, without running CI.
+   - If both halves are green, the failure came from how they interact. The first half lands and the second is retested, as the same set, on the new `main`.
+   - A single PR whose confirmed run fails is **ejected**: the queue removes its `merge-when-ready` label and leaves a comment linking the failed run.
+   - If **both** halves fail, the queue holds them for an hour and posts an alert to the escalation channel before bisecting further. That pattern usually means `main` or a shared dependency is broken, not the PRs. A push to `main` during the hold retests both halves on the new `main`, so nobody is ejected for someone else's breakage.
+
+When building a batch, a PR that textually conflicts with a PR earlier in the batch is left out for a later batch, with no extra CI run. A first PR that conflicts with `main` itself is ejected.
 
 The rules that keep this safe:
 
-- Only one batch, or one pair of bisect halves, is in flight at a time.
-- If any PR in a set gets a new push, loses the label or fails a gate, the set is discarded and its PRs requeue.
-- Infra failures never trigger a bisect or an ejection. This covers a run that finished without a terminal CI Gate (runner loss): it is re-run once, then requeued.
+- New batches start only when nothing is in flight. While a bisection is under way, its halves and their descendants stay together: when one half lands, the other is rebuilt as-is on the new `main`, never mixed with newly queued PRs. That keeps the failing PR isolated.
+- If any PR in a set gets a new push, loses the label or fails a gate, the set is discarded and its PRs requeue. A PR the queue merely couldn't evaluate this pass (API error, mergeable state still computing, a check re-running) keeps its set alive, but the set can't land until the PR checks out again.
+- Infra failures never eject a PR straight away. A run that finished without a terminal CI Gate (runner loss), or that has run for more than 3 hours, has its failed jobs re-run once. The same set is then rebuilt up to twice, with the count stored in the set's metadata. After that the set is bisected like a failure, so a PR that hangs CI is eventually isolated instead of looping the queue.
+- Landing is retried, not thrown away. If the merge API refuses the first PR of a green set (a required check still settling, an API error), the set is kept and the land retried on later passes with no new CI. After 3 attempts spanning at least 30 minutes, the refusing PR is ejected with the API's message. A "waiting on code owner review" refusal ejects that PR immediately. Other in-flight sets are never discarded because a land failed.
+- After landing, if `main`'s tree doesn't match the tested tree, the queue raises an alert.
 - A PR that GitHub reports as `blocked` even though every queue gate passes stays out of batches until it unblocks. This is usually a path-scoped CODEOWNER approval, and it keeps one PR from stalling every batch behind it.
 - The batch CI validates every PR against the current `main`, so it replaces the per-PR staleness guard (LS-9662).
 
 #### The `merge-queue` status on your PR (LS-10620)
 
-Every open PR with `merge-when-ready` that targets `main` gets a `merge-queue` commit status on its head SHA. Open the PR's checks list and follow **Details** to reach the run that is processing it. The queue refreshes the status on every pass.
+Every open PR with `merge-when-ready` that targets `main` gets a `merge-queue` commit status on its head SHA. Open the PR's checks list and follow **Details** to reach the run that is processing it. The queue checks the status on every pass and writes it only when it changes, because GitHub caps a commit at 1000 statuses per context.
 
 | Status                                                   | Meaning                                                     | Details link                                                                |
 | -------------------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------- |

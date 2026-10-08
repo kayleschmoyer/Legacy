@@ -137,6 +137,9 @@ const INTEGRATION_WORKFLOW_FILE = 'run-integration-tests.yml';
 const MAX_ORCHESTRATOR_RUN_ATTEMPTS = 3;
 // Per-queue-cycle cap, mirroring MAX_REVIEW_REMEDIATIONS_PER_RUN.
 const MAX_CI_RERUNS_PER_RUN = 3;
+// Attempts for a squash merge that GitHub rejects with 405 "Base branch was
+// modified" (a race with the previous merge of a batch landing).
+const MERGE_BASE_MODIFIED_RETRIES = 3;
 
 // LS-9490: a non-completed orchestrator run stuck past this long with zero
 // jobs ever created is dead (the API-visible signature of a run blocked on a
@@ -309,6 +312,9 @@ module.exports = async ({
   // merge-queue.yml enables it unless the MERGE_QUEUE_MODE repo variable is
   // 'serial' (the rollback switch).
   batchMode = false,
+  // Base delay between retries of a 405 "Base branch was modified" merge.
+  // Tests pass 0.
+  mergeRetryDelayMs = 2000,
 }) => {
   const { owner, repo } = context.repo;
   const isTriggeredByWorkflow = context.eventName === 'workflow_run';
@@ -369,14 +375,39 @@ module.exports = async ({
     context.payload?.pull_request?.base?.ref === 'main'
   ) {
     try {
-      await statusGithub.rest.repos.createCommitStatus({
-        owner,
-        repo,
-        sha: context.payload.pull_request.head.sha,
-        state: 'success',
-        context: MERGE_QUEUE_STATUS_CONTEXT,
-        description: 'Not in the merge queue (merge-when-ready removed)',
-      });
+      // The batch queue removes the label itself when it ejects a PR, which
+      // fires this run. Don't paint that ejection over with a green status
+      // (merge-queue review, 2026-10).
+      // A failed read just means "write it", as before.
+      let current;
+      try {
+        const { data: combined } =
+          await github.rest.repos.getCombinedStatusForRef({
+            owner,
+            repo,
+            ref: context.payload.pull_request.head.sha,
+            per_page: 100,
+          });
+        current = (combined?.statuses || []).find(
+          (st) => st.context === MERGE_QUEUE_STATUS_CONTEXT,
+        );
+      } catch {
+        current = undefined;
+      }
+      if (current?.state === 'failure') {
+        console.log(
+          `ℹ️ PR #${context.payload.pull_request.number}: keeping the ${MERGE_QUEUE_STATUS_CONTEXT} ejection status`,
+        );
+      } else {
+        await statusGithub.rest.repos.createCommitStatus({
+          owner,
+          repo,
+          sha: context.payload.pull_request.head.sha,
+          state: 'success',
+          context: MERGE_QUEUE_STATUS_CONTEXT,
+          description: 'Not in the merge queue (merge-when-ready removed)',
+        });
+      }
     } catch (statusError) {
       console.warn(
         `⚠️ PR #${context.payload.pull_request.number}: could not clear ${MERGE_QUEUE_STATUS_CONTEXT} status: ${statusError.message}`,
@@ -443,14 +474,20 @@ module.exports = async ({
   // LS-10620: every labeled PR the batch queue is responsible for, ready or
   // not — each gets a `merge-queue` status.
   const batchCandidatePRs = [];
+  // PRs whose readiness could not be determined this pass (API error,
+  // mergeable still computing, a check still running) → head SHA, or null
+  // when unknown. They keep an in-flight batch alive instead of discarding
+  // its CI (merge-queue review, 2026-10).
+  const batchUncertainPRs = new Map();
 
   for (const pr of mergeReadyPRs) {
     processedPRNumbers.add(pr.number);
     console.log(`\n🔍 Processing PR #${pr.number}: ${pr.title}`);
 
+    let prDetails;
     try {
       // Get fresh PR details
-      const prDetails = await github.rest.pulls.get({
+      prDetails = await github.rest.pulls.get({
         owner,
         repo,
         pull_number: pr.number,
@@ -471,9 +508,25 @@ module.exports = async ({
       }
 
       if (
+        batchMode &&
+        !validationResult.canMerge &&
+        (validationResult.isPending || validationResult.mergeableUnknown) &&
+        isBatchable(prDetails.data)
+      ) {
+        batchUncertainPRs.set(
+          pr.number,
+          (validationResult.pr ?? prDetails.data).head.sha,
+        );
+      }
+
+      // forceCheck walks unlabeled PRs too; only labeled ones may be batched.
+      if (
         validationResult.canMerge &&
         batchMode &&
-        isBatchable(validationResult.pr)
+        isBatchable(validationResult.pr) &&
+        (validationResult.pr.labels || []).some(
+          (l) => l.name === 'merge-when-ready',
+        )
       ) {
         console.log(`✅ PR #${pr.number} is ready — queued for batch testing`);
         batchReadyPRs.push(validationResult.pr);
@@ -500,6 +553,9 @@ module.exports = async ({
       console.error(
         `💥 Error processing PR #${pr.number}: ${sanitizeLog(error.message)}`,
       );
+      if (batchMode) {
+        batchUncertainPRs.set(pr.number, prDetails?.data?.head?.sha ?? null);
+      }
       await reportProcessingError(pr, error);
     }
   }
@@ -512,6 +568,8 @@ module.exports = async ({
         repo,
         readyPRs: batchReadyPRs,
         candidatePRs: batchCandidatePRs,
+        uncertainPRs: batchUncertainPRs,
+        onAlert: postQueueAlert,
         statusClient: statusGithub,
         queueRunUrl: context.runId
           ? `${context.serverUrl || 'https://github.com'}/${owner}/${repo}/actions/runs/${context.runId}`
@@ -638,6 +696,7 @@ module.exports = async ({
       return {
         canMerge: false,
         pr,
+        mergeableUnknown: true,
         reason:
           'GitHub is still calculating mergeable state after 60s, will retry next cycle',
       };
@@ -1717,10 +1776,11 @@ module.exports = async ({
   }
 
   async function remediateCancelledCiRun(pr, validation) {
+    // Only CI Gate comes from the orchestrator. Re-running full CI for a
+    // context it never posts (migrations, conflicts) cannot register that
+    // context and just repeats CI (merge-queue review, 2026-10).
     const unregistered = (validation.pendingChecks ?? []).filter(
-      (c) =>
-        c.endsWith('(not yet registered)') &&
-        !c.startsWith(`${BOT_REVIEW_STATUS_CONTEXT} `),
+      (c) => c === `${CI_GATE_CONTEXT} (not yet registered)`,
     );
     if (unregistered.length === 0) return;
 
@@ -2119,7 +2179,7 @@ module.exports = async ({
             `(${pr.head.sha} → ${currentSha}). ` +
             `Skipping merge — will re-evaluate on next trigger.`,
         );
-        return { merged: false };
+        return { merged: false, reason: 'head-moved' };
       }
 
       // Sanitize commit message: remove null bytes and control characters that cause HTTP 500.
@@ -2128,21 +2188,63 @@ module.exports = async ({
           .replace(/\x00/g, '')
           .replace(/[\x01-\x08\x0B\x0C\x0E-\x1F]/g, '');
 
-      const mergeResult = await github.rest.pulls.merge({
-        owner,
-        repo,
-        pull_number: pr.number,
-        merge_method: 'squash',
-        commit_title: sanitize(pr.title + ' (#' + pr.number + ')'),
-        commit_message: sanitize(
-          'Merged via automated merge queue\n\n' + (pr.body || ''),
-        ),
-        // Pin to the validated SHA — prevents merging an unvalidated commit if the branch advanced.
-        sha: pr.head.sha,
-      });
+      // Back-to-back squash merges (a batch landing) can briefly race GitHub's
+      // own base update and get 405 "Base branch was modified". That is
+      // transient — retry a few times before treating it as a failure
+      // (merge-queue review, 2026-10).
+      let mergeResult;
+      for (let attempt = 1; ; attempt++) {
+        try {
+          mergeResult = await github.rest.pulls.merge({
+            owner,
+            repo,
+            pull_number: pr.number,
+            merge_method: 'squash',
+            commit_title: sanitize(pr.title + ' (#' + pr.number + ')'),
+            commit_message: sanitize(
+              'Merged via automated merge queue\n\n' + (pr.body || ''),
+            ),
+            // Pin to the validated SHA — prevents merging an unvalidated commit if the branch advanced.
+            sha: pr.head.sha,
+          });
+          break;
+        } catch (mergeError) {
+          const baseModified =
+            mergeError.status === 405 &&
+            /base branch was modified/i.test(
+              (mergeError.response?.data?.message ?? '') +
+                (mergeError.message ?? ''),
+            );
+          if (!baseModified || attempt >= MERGE_BASE_MODIFIED_RETRIES) {
+            throw mergeError;
+          }
+          console.log(
+            `⏳ PR #${pr.number}: 405 base branch was modified — retrying merge (${attempt}/${MERGE_BASE_MODIFIED_RETRIES})`,
+          );
+          await new Promise((r) => setTimeout(r, mergeRetryDelayMs * attempt));
+        }
+      }
 
       console.log(`✅ Successfully merged PR #${pr.number}`);
 
+      // The PR is merged. Everything below is bookkeeping: a failure here must
+      // not report the merge as failed, or a batch would stop landing the
+      // rest of an already-tested set (merge-queue review, 2026-10).
+      try {
+        await postMergeBookkeeping(pr, mergeResult, stalenessVerdict);
+      } catch (bookkeepingError) {
+        console.warn(
+          `⚠️ PR #${pr.number}: merged, but post-merge bookkeeping failed: ${sanitizeLog(bookkeepingError.message)}`,
+        );
+      }
+      return { merged: true, sha: mergeResult.data.sha };
+    } catch (error) {
+      return handleMergeError(pr, error);
+    }
+  }
+
+  async function postMergeBookkeeping(pr, mergeResult, stalenessVerdict) {
+    {
       // LS-9404: the sha-pin above relies on GitHub's own view of "current
       // head" at merge time being correct. An observed incident (PR #7092)
       // showed the squash-merge commit's actual content matching an earlier
@@ -2205,8 +2307,11 @@ module.exports = async ({
           );
         }
       }
-      return { merged: true, sha: mergeResult.data.sha };
-    } catch (error) {
+    }
+  }
+
+  async function handleMergeError(pr, error) {
+    {
       // 422 with a head-SHA mismatch message means the branch advanced between
       // our pre-merge check and the merge API call (residual race window). This
       // is not a system error; treat it as a re-queue signal so the next trigger
@@ -2222,7 +2327,7 @@ module.exports = async ({
           `⚠️ PR #${pr.number}: merge rejected with 422 (head branch modified) — ` +
             `branch advanced during merge window. Will re-evaluate on next trigger.`,
         );
-        return { merged: false };
+        return { merged: false, reason: 'head-moved' };
       }
 
       // Surface GitHub's actual 405 body verbatim before any processor
@@ -2275,7 +2380,11 @@ module.exports = async ({
             `Will re-evaluate on next trigger.`,
         );
         hasPendingPRs = true;
-        return { merged: false };
+        return {
+          merged: false,
+          reason: 'required-check-pending',
+          message: sanitizeLog(error.response?.data?.message ?? error.message),
+        };
       }
 
       // 405 "Waiting on code owner review" (LS-8297): path-scoped CODEOWNERS
@@ -2298,7 +2407,7 @@ module.exports = async ({
           canMerge: false,
           reason: 'PR requires CODEOWNER approval for sensitive path(s)',
         });
-        return { merged: false };
+        return { merged: false, reason: 'codeowner-review' };
       }
 
       console.error(
@@ -2706,6 +2815,34 @@ module.exports = async ({
     } else {
       console.warn(
         `⚠️ Discord webhook returned ${res.statusCode} for PR #${pr.number}`,
+      );
+    }
+  }
+
+  // Batch-queue alerts (held bisection, tree mismatch) are queue-wide, not
+  // per-PR, so they open their own forum thread. Best-effort.
+  async function postQueueAlert(message) {
+    const webhookUrl = process.env.ESCALATION_WEBHOOK_URL;
+    if (!webhookUrl || isDryRun) return;
+    const res = await postDiscordJson(
+      webhookUrl,
+      { wait: 'true' },
+      {
+        thread_name: `Merge queue alert ${new Date().toISOString().slice(0, 16)}`,
+        embeds: [
+          {
+            title: '🚨 Merge queue needs attention',
+            description: message.slice(0, 4000),
+            color: 0xed4245,
+            timestamp: new Date().toISOString(),
+            footer: { text: 'Merge Queue · legacy-sports' },
+          },
+        ],
+      },
+    );
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      console.warn(
+        `⚠️ Discord webhook returned ${res.statusCode} for a queue alert`,
       );
     }
   }

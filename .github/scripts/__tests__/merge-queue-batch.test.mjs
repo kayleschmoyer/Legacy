@@ -21,6 +21,11 @@ const {
   MERGE_QUEUE_STATUS_CONTEXT,
   MAX_BATCH_SIZE,
   DISPATCH_GRACE_MS,
+  MAX_INFRA_ROUNDS,
+  HOLD_MS,
+  MAX_LAND_ATTEMPTS,
+  LAND_RETRY_WINDOW_MS,
+  LAND_STATUS_CONTEXT,
 } = require('../merge-queue-batch.js');
 
 const MAIN = 'main000000000000000000000000000000000000';
@@ -30,12 +35,28 @@ const head = (n) => `head${String(n).padStart(36, '0')}`;
 const readyMap = (...nums) => new Map(nums.map((n) => [n, head(n)]));
 const prs = (...nums) => nums.map((n) => ({ number: n, head: head(n) }));
 
-function set(id, nums, verdict, { base = MAIN, run = null } = {}) {
+// A split child's parent is its id minus the last segment (`a.1` → `a`).
+function set(
+  id,
+  nums,
+  verdict,
+  { base = MAIN, run = null, infraRounds, holdNotified } = {},
+) {
+  const dot = id.lastIndexOf('.');
   return {
     name: `mq/test/${id}`,
-    meta: { id, base, prs: prs(...nums), parent: null, createdAt: 0 },
+    sha: `tip-${id}`,
+    meta: {
+      id,
+      base,
+      prs: prs(...nums),
+      parent: dot === -1 ? null : id.slice(0, dot),
+      createdAt: 0,
+      ...(infraRounds ? { infraRounds } : {}),
+    },
     verdict,
     run,
+    ...(holdNotified ? { holdNotified } : {}),
   };
 }
 
@@ -183,14 +204,14 @@ describe('decideBatchActions', () => {
     assert.deepEqual(types(actions), ['land:a.2', 'split:a.1']);
   });
 
-  it('when both halves pass (interaction), lands the first and requeues the second', () => {
+  it('when both halves pass (interaction), lands the first and retests the second as-is on the new main', () => {
     const actions = decideBatchActions({
       mainSha: MAIN,
       sets: [set('a.1', [1, 2], 'green'), set('a.2', [3, 4], 'green')],
-      ready: readyMap(1, 2, 3, 4),
+      ready: readyMap(1, 2, 3, 4, 5),
     });
-    assert.deepEqual(types(actions), ['land:a.1', 'discard:a.2', 'start:3,4']);
-    assert.equal(actions[1].reason, 'stale-base');
+    // a.2 keeps its lineage instead of being mixed with #5 in a fresh batch.
+    assert.deepEqual(types(actions), ['land:a.1', 'rebuild:a.2']);
   });
 
   it('discards a set whose PR moved to a new head', () => {
@@ -214,20 +235,180 @@ describe('decideBatchActions', () => {
     assert.deepEqual(types(actions), ['discard:a', 'start:1']);
   });
 
-  it('re-runs an infra failure once, then requeues', () => {
+  it('re-runs an infra failure once, then rebuilds it with the round counted in its metadata', () => {
     const first = decideBatchActions({
       mainSha: MAIN,
-      sets: [set('a', [1], 'infra', { run: { id: 7, run_attempt: 1 } })],
-      ready: readyMap(1),
+      sets: [set('a', [1, 2], 'infra', { run: { id: 7, run_attempt: 1 } })],
+      ready: readyMap(1, 2, 3),
     });
     assert.deepEqual(types(first), ['rerun:a']);
     const second = decideBatchActions({
       mainSha: MAIN,
-      sets: [set('a', [1], 'infra', { run: { id: 7, run_attempt: 2 } })],
+      sets: [set('a', [1, 2], 'infra', { run: { id: 7, run_attempt: 2 } })],
+      ready: readyMap(1, 2, 3),
+    });
+    // Same PRs, never mixed with #3, and the round survives the rebuild.
+    assert.deepEqual(types(second), ['rebuild:a']);
+    assert.equal(second[0].infraRounds, 1);
+  });
+
+  it(`bisects a set that never reaches a verdict after ${MAX_INFRA_ROUNDS} rebuilds instead of looping`, () => {
+    const multi = decideBatchActions({
+      mainSha: MAIN,
+      sets: [
+        set('a', [1, 2], 'infra', {
+          run: { id: 7, run_attempt: 2 },
+          infraRounds: MAX_INFRA_ROUNDS,
+        }),
+      ],
+      ready: readyMap(1, 2),
+    });
+    assert.deepEqual(types(multi), ['split:a']);
+    const single = decideBatchActions({
+      mainSha: MAIN,
+      sets: [
+        set('a', [1], 'stuck', {
+          run: { id: 7, run_attempt: 1, status: 'queued' },
+          infraRounds: MAX_INFRA_ROUNDS,
+        }),
+      ],
       ready: readyMap(1),
     });
-    assert.deepEqual(types(second), ['discard:a', 'start:1']);
-    assert.equal(second[0].reason, 'infra-exhausted');
+    assert.deepEqual(types(single), ['eject:a']);
+    assert.equal(single[0].cause, 'no-verdict');
+  });
+
+  it('confirms a red verdict by re-running failed jobs before bisecting or ejecting', () => {
+    const multi = decideBatchActions({
+      mainSha: MAIN,
+      sets: [set('a', [1, 2], 'red', { run: { id: 7, run_attempt: 1 } })],
+      ready: readyMap(1, 2),
+    });
+    assert.deepEqual(types(multi), ['rerun:a']);
+    const single = decideBatchActions({
+      mainSha: MAIN,
+      sets: [set('a.1', [1], 'red', { run: { id: 7, run_attempt: 1 } })],
+      ready: readyMap(1),
+    });
+    assert.deepEqual(types(single), ['rerun:a.1']);
+    const confirmed = decideBatchActions({
+      mainSha: MAIN,
+      sets: [set('a.1', [1], 'red', { run: { id: 7, run_attempt: 2 } })],
+      ready: readyMap(1),
+    });
+    assert.deepEqual(types(confirmed), ['eject:a.1']);
+  });
+
+  it('waits for the sibling before acting on a failed half', () => {
+    const actions = decideBatchActions({
+      mainSha: MAIN,
+      sets: [
+        set('a.1', [1, 2], 'red', { run: { id: 7, run_attempt: 2 } }),
+        set('a.2', [3, 4], 'pending', {
+          run: { id: 8, status: 'in_progress' },
+        }),
+      ],
+      ready: readyMap(1, 2, 3, 4),
+    });
+    assert.deepEqual(actions, []);
+  });
+
+  it('holds (and alerts once) when both halves fail, then bisects after the hold', () => {
+    const done = new Date(0).toISOString();
+    const failed = (id, nums, extra = {}) =>
+      set(id, nums, 'red', {
+        run: { id: 7, run_attempt: 2, updated_at: done },
+        ...extra,
+      });
+    const during = decideBatchActions({
+      mainSha: MAIN,
+      sets: [
+        failed('a.1', [1, 2]),
+        failed('a.2', [3, 4], { holdNotified: true }),
+      ],
+      ready: readyMap(1, 2, 3, 4, 5),
+      now: HOLD_MS - 1,
+    });
+    assert.deepEqual(types(during), ['hold:a.1', 'hold:a.2']);
+    assert.equal(during[0].notified, false);
+    assert.equal(during[1].notified, true);
+    const after = decideBatchActions({
+      mainSha: MAIN,
+      sets: [failed('a.1', [1, 2]), failed('a.2', [3, 4])],
+      ready: readyMap(1, 2, 3, 4),
+      now: HOLD_MS + 1,
+    });
+    assert.deepEqual(types(after), ['split:a.1', 'split:a.2']);
+  });
+
+  it('retests both failed halves on the new main when main moves during the hold', () => {
+    const failed = (id, nums) =>
+      set(id, nums, 'red', {
+        base: OLD_MAIN,
+        run: { id: 7, run_attempt: 2, updated_at: new Date(0).toISOString() },
+      });
+    const actions = decideBatchActions({
+      mainSha: MAIN,
+      sets: [failed('a.1.1', [1]), failed('a.1.2', [2])],
+      ready: readyMap(1, 2),
+      now: 1,
+    });
+    // Nobody is ejected: whatever broke both may be fixed on the new main.
+    assert.deepEqual(types(actions), ['rebuild:a.1.1', 'rebuild:a.1.2']);
+  });
+
+  it('keeps a bisection lineage together when its sibling lands', () => {
+    const running = { run: { id: 9, status: 'in_progress' } };
+    const actions = decideBatchActions({
+      mainSha: MAIN,
+      sets: [
+        set('a.1', [1, 2], 'green'),
+        set('a.2.1', [3], 'pending', running),
+        set('a.2.2', [4], 'pending', running),
+      ],
+      ready: readyMap(1, 2, 3, 4, 5, 6),
+    });
+    assert.deepEqual(types(actions), [
+      'land:a.1',
+      'rebuild:a.2.1',
+      'rebuild:a.2.2',
+    ]);
+  });
+
+  it('keeps a set alive, but does not land it, while a member PR is undetermined', () => {
+    const green = decideBatchActions({
+      mainSha: MAIN,
+      sets: [set('a', [1, 2], 'green')],
+      ready: readyMap(1, 3),
+      uncertain: new Map([[2, head(2)]]),
+    });
+    assert.deepEqual(green, []);
+    // An unknown head (validation threw before reading the PR) also keeps it.
+    const unknownHead = decideBatchActions({
+      mainSha: MAIN,
+      sets: [set('a', [1, 2], 'pending')],
+      ready: readyMap(1),
+      uncertain: new Map([[2, null]]),
+    });
+    assert.deepEqual(unknownHead, []);
+    // A different head is a real change.
+    const moved = decideBatchActions({
+      mainSha: MAIN,
+      sets: [set('a', [1, 2], 'pending')],
+      ready: readyMap(1),
+      uncertain: new Map([[2, 'pushed-again']]),
+    });
+    assert.deepEqual(types(moved), ['discard:a', 'start:1']);
+  });
+
+  it('decides everything but landing when landBlocked', () => {
+    const actions = decideBatchActions({
+      mainSha: MAIN,
+      sets: [set('a', [1, 2], 'green')],
+      ready: readyMap(1, 2, 3),
+      landBlocked: true,
+    });
+    assert.deepEqual(actions, []);
   });
 
   it('discards an in-flight set built on an old main', () => {
@@ -278,6 +459,7 @@ function makeFakeGithub({
     removedLabels: [],
     prMerges: [],
     statuses: [],
+    reruns: [],
   };
   let n = 0;
   const notFound = () => Object.assign(new Error('Not Found'), { status: 404 });
@@ -354,7 +536,10 @@ function makeFakeGithub({
           data: { workflow_runs: runs[branch] || [] },
         }),
         cancelWorkflowRun: async () => ({ data: {} }),
-        reRunWorkflow: async () => ({ data: {} }),
+        reRunWorkflowFailedJobs: async (p) => {
+          calls.reruns.push(p.run_id);
+          return { data: {} };
+        },
       },
       issues: {
         removeLabel: async (p) => {
@@ -405,8 +590,10 @@ describe('runBatchQueue', () => {
     });
   });
 
-  it('splits immediately when PRs in a new batch conflict with each other', async () => {
-    const { github, refs, calls } = makeFakeGithub({ conflicts: [head(3)] });
+  it('leaves a PR that conflicts with earlier batch PRs for later, with one CI run', async () => {
+    const { github, refs, commits, calls } = makeFakeGithub({
+      conflicts: [head(3)],
+    });
     await runBatchQueue({
       github,
       owner: 'o',
@@ -416,18 +603,231 @@ describe('runBatchQueue', () => {
       now: () => 1000,
     });
     const id = (1000).toString(36);
-    // Root fails on #3 → halves [1,2] and [3,4]; [3,4] fails on #3 → [3] and
-    // [4]; #3 alone conflicts with main and is ejected.
-    assert.ok(refs.has(`heads/mq/test/${id}.1`));
-    assert.ok(refs.has(`heads/mq/test/${id}.2.2`));
-    assert.ok(!refs.has(`heads/mq/test/${id}`));
-    assert.ok(!refs.has(`heads/mq/test/${id}.2`));
-    assert.ok(!refs.has(`heads/mq/test/${id}.2.1`));
-    assert.deepEqual(calls.removedLabels, [3]);
-    assert.deepEqual(calls.dispatches.map((d) => d.ref).sort(), [
-      `mq/test/${id}.1`,
-      `mq/test/${id}.2.2`,
-    ]);
+    const tip = refs.get(`heads/mq/test/${id}`);
+    assert.deepEqual(
+      parseBatchMeta(commits.get(tip).message).prs,
+      prs(1, 2, 4),
+    );
+    // No fan-out into parallel batches, and #3 is not punished.
+    assert.deepEqual(
+      calls.dispatches.map((d) => d.ref),
+      [`mq/test/${id}`],
+    );
+    assert.deepEqual(calls.removedLabels, []);
+  });
+
+  it('ejects the first PR when it conflicts with main itself and builds the rest', async () => {
+    const { github, refs, commits, calls } = makeFakeGithub({
+      conflicts: [head(1)],
+    });
+    await runBatchQueue({
+      github,
+      owner: 'o',
+      repo: 'r',
+      readyPRs: [readyPR(1), readyPR(2)],
+      mergePR: async () => assert.fail('nothing should merge'),
+      now: () => 1000,
+    });
+    const tip = refs.get(`heads/mq/test/${(1000).toString(36)}`);
+    assert.deepEqual(parseBatchMeta(commits.get(tip).message).prs, prs(2));
+    assert.deepEqual(calls.removedLabels, [1]);
+  });
+
+  // Builds a batch of the given PRs at t=1000 and marks its run green.
+  async function greenBatch(fake, nums) {
+    const { github, refs } = fake;
+    await runBatchQueue({
+      github,
+      owner: 'o',
+      repo: 'r',
+      readyPRs: nums.map(readyPR),
+      mergePR: async () => assert.fail('nothing should merge yet'),
+      now: () => 1000,
+    });
+    const name = `mq/test/${(1000).toString(36)}`;
+    const tip = refs.get(`heads/${name}`);
+    const tipStatuses = [{ context: 'CI Gate', state: 'success' }];
+    github.rest.repos.getCombinedStatusForRef = async ({ ref }) => ({
+      data: { statuses: ref === tip ? tipStatuses : [] },
+    });
+    github.rest.repos.createCommitStatus = async (params) => {
+      fake.calls.statuses.push(params);
+      if (params.sha === tip) {
+        const i = tipStatuses.findIndex((s) => s.context === params.context);
+        if (i !== -1) tipStatuses.splice(i, 1);
+        tipStatuses.unshift({
+          context: params.context,
+          state: params.state,
+          description: params.description,
+        });
+      }
+      return { data: {} };
+    };
+    return { name, tip };
+  }
+
+  it('keeps a green set for another land attempt when the merge API refuses, without new CI', async () => {
+    const fake = makeFakeGithub();
+    const { github, refs, calls } = fake;
+    const { name, tip } = await greenBatch(fake, [1, 2]);
+    await runBatchQueue({
+      github,
+      owner: 'o',
+      repo: 'r',
+      readyPRs: [readyPR(1), readyPR(2), readyPR(3)],
+      mergePR: async () => {
+        throw new Error('Server Error');
+      },
+      now: () => 2000,
+    });
+    assert.ok(refs.has(`heads/${name}`), 'green set is kept');
+    assert.equal(calls.dispatches.length, 1, 'no new batch started for #3');
+    const land = calls.statuses.find(
+      (s) => s.sha === tip && s.context === LAND_STATUS_CONTEXT,
+    );
+    assert.match(land.description, /^attempt 1 since/);
+  });
+
+  it(`ejects the refusing PR after ${MAX_LAND_ATTEMPTS} land attempts over the retry window`, async () => {
+    const fake = makeFakeGithub();
+    const { github, refs, calls } = fake;
+    const { name } = await greenBatch(fake, [1, 2]);
+    const refuse = async () => ({
+      merged: false,
+      reason: 'required-check-pending',
+      message: 'Required status check "CI Gate" is expected.',
+    });
+    const pass = (t) =>
+      runBatchQueue({
+        github,
+        owner: 'o',
+        repo: 'r',
+        readyPRs: [readyPR(1), readyPR(2)],
+        mergePR: refuse,
+        now: () => t,
+      });
+    await pass(2000);
+    await pass(3000);
+    // The third attempt comes too soon after the first: keep retrying.
+    await pass(4000);
+    assert.ok(refs.has(`heads/${name}`));
+    assert.deepEqual(calls.removedLabels, []);
+    await pass(2000 + LAND_RETRY_WINDOW_MS);
+    assert.ok(!refs.has(`heads/${name}`));
+    assert.deepEqual(calls.removedLabels, [1]);
+  });
+
+  it('does not throw away other sets when a land fails', async () => {
+    const fake = makeFakeGithub();
+    const { github, refs } = fake;
+    const { name } = await greenBatch(fake, [1, 2]);
+    // A second, later set built on the same main and still running.
+    refs.set('heads/mq/test/zzz', 'meta-other');
+    fake.commits.set('meta-other', {
+      message: encodeBatchMeta({
+        id: 'zzz',
+        base: MAIN,
+        prs: prs(3),
+        parent: null,
+        createdAt: 1500,
+      }),
+      tree: { sha: 'tree-other' },
+      parents: [],
+    });
+    github.rest.actions.listWorkflowRuns = async ({ branch }) => ({
+      data: {
+        workflow_runs:
+          branch === 'mq/test/zzz'
+            ? [
+                {
+                  id: 5,
+                  head_sha: 'meta-other',
+                  status: 'in_progress',
+                  created_at: new Date(1500).toISOString(),
+                },
+              ]
+            : [],
+      },
+    });
+    await runBatchQueue({
+      github,
+      owner: 'o',
+      repo: 'r',
+      readyPRs: [readyPR(1), readyPR(2), readyPR(3)],
+      mergePR: async () => ({ merged: false, reason: 'error' }),
+      now: () => 2000,
+    });
+    assert.ok(refs.has(`heads/${name}`));
+    assert.ok(refs.has('heads/mq/test/zzz'), 'running set was not discarded');
+  });
+
+  it('alerts when the landed tree does not match the tested tree', async () => {
+    const fake = makeFakeGithub();
+    const { github, refs, commits } = fake;
+    await greenBatch(fake, [1]);
+    const alerts = [];
+    await runBatchQueue({
+      github,
+      owner: 'o',
+      repo: 'r',
+      readyPRs: [readyPR(1)],
+      mergePR: async () => {
+        commits.set('squash1', {
+          message: '',
+          tree: { sha: 'something-else' },
+          parents: [],
+        });
+        refs.set('heads/main', 'squash1');
+        return { merged: true, sha: 'squash1' };
+      },
+      onAlert: async (m) => alerts.push(m),
+      now: () => 2000,
+    });
+    assert.equal(alerts.length, 1);
+    assert.match(alerts[0], /tree mismatch/);
+  });
+
+  it('re-runs only the failed jobs of a red batch before bisecting it', async () => {
+    const fake = makeFakeGithub();
+    const { github, refs, calls } = fake;
+    await runBatchQueue({
+      github,
+      owner: 'o',
+      repo: 'r',
+      readyPRs: [readyPR(1), readyPR(2)],
+      mergePR: async () => assert.fail('nothing should merge'),
+      now: () => 1000,
+    });
+    const name = `mq/test/${(1000).toString(36)}`;
+    const tip = refs.get(`heads/${name}`);
+    github.rest.repos.getCombinedStatusForRef = async ({ ref }) => ({
+      data: {
+        statuses: ref === tip ? [{ context: 'CI Gate', state: 'failure' }] : [],
+      },
+    });
+    github.rest.actions.listWorkflowRuns = async () => ({
+      data: {
+        workflow_runs: [
+          {
+            id: 42,
+            head_sha: tip,
+            status: 'completed',
+            run_attempt: 1,
+            created_at: new Date(1000).toISOString(),
+          },
+        ],
+      },
+    });
+    await runBatchQueue({
+      github,
+      owner: 'o',
+      repo: 'r',
+      readyPRs: [readyPR(1), readyPR(2)],
+      mergePR: async () => assert.fail('nothing should merge'),
+      now: () => 2000,
+    });
+    assert.deepEqual(calls.reruns, [42]);
+    assert.ok(refs.has(`heads/${name}`), 'not split yet');
   });
 
   it('lands a green batch in order, one merge per PR, and cleans up', async () => {
@@ -591,7 +991,7 @@ describe('planQueueStatuses', () => {
     const phrases = {
       pending: /CI running/,
       green: /CI passed, landing/,
-      red: /CI failed, bisecting/,
+      red: /CI failed, confirming/,
       infra: /retrying after a runner failure/,
     };
     for (const [verdict, re] of Object.entries(phrases)) {
@@ -885,7 +1285,12 @@ describe('runBatchQueue merge-queue statuses', () => {
     });
     const tip = refs.get(`heads/mq/test/${(1000).toString(36)}`);
     github.rest.repos.getCombinedStatusForRef = gateOn(tip, 'failure');
-    github.rest.actions.listWorkflowRuns = async () => runOn(tip, 'completed');
+    // Second attempt: the red verdict is already confirmed.
+    github.rest.actions.listWorkflowRuns = async () => {
+      const res = runOn(tip, 'completed');
+      res.data.workflow_runs[0].run_attempt = 2;
+      return res;
+    };
     calls.statuses.length = 0;
     await runBatchQueue({
       github,
