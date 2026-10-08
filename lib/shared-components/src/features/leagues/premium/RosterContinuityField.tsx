@@ -83,6 +83,7 @@ function KeeperNumberField({
         <Input
           size="$3"
           testID={testID}
+          aria-label={label}
           value={value !== undefined ? String(value) : ''}
           onChangeText={(text: string) => {
             const n = parseInt(text, 10);

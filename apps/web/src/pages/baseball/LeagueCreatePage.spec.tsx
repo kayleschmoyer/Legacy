@@ -325,6 +325,8 @@ jest.mock('tamagui', () => {
         onBlur,
         'aria-invalid': rest['aria-invalid'],
         'aria-describedby': rest['aria-describedby'],
+        'aria-label': rest['aria-label'],
+        'aria-labelledby': rest['aria-labelledby'],
         'data-border-color': borderColor,
       }),
     Label: ({ children }: any) =>
@@ -3882,5 +3884,40 @@ describe('LeagueCreatePage — segmented controls expose selected state (LS-1070
       'aria-pressed',
       'false',
     );
+  });
+});
+
+describe('LeagueCreatePage — numeric inputs are named by their captions (LS-10753)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = true;
+    mockIsPremiumLoading = false;
+  });
+
+  it.each(['/baseball/league/create', '/football/league/create'])(
+    'names the Games Per Matchup input on %s',
+    (path) => {
+      renderPage(path);
+      expandAllSections();
+
+      expect(
+        screen.getByRole('textbox', { name: 'Games Per Matchup' }),
+      ).toBeInTheDocument();
+    },
+  );
+
+  it('names the auction budget and minimum bid inputs', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    fireEvent.click(screen.getByRole('button', { name: 'Auction' }));
+
+    expect(
+      screen.getByRole('textbox', { name: 'Auction Budget per Team' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('textbox', { name: 'Minimum Bid' }),
+    ).toBeInTheDocument();
   });
 });

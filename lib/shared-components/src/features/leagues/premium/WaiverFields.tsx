@@ -142,6 +142,7 @@ export function FaabBudgetField({
             <Input
               size="$3"
               testID="create-league-faab-budget-custom-input"
+              aria-label="FAAB Budget (per manager)"
               value={customText}
               onChangeText={(text: string) => {
                 setCustomText(text);

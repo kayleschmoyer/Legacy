@@ -3573,6 +3573,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                   <div style={{ gridColumn: '1 / -1' }}>
                     <FieldRow
                       label="Games Per Matchup"
+                      labelId="games-per-matchup-label"
                       hint={`Games played in each weekly matchup. Max ${GAMES_PER_MATCHUP_BY_SPORT[formData.sport]?.max ?? 162} for ${formData.sport}.`}
                       hintId="games-per-matchup-hint"
                     >
@@ -3580,6 +3581,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                         <Input
                           size="$4"
                           testID="create-league-games-per-matchup-input"
+                          aria-labelledby="games-per-matchup-label"
                           keyboardType="numeric"
                           value={String(formData.gamesPerMatchup)}
                           onChangeText={(text: string) => {
@@ -4144,11 +4146,13 @@ export function LeagueCreatePage(): React.JSX.Element {
                       <>
                         <FieldRow
                           label="Auction Budget per Team"
+                          labelId="auction-budget-label"
                           hint={`Total dollars each manager has to fill a roster. ${AUCTION_BUDGET_RANGE.min}–${AUCTION_BUDGET_RANGE.max}.`}
                           hintId="auction-budget-hint"
                         >
                           <Input
                             size="$3"
+                            aria-labelledby="auction-budget-label"
                             value={String(formData.auctionBudget)}
                             onChangeText={(text: string) => {
                               const n = parseInt(text, 10);
@@ -4172,12 +4176,14 @@ export function LeagueCreatePage(): React.JSX.Element {
                         </FieldRow>
                         <FieldRow
                           label="Minimum Bid"
+                          labelId="auction-min-bid-label"
                           hint={`Lowest opening bid accepted. ${AUCTION_MIN_BID_RANGE.min}–${AUCTION_MIN_BID_RANGE.max}.`}
                           hintId="auction-min-bid-hint"
                         >
                           <XStack alignItems="center" gap="$3">
                             <Input
                               size="$3"
+                              aria-labelledby="auction-min-bid-label"
                               value={String(formData.auctionMinBid)}
                               onChangeText={(text: string) => {
                                 const n = parseInt(text, 10);

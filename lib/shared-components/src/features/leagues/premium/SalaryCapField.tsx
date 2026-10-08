@@ -85,6 +85,7 @@ function AdvancedNumberField({
         <Input
           size="$3"
           testID={testID}
+          aria-label={label}
           value={value !== undefined ? String(value) : ''}
           onChangeText={(text: string) => {
             const n = parseInt(text, 10);
@@ -173,6 +174,7 @@ export function SalaryCapField({
             <Input
               size="$3"
               testID="create-league-salary-cap-input"
+              aria-label="Salary Cap Limit"
               value={amount !== undefined ? String(amount) : ''}
               onChangeText={(text: string) => {
                 const n = parseInt(text, 10);

@@ -57,6 +57,7 @@ export function CustomEraRange({
           id="era-start"
           size="$3"
           testID="create-league-era-start-input"
+          aria-label="Start Year"
           placeholder="e.g. 1940"
           value={startYear !== undefined ? String(startYear) : ''}
           onChangeText={(text: string) => onChangeStart(parseYear(text))}
@@ -88,6 +89,7 @@ export function CustomEraRange({
           id="era-end"
           size="$3"
           testID="create-league-era-end-input"
+          aria-label="End Year"
           placeholder="e.g. 1960"
           value={endYear !== undefined ? String(endYear) : ''}
           onChangeText={(text: string) => onChangeEnd(parseYear(text))}

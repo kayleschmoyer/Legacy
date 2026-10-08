@@ -1010,4 +1010,74 @@ describe('premium league-create fields (LS-5174)', () => {
       ]);
     });
   });
+
+  // LS-10753 — every numeric input must carry an accessible name matching its
+  // visible caption; the uppercase caption Text is not a <label>.
+  describe('numeric inputs are named by their captions (LS-10753)', () => {
+    it('names the keeper count and max consecutive keeps inputs', () => {
+      const { getByRole } = render(
+        <RosterContinuityField
+          rosterContinuity="keeper"
+          onRosterContinuityChange={jest.fn()}
+          selectionMethod="standard"
+          onKeeperCountChange={jest.fn()}
+          onCostModelChange={jest.fn()}
+          onMaxConsecutiveKeepsChange={jest.fn()}
+          rookieExempt={false}
+          onRookieExemptChange={jest.fn()}
+          onUpgrade={jest.fn()}
+          isPremium
+        />,
+      );
+      expect(getByRole('textbox', { name: 'Keeper Count' })).toBeTruthy();
+      expect(
+        getByRole('textbox', { name: 'Max Consecutive Keeps' }),
+      ).toBeTruthy();
+    });
+
+    it('names all six salary-cap inputs', () => {
+      const { getByRole } = render(
+        <SalaryCapField
+          enabled
+          isPremium
+          onToggleEnabled={jest.fn()}
+          onAmountChange={jest.fn()}
+          onUpgrade={jest.fn()}
+          onSalaryFloorChange={jest.fn()}
+          onLuxuryTaxThresholdChange={jest.fn()}
+          onMinSalaryChange={jest.fn()}
+          onSalaryEscalationPctChange={jest.fn()}
+          onSalaryDecayPctChange={jest.fn()}
+        />,
+      );
+      for (const name of [
+        'Salary Cap Limit',
+        'Salary Floor',
+        'Luxury Tax Threshold',
+        'Minimum Player Salary',
+        'Salary Escalation %',
+        'Salary Decay %',
+      ]) {
+        expect(getByRole('textbox', { name })).toBeTruthy();
+      }
+    });
+
+    it('names the custom FAAB budget input', () => {
+      const { getByText, getByRole } = render(
+        <FaabBudgetField value={100} onChange={jest.fn()} />,
+      );
+      fireEvent.click(getByText('Custom'));
+      expect(
+        getByRole('textbox', { name: 'FAAB Budget (per manager)' }),
+      ).toBeTruthy();
+    });
+
+    it('names the custom era start and end year inputs', () => {
+      const { getByRole } = render(
+        <CustomEraRange onChangeStart={jest.fn()} onChangeEnd={jest.fn()} />,
+      );
+      expect(getByRole('textbox', { name: 'Start Year' })).toBeTruthy();
+      expect(getByRole('textbox', { name: 'End Year' })).toBeTruthy();
+    });
+  });
 });
