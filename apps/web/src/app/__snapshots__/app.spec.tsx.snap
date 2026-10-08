@@ -258,6 +258,9 @@ exports[`App FootballHubPage should match complete football page layout snapshot
         </div>
       </div>
     </nav>
+    <span
+      data-testid="notification-realtime-sync"
+    />
   </div>
   <div
     data-testid="main-content"
@@ -541,6 +544,9 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
         </div>
       </div>
     </nav>
+    <span
+      data-testid="notification-realtime-sync"
+    />
   </div>
   <div
     data-testid="main-content"

@@ -191,6 +191,10 @@ jest.mock('../components/layout/MyLeaguesDropdown', () => ({
 
 jest.mock('../components/layout/NotificationDropdown', () => ({
   NotificationDropdown: () => <div>Notification Dropdown</div>,
+  // Renders a marker so the spec can count mounted socket owners.
+  NotificationRealtimeSync: () => (
+    <span data-testid="notification-realtime-sync" />
+  ),
 }));
 
 jest.mock('../components/a11y/GlobalAnnouncer', () => ({
@@ -452,6 +456,27 @@ describe('App', () => {
       // Find the navigation element
       const navigation = container.querySelector('nav');
       expect(navigation).toMatchSnapshot();
+    });
+  });
+
+  describe('Notification socket (LS-10715)', () => {
+    it('mounts one notification socket owner although both header layouts render a dropdown', () => {
+      const { getAllByText, getAllByTestId } = render(
+        <BrowserRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        >
+          <App />
+        </BrowserRouter>,
+      );
+
+      act(() => {
+        jest.advanceTimersByTime(1000);
+      });
+
+      // Desktop NavBar + mobile row are CSS-toggled, so both stay mounted...
+      expect(getAllByText('Notification Dropdown')).toHaveLength(2);
+      // ...but only one component owns the WebSocket.
+      expect(getAllByTestId('notification-realtime-sync')).toHaveLength(1);
     });
   });
 

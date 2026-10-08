@@ -25,7 +25,10 @@ import { LegacyJoinRedirect } from '../pages/join/LegacyJoinRedirect';
 import { CatchAllRoute } from '../pages/not-found/NotFoundPage';
 import { UserProfileDropdown } from '../components/layout/UserProfileDropdown';
 import { BugReportButton } from '../components/layout/BugReportButton';
-import { NotificationDropdown } from '../components/layout/NotificationDropdown';
+import {
+  NotificationDropdown,
+  NotificationRealtimeSync,
+} from '../components/layout/NotificationDropdown';
 import { LeagueSwitcherChip } from '../components/layout/LeagueSwitcherChip';
 import { HelpMenuButton } from '../components/layout/HelpMenuButton';
 import { MobileBottomBar } from '../components/layout/MobileBottomBar';
@@ -585,6 +588,9 @@ function Navigation() {
           </XStack>
         </NavContainer>
       </nav>
+
+      {/* One notification socket for both dropdowns above (LS-10715) */}
+      <NotificationRealtimeSync />
 
       {/* Mobile drawer overlay */}
       <MobileNavDrawer

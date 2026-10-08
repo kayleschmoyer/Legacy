@@ -142,8 +142,50 @@ export function getNotificationLink(notification: {
   return '/notifications';
 }
 
-export const NotificationDropdown: React.FC = () => {
+/** Queries a `notification-received` push should refresh, by operation name. */
+const NOTIFICATION_QUERY_NAMES: ReadonlySet<string> = new Set([
+  'GetUnreadNotificationCount',
+  'GetNotificationHistory',
+]);
+
+/**
+ * Owns the header's single notification WebSocket (LS-10715).
+ *
+ * The header renders `NotificationDropdown` twice — desktop NavBar and mobile
+ * row, toggled with CSS `display` so both stay mounted — and each instance
+ * used to call `useWebSocket` itself, opening two sockets per page load. Mount
+ * this exactly once next to them instead.
+ *
+ * A push refetches the *active* notification queries, so both dropdown
+ * instances update through the shared Apollo cache within ~1s instead of
+ * waiting on their 30s poll (LS-8914). The history query is skipped (standby)
+ * while its dropdown is closed and so is left alone, same as before. The poll
+ * stays as a fallback for missed/late connections — see websocket-realtime
+ * skill.
+ */
+export const NotificationRealtimeSync: React.FC = () => {
   const { isAuthenticated, token } = useAuth();
+  const client = useApolloClient();
+
+  useWebSocket({
+    url: env.websocketUrl,
+    token: token ?? undefined,
+    viewContext: 'general',
+    autoConnect: isAuthenticated && !!token,
+    onNotificationReceived: () => {
+      void client.refetchQueries({
+        include: 'active',
+        onQueryUpdated: (observableQuery) =>
+          NOTIFICATION_QUERY_NAMES.has(observableQuery.queryName ?? ''),
+      });
+    },
+  });
+
+  return null;
+};
+
+export const NotificationDropdown: React.FC = () => {
+  const { isAuthenticated } = useAuth();
   const client = useApolloClient();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
@@ -151,33 +193,14 @@ export const NotificationDropdown: React.FC = () => {
   const buttonId = 'notification-menu-button';
   const menuId = 'notification-menu';
 
-  const { data: countData, refetch: refetchCount } =
-    useGetUnreadNotificationCountQuery({
-      skip: !isAuthenticated,
-      pollInterval: 30000,
-    });
-  const {
-    data: historyData,
-    loading,
-    refetch: refetchHistory,
-  } = useGetNotificationHistoryQuery({
+  const { data: countData } = useGetUnreadNotificationCountQuery({
+    skip: !isAuthenticated,
+    pollInterval: 30000,
+  });
+  const { data: historyData, loading } = useGetNotificationHistoryQuery({
     skip: !isAuthenticated || !isOpen,
     variables: { limit: 10, offset: 0 },
     fetchPolicy: 'cache-and-network',
-  });
-
-  // Pushed WS update so the badge/list reflect a new notification within
-  // ~1s instead of waiting on the 30s poll above (LS-8914). The poll stays
-  // as a fallback for missed/late connections — see websocket-realtime skill.
-  useWebSocket({
-    url: env.websocketUrl,
-    token: token ?? undefined,
-    viewContext: 'general',
-    autoConnect: isAuthenticated && !!token,
-    onNotificationReceived: () => {
-      void refetchCount();
-      if (isOpen) void refetchHistory();
-    },
   });
 
   const [markAsRead] = useMarkNotificationAsReadMutation();

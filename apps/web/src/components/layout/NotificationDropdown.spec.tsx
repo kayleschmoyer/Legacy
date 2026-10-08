@@ -6,9 +6,10 @@
  * whenever the unread count changes while the dropdown is closed, so the
  * next open fetches fresh data.
  *
- * Also covers LS-8914: the dropdown mirrors NotificationsPage's WebSocket
- * wiring so the badge updates on a `notification-received` push instead of
- * relying solely on 30s polling.
+ * Also covers LS-8914: the header badge updates on a `notification-received`
+ * push instead of relying solely on 30s polling — via a single
+ * `NotificationRealtimeSync` socket rather than one per dropdown instance
+ * (LS-10715).
  */
 import React from 'react';
 import { act, render } from '@testing-library/react';
@@ -17,6 +18,7 @@ import { MemoryRouter } from 'react-router-dom';
 import {
   getNotificationLink,
   NotificationDropdown,
+  NotificationRealtimeSync,
 } from './NotificationDropdown';
 
 type UnreadCountResult = {
@@ -33,6 +35,7 @@ type UseWebSocketOptions = {
 
 const mockEvict = jest.fn();
 const mockGc = jest.fn();
+const mockRefetchQueries = jest.fn();
 const mockRefetchCount = jest.fn();
 const mockRefetchHistory = jest.fn();
 const mockUseGetUnreadNotificationCountQuery = jest.fn<
@@ -50,6 +53,7 @@ jest.mock('@apollo/client/react', () => {
     ...actual,
     useApolloClient: () => ({
       cache: { evict: mockEvict, gc: mockGc },
+      refetchQueries: mockRefetchQueries,
     }),
   };
 });
@@ -201,12 +205,16 @@ describe('NotificationDropdown — LS-4094 stale-history invalidation', () => {
   });
 });
 
-describe('NotificationDropdown — LS-8914 WebSocket subscription', () => {
+describe('NotificationRealtimeSync — LS-8914 push / LS-10715 single socket', () => {
+  type RefetchQueriesOptions = {
+    include: unknown;
+    onQueryUpdated: (oq: { queryName?: string }) => boolean;
+  };
+
   beforeEach(() => {
     mockEvict.mockReset();
     mockGc.mockReset();
-    mockRefetchCount.mockReset();
-    mockRefetchHistory.mockReset();
+    mockRefetchQueries.mockReset();
     mockUseGetUnreadNotificationCountQuery.mockReset();
     mockUseGetNotificationHistoryQuery.mockReset();
     mockUseWebSocket.mockReset();
@@ -219,7 +227,7 @@ describe('NotificationDropdown — LS-8914 WebSocket subscription', () => {
   });
 
   it('subscribes via useWebSocket with the auth token and websocket url, mirroring NotificationsPage', () => {
-    renderDropdown();
+    render(<NotificationRealtimeSync />);
 
     expect(mockUseWebSocket).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -230,15 +238,40 @@ describe('NotificationDropdown — LS-8914 WebSocket subscription', () => {
     );
   });
 
-  it('refetches the unread count on a notification-received push', () => {
-    renderDropdown();
+  it('refetches only the active notification queries on a notification-received push', () => {
+    render(<NotificationRealtimeSync />);
 
     const { onNotificationReceived } = mockUseWebSocket.mock.calls[0][0];
     act(() => {
       onNotificationReceived?.();
     });
 
-    expect(mockRefetchCount).toHaveBeenCalledTimes(1);
+    expect(mockRefetchQueries).toHaveBeenCalledTimes(1);
+    const [options] = mockRefetchQueries.mock.calls[0] as [
+      RefetchQueriesOptions,
+    ];
+    // 'active' skips standby queries, so a closed dropdown's skipped history
+    // query is not fetched.
+    expect(options.include).toBe('active');
+    expect(
+      options.onQueryUpdated({ queryName: 'GetUnreadNotificationCount' }),
+    ).toBe(true);
+    expect(
+      options.onQueryUpdated({ queryName: 'GetNotificationHistory' }),
+    ).toBe(true);
+    expect(options.onQueryUpdated({ queryName: 'GetLeague' })).toBe(false);
+    expect(options.onQueryUpdated({})).toBe(false);
+  });
+
+  it('dropdown instances do not open their own socket — the header can mount two of them', () => {
+    render(
+      <MemoryRouter>
+        <NotificationDropdown />
+        <NotificationDropdown />
+      </MemoryRouter>,
+    );
+
+    expect(mockUseWebSocket).not.toHaveBeenCalled();
   });
 
   it('still fetches the unread count on mount independent of the WebSocket push (no regression to initial fetch)', () => {
