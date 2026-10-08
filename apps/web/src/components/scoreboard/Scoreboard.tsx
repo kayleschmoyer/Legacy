@@ -11,12 +11,14 @@
  * (web-canonical principle LS-7790).
  */
 import React from 'react';
+import { CombinedGraphQLErrors } from '@apollo/client';
 import { useSearchParams } from 'react-router-dom';
 import { Text, XStack, YStack } from 'tamagui';
 import {
   formatDisplayDate,
   maxScoreboardDateISO,
   offsetDate,
+  SCOREBOARD_MIN_DATE_ISO,
   ScoreboardContainer,
   type ScoreboardGame,
   type SportKey,
@@ -43,12 +45,20 @@ export function DateNav({
   // (LS-10456), bounded by how far ahead the schedule feed publishes.
   const maxDate = maxScoreboardDateISO();
   const isAtMax = date >= maxDate;
-  // A date typed past the bound is clamped to it — say so instead of
-  // silently swapping the user's input for another date.
-  const [isClamped, setIsClamped] = React.useState(false);
+  // Nothing before MLB's first season can have games (LS-10649).
+  const minDate = SCOREBOARD_MIN_DATE_ISO;
+  const isAtMin = date <= minDate;
+  // A date typed outside the bounds is clamped to the nearest one — say so
+  // instead of silently swapping the user's input for another date.
+  const [clampedTo, setClampedTo] = React.useState<'min' | 'max' | null>(null);
+  // A typed date below the minimum is held here rather than selected: Chrome
+  // emits partial years while typing ("0002-…" on the way to "2024-…"), so it
+  // is only clamped on blur, and never sent as a query in the meantime.
+  const [belowMinDraft, setBelowMinDraft] = React.useState<string | null>(null);
 
   const select = (next: string) => {
-    setIsClamped(false);
+    setClampedTo(null);
+    setBelowMinDraft(null);
     onChange(next);
   };
 
@@ -68,7 +78,8 @@ export function DateNav({
         <button
           type="button"
           aria-label="Previous day"
-          onClick={() => select(offsetDate(date, -1))}
+          disabled={isAtMin}
+          onClick={() => !isAtMin && select(offsetDate(date, -1))}
           className="date-nav-btn"
         >
           ←
@@ -76,17 +87,27 @@ export function DateNav({
 
         <input
           type="date"
-          value={date}
+          value={belowMinDraft ?? date}
+          min={minDate}
           max={maxDate}
           onChange={(e) => {
             const val = e.target.value;
             if (!val) return;
             if (val > maxDate) {
+              setBelowMinDraft(null);
               onChange(maxDate);
-              setIsClamped(true);
+              setClampedTo('max');
+            } else if (val < minDate) {
+              setBelowMinDraft(val);
+              setClampedTo('min');
             } else {
               select(val);
             }
+          }}
+          onBlur={() => {
+            if (belowMinDraft === null) return;
+            setBelowMinDraft(null);
+            onChange(minDate);
           }}
           aria-label="Scoreboard date"
           data-testid="scoreboard-date-picker"
@@ -103,14 +124,16 @@ export function DateNav({
           →
         </button>
       </XStack>
-      {isClamped && (
+      {clampedTo && (
         <Text
           role="status"
           fontSize={12}
           color="$color11"
           testID="scoreboard-date-clamped"
         >
-          Schedules are only available through {formatDisplayDate(maxDate)}.
+          {clampedTo === 'max'
+            ? `Schedules are only available through ${formatDisplayDate(maxDate)}.`
+            : `Scores are only available from ${formatDisplayDate(minDate)}.`}
         </Text>
       )}
     </YStack>
@@ -124,7 +147,8 @@ const DATE_PARAM = 'date';
 /**
  * Resolve the `?date=` search param to a selectable scoreboard date. Applies
  * the same rules as `DateNav` — a real `YYYY-MM-DD` calendar date no later
- * than `maxScoreboardDateISO()` — and falls back to today for a missing,
+ * than `maxScoreboardDateISO()` and no earlier than `SCOREBOARD_MIN_DATE_ISO`
+ * — and falls back to today for a missing,
  * malformed, or out-of-range value. Exported for unit tests.
  */
 export function resolveScoreboardDateParam(param: string | null): string {
@@ -132,6 +156,7 @@ export function resolveScoreboardDateParam(param: string | null): string {
   // Round-tripping through a Date rejects impossible dates like 2026-02-30.
   if (offsetDate(param, 0) !== param) return todayISO();
   if (param > maxScoreboardDateISO()) return todayISO();
+  if (param < SCOREBOARD_MIN_DATE_ISO) return todayISO();
   return param;
 }
 
@@ -163,6 +188,14 @@ function useScoreboardDateParam(): [string, (next: string) => void] {
 }
 
 // ─── Main component ────────────────────────────────────────────────────────
+
+/** The API rejected the date itself rather than failing to fetch (LS-10649). */
+function isInvalidDateError(error: unknown): boolean {
+  return (
+    CombinedGraphQLErrors.is(error) &&
+    error.errors.some((e) => e.extensions?.['code'] === 'BAD_USER_INPUT')
+  );
+}
 
 export function Scoreboard() {
   const [date, setDate] = useScoreboardDateParam();
@@ -199,6 +232,7 @@ export function Scoreboard() {
       lastUpdated={data?.scoreboard?.lastUpdated}
       loading={loading && !data}
       hasError={!!error && !data?.scoreboard}
+      isInvalidDate={isInvalidDateError(error)}
       isUnavailable={!loading && !error && !!data && data.scoreboard === null}
       dateNav={<DateNav date={date} onChange={setDate} />}
     />

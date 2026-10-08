@@ -39,6 +39,12 @@ export interface ScoreboardContainerProps {
   loading?: boolean;
   /** Show the full-page error card (query errored with no cached data). */
   hasError?: boolean;
+  /**
+   * The error was the API rejecting the date itself (`BAD_USER_INPUT`), so the
+   * error card says the date is invalid instead of blaming the connection
+   * (LS-10649).
+   */
+  isInvalidDate?: boolean;
   /** Show the "not available yet" card (query resolved but `scoreboard` was null). */
   isUnavailable?: boolean;
   /**
@@ -289,7 +295,7 @@ function LoadingState() {
   );
 }
 
-function ErrorView() {
+function ErrorView({ isInvalidDate }: { isInvalidDate: boolean }) {
   return (
     <Card
       bordered
@@ -323,12 +329,14 @@ function ErrorView() {
             color="$color12"
             fontFamily={FONT_DISPLAY}
           >
-            Unable to load the scoreboard
+            {isInvalidDate
+              ? 'That date isn’t valid'
+              : 'Unable to load the scoreboard'}
           </Text>
           <Text fontSize={15} color="$color11" fontFamily={FONT_BODY}>
-            We can’t reach the live data feed right now. Your connection may be
-            offline, or the upstream service is having a moment. Try refreshing
-            the page in a few seconds.
+            {isInvalidDate
+              ? 'Pick a different date to see its games.'
+              : 'We can’t reach the live data feed right now. Your connection may be offline, or the upstream service is having a moment. Try refreshing the page in a few seconds.'}
           </Text>
         </YStack>
       </XStack>
@@ -637,6 +645,7 @@ export function ScoreboardContainer({
   lastUpdated,
   loading = false,
   hasError = false,
+  isInvalidDate = false,
   isUnavailable = false,
   dateNav,
   disabledSports,
@@ -674,7 +683,7 @@ export function ScoreboardContainer({
         <>
           {loading && <LoadingState />}
 
-          {hasError && <ErrorView />}
+          {hasError && <ErrorView isInvalidDate={isInvalidDate} />}
 
           {isUnavailable && <NoDataView date={date} />}
 

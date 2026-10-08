@@ -21,4 +21,5 @@ export {
   formatLastUpdated,
   maxScoreboardDateISO,
   SCOREBOARD_MAX_FUTURE_DAYS,
+  SCOREBOARD_MIN_DATE_ISO,
 } from './dateUtils';

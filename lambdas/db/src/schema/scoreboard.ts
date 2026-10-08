@@ -54,7 +54,10 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 function isValidDate(date: string): boolean {
   if (!DATE_RE.test(date)) return false;
   const [y, m, d] = date.split('-').map(Number) as [number, number, number];
-  const parsed = new Date(y, m - 1, d);
+  // setFullYear, not `new Date(y, m, d)`: the constructor maps years 0–99 to
+  // 1900–1999, so "0001-01-01" would fail the round-trip below (LS-10649).
+  const parsed = new Date(2000, 0, 1);
+  parsed.setFullYear(y, m - 1, d);
   return (
     parsed.getFullYear() === y &&
     parsed.getMonth() === m - 1 &&

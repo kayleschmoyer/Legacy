@@ -210,6 +210,16 @@ describe('ScoreboardContainer', () => {
     expect(getByTestId('scoreboard-error')).toBeTruthy();
   });
 
+  it('says the date is invalid, not that the connection is offline, for an invalid date (LS-10649)', () => {
+    const { getByTestId } = renderContainer({
+      hasError: true,
+      isInvalidDate: true,
+    });
+    const card = getByTestId('scoreboard-error').textContent;
+    expect(card).toContain('That date isn’t valid');
+    expect(card).not.toContain('offline');
+  });
+
   it('fires onSportChange when a sport option is pressed', () => {
     const onSportChange = jest.fn();
     const { getByTestId } = renderContainer({ onSportChange });

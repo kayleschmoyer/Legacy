@@ -10,6 +10,7 @@
  * must not inherit.
  */
 import React from 'react';
+import { CombinedGraphQLErrors } from '@apollo/client';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import { useGetScoreboardQuery } from '@legacy-sports/graphql';
@@ -24,22 +25,27 @@ jest.mock('@legacy-sports/shared-components/scoreboard', () => ({
   todayISO: () => '2026-10-06',
   maxScoreboardDateISO: () => '2027-10-06',
   formatDisplayDate: (iso: string) => `DISPLAY(${iso})`,
+  SCOREBOARD_MIN_DATE_ISO: '1876-01-01',
   offsetDate: (iso: string, days: number) => {
     const [y, m, d] = iso.split('-').map(Number);
-    const dt = new Date(y, m - 1, d + days);
-    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+    const dt = new Date(2000, 0, 1);
+    dt.setFullYear(y, m - 1, d + days);
+    return `${String(dt.getFullYear()).padStart(4, '0')}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
   },
   partitionScoreboardGames: jest.fn(),
   useScoreboardLivePolling: jest.fn(),
   ScoreboardContainer: ({
     date,
     dateNav,
+    isInvalidDate,
   }: {
     date: string;
     dateNav: React.ReactNode;
+    isInvalidDate?: boolean;
   }) => (
     <div>
       <span data-testid="scoreboard-date">{date}</span>
+      {isInvalidDate && <span data-testid="scoreboard-invalid-date" />}
       {dateNav}
     </div>
   ),
@@ -203,5 +209,35 @@ describe('resolveScoreboardDateParam', () => {
 
   it('returns today for a missing param', () => {
     expect(resolveScoreboardDateParam(null)).toBe('2026-10-06');
+  });
+
+  it('accepts the first selectable date and rejects anything earlier (LS-10649)', () => {
+    expect(resolveScoreboardDateParam('1876-01-01')).toBe('1876-01-01');
+    expect(resolveScoreboardDateParam('1875-12-31')).toBe('2026-10-06');
+    expect(resolveScoreboardDateParam('0001-01-01')).toBe('2026-10-06');
+  });
+});
+
+describe('Scoreboard invalid-date errors (LS-10649)', () => {
+  const errorResult = (code: string) => ({
+    data: undefined,
+    loading: false,
+    error: new CombinedGraphQLErrors({
+      errors: [{ message: 'nope', extensions: { code } }],
+    }),
+    startPolling: jest.fn(),
+    stopPolling: jest.fn(),
+  });
+
+  it('flags a BAD_USER_INPUT error as an invalid date', () => {
+    mockedQuery.mockReturnValue(errorResult('BAD_USER_INPUT'));
+    renderAt('/scoreboard');
+    expect(screen.getByTestId('scoreboard-invalid-date')).toBeTruthy();
+  });
+
+  it('does not flag a fetch failure as an invalid date', () => {
+    mockedQuery.mockReturnValue(errorResult('SCOREBOARD_FETCH_FAILED'));
+    renderAt('/scoreboard');
+    expect(screen.queryByTestId('scoreboard-invalid-date')).toBeNull();
   });
 });

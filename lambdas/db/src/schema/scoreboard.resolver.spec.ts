@@ -271,6 +271,29 @@ describe('scoreboard resolver', () => {
     expect(mockGetScoreboard).not.toHaveBeenCalled();
   });
 
+  it('scoreboard: accepts real dates with a year below 100 (LS-10649)', async () => {
+    mockGetScoreboard.mockResolvedValue({ games: [] });
+    await getQueryResolver('scoreboard')(
+      {},
+      { date: '0001-01-01' },
+      {},
+      undefined as never,
+    );
+    expect(mockGetScoreboard).toHaveBeenCalledWith('0001-01-01');
+  });
+
+  it('scoreboard: still rejects impossible dates with a year below 100', async () => {
+    await expect(
+      getQueryResolver('scoreboard')(
+        {},
+        { date: '0001-02-30' },
+        {},
+        undefined as never,
+      ),
+    ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+    expect(mockGetScoreboard).not.toHaveBeenCalled();
+  });
+
   it('scoreboard: logs and wraps provider errors', async () => {
     const providerError = new Error('upstream 429');
     mockGetScoreboard.mockRejectedValue(providerError);

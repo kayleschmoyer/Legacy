@@ -3,6 +3,9 @@
  * preview upcoming slates), bounded by how far ahead the schedule feed
  * publishes. A date typed past that bound is clamped with a visible notice
  * rather than silently reset to today.
+ *
+ * LS-10649 — dates before MLB's first season are clamped to the minimum with
+ * an "available from" notice, and never queried.
  */
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -11,6 +14,7 @@ import { DateNav } from './Scoreboard';
 
 const TODAY = '2026-10-04';
 const MAX_DATE = '2027-10-04';
+const MIN_DATE = '1876-01-01';
 
 jest.mock('@legacy-sports/graphql', () => ({
   useGetScoreboardQuery: jest.fn(),
@@ -20,10 +24,12 @@ jest.mock('@legacy-sports/shared-components/scoreboard', () => ({
   todayISO: () => '2026-10-04',
   maxScoreboardDateISO: () => '2027-10-04',
   formatDisplayDate: (iso: string) => `DISPLAY(${iso})`,
+  SCOREBOARD_MIN_DATE_ISO: '1876-01-01',
   offsetDate: (iso: string, days: number) => {
     const [y, m, d] = iso.split('-').map(Number);
-    const dt = new Date(y, m - 1, d + days);
-    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+    const dt = new Date(2000, 0, 1);
+    dt.setFullYear(y, m - 1, d + days);
+    return `${String(dt.getFullYear()).padStart(4, '0')}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
   },
   partitionScoreboardGames: jest.fn(),
   useScoreboardLivePolling: jest.fn(),
@@ -105,6 +111,49 @@ describe('Scoreboard DateNav (web)', () => {
     const next = screen.getByRole('button', { name: 'Next day' });
     expect(next).toBeDisabled();
     fireEvent.click(next);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('bounds the picker below at the first MLB season', () => {
+    renderNav(TODAY);
+    expect(screen.getByTestId('scoreboard-date-picker')).toHaveAttribute(
+      'min',
+      MIN_DATE,
+    );
+  });
+
+  it('holds a date typed before the minimum without selecting it, then clamps on blur', () => {
+    const onChange = renderNav(TODAY);
+    const picker = screen.getByTestId('scoreboard-date-picker');
+    fireEvent.change(picker, { target: { value: '0001-01-01' } });
+    // No request for the out-of-range date — the parent is never told about it.
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByTestId('scoreboard-date-clamped')).toHaveTextContent(
+      `Scores are only available from DISPLAY(${MIN_DATE}).`,
+    );
+    fireEvent.blur(picker);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith(MIN_DATE);
+  });
+
+  it('does not clamp the partial years Chrome emits while a year is typed', () => {
+    const onChange = renderNav(TODAY);
+    const picker = screen.getByTestId('scoreboard-date-picker');
+    for (const value of ['0002-10-04', '0020-10-04', '0202-10-04']) {
+      fireEvent.change(picker, { target: { value } });
+    }
+    fireEvent.change(picker, { target: { value: '2024-10-04' } });
+    fireEvent.blur(picker);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith('2024-10-04');
+    expect(screen.queryByTestId('scoreboard-date-clamped')).toBeNull();
+  });
+
+  it('disables Previous on the first selectable date', () => {
+    const onChange = renderNav(MIN_DATE);
+    const prev = screen.getByRole('button', { name: 'Previous day' });
+    expect(prev).toBeDisabled();
+    fireEvent.click(prev);
     expect(onChange).not.toHaveBeenCalled();
   });
 });
