@@ -1605,6 +1605,13 @@ builder.mutationField('verifyApplePurchase', (t) =>
 
       // Map iOS product IDs to subscription tiers
       const tier = tierFromAppleProductId(productId);
+      assertAppleExpiryPresent('verifyApplePurchase', {
+        userId,
+        tier,
+        expiresDate,
+        productId,
+        originalTransactionId,
+      });
       const status = 'active';
       const currentPeriodEnd = expiresDate ? new Date(expiresDate) : null;
 
@@ -1711,6 +1718,16 @@ builder.mutationField('restoreApplePurchases', (t) =>
       const { originalTransactionId, productId, expiresDate } = transaction;
       const now = new Date();
 
+      // A restore resolves to premium whenever the transaction is unexpired, so
+      // a missing expiresDate must be rejected rather than restored as premium.
+      assertAppleExpiryPresent('restoreApplePurchases', {
+        userId,
+        tier: 'premium',
+        expiresDate,
+        productId,
+        originalTransactionId,
+      });
+
       // Check if the transaction has expired
       const expiry = expiresDate ? new Date(expiresDate) : null;
       const isExpired = expiry ? expiry < now : false;
@@ -1789,6 +1806,33 @@ function tierFromAppleProductId(productId: string): 'free' | 'premium' {
     return 'premium';
   }
   return 'free';
+}
+
+/**
+ * Premium Apple products are subscription SKUs and always carry expiresDate.
+ * Refuse to persist a premium row without an expiry — nothing would ever
+ * expire it (LS-7386).
+ */
+function assertAppleExpiryPresent(
+  operation: 'verifyApplePurchase' | 'restoreApplePurchases',
+  ctx: {
+    userId: number;
+    tier: 'free' | 'premium';
+    expiresDate: number | undefined;
+    productId: string;
+    originalTransactionId: string;
+  },
+): void {
+  if (ctx.tier !== 'premium' || ctx.expiresDate) return;
+  const { expiresDate: _omit, ...logCtx } = ctx;
+  LOGGER.warn(`${operation} — premium transaction missing expiresDate`, logCtx);
+  captureWarning(
+    new Error(`${operation} — premium transaction missing expiresDate`),
+    { ...logCtx, operation },
+  );
+  throw UserInputError(
+    'Invalid transaction: subscription product missing expiresDate',
+  );
 }
 
 async function getPreviousTierForAppleSubscription(

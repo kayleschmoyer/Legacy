@@ -713,6 +713,137 @@ describe('Google Play mutation validation (LS-5121)', () => {
     });
   });
 
+  // LS-7386: a premium Apple transaction without expiresDate must be rejected
+  // rather than persisted as premium with no expiry (nothing would expire it).
+  describe('Apple missing expiresDate guard (LS-7386)', () => {
+    const premiumProductId = 'com.legacysports.app.premium.monthly';
+    const baseTransaction = {
+      originalTransactionId: 'orig-1',
+      transactionId: 'tx-1',
+      bundleId: 'com.legacysports.app',
+      purchaseDate: 1_700_000_000_000,
+    };
+
+    function installDbCapture(): { values: () => unknown } {
+      let capturedValues: unknown;
+      const mockDb = {
+        select: () => ({
+          from: () => ({ where: () => ({ limit: async () => [] }) }),
+        }),
+        insert: () => ({
+          values: (v: unknown) => {
+            capturedValues = v;
+            return { onConflictDoUpdate: () => Promise.resolve() };
+          },
+        }),
+        update: () => ({ set: () => ({ where: async () => undefined }) }),
+      };
+      const dbClient = jest.requireMock('@legacy-sports/db-client');
+      dbClient.runWithInternalClient.mockImplementation(
+        async (_opts: unknown, cb: (db: typeof mockDb) => unknown) =>
+          cb(mockDb),
+      );
+      return { values: () => capturedValues };
+    }
+
+    function mockTransaction(tx: Record<string, unknown>) {
+      const appleJws = jest.requireMock('../apple-jws');
+      appleJws.decodeAndVerifyJwsTransaction.mockResolvedValue({
+        ...baseTransaction,
+        ...tx,
+      });
+    }
+
+    it.each(['verifyApplePurchase', 'restoreApplePurchases'])(
+      '%s rejects a premium transaction missing expiresDate without writing',
+      async (mutation) => {
+        mockTransaction({ productId: premiumProductId });
+        const captured = installDbCapture();
+
+        const resolve = getResolver(mutation);
+        await expect(
+          resolve(
+            {},
+            { jwsTransaction: 'jws' },
+            mockContext,
+            undefined as never,
+          ),
+        ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+
+        expect(captured.values()).toBeUndefined();
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          `${mutation} — premium transaction missing expiresDate`,
+          expect.objectContaining({ productId: premiumProductId }),
+        );
+        expect(mockCaptureWarning).toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: `${mutation} — premium transaction missing expiresDate`,
+          }),
+          expect.objectContaining({ operation: mutation }),
+        );
+      },
+    );
+
+    it('verifyApplePurchase still records a premium transaction with expiresDate', async () => {
+      const expiresDate = Date.now() + 30 * 24 * 60 * 60 * 1000;
+      mockTransaction({ productId: premiumProductId, expiresDate });
+      const captured = installDbCapture();
+
+      const resolve = getResolver('verifyApplePurchase');
+      const result = await resolve(
+        {},
+        { jwsTransaction: 'jws' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toMatchObject({ success: true, tier: 'premium' });
+      expect(captured.values()).toMatchObject({
+        tier: 'premium',
+        currentPeriodEnd: new Date(expiresDate),
+      });
+    });
+
+    it('restoreApplePurchases still restores a premium transaction with expiresDate', async () => {
+      const expiresDate = Date.now() + 30 * 24 * 60 * 60 * 1000;
+      mockTransaction({ productId: premiumProductId, expiresDate });
+      const captured = installDbCapture();
+
+      const resolve = getResolver('restoreApplePurchases');
+      const result = await resolve(
+        {},
+        { jwsTransaction: 'jws' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toBe(true);
+      expect(captured.values()).toMatchObject({
+        tier: 'premium',
+        currentPeriodEnd: new Date(expiresDate),
+      });
+    });
+
+    it('verifyApplePurchase does not require expiresDate for a non-premium product', async () => {
+      mockTransaction({ productId: 'com.legacysports.app.consumable.coins' });
+      const captured = installDbCapture();
+
+      const resolve = getResolver('verifyApplePurchase');
+      const result = await resolve(
+        {},
+        { jwsTransaction: 'jws' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toMatchObject({ success: true, tier: 'free' });
+      expect(captured.values()).toMatchObject({
+        tier: 'free',
+        currentPeriodEnd: null,
+      });
+    });
+  });
+
   // LS-5176: createBillingPortalSession must surface a BAD_USER_INPUT
   // GraphQLError (not a raw Error → INTERNAL_SERVER_ERROR) when the caller has
   // no manageable Stripe subscription, so free / IAP users get a clean 4xx-style
