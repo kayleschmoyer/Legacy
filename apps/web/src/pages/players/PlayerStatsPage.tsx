@@ -1797,7 +1797,9 @@ export function PlayerStatsRoute() {
             showSportToggle={false}
             onSportChange={handleSelectSport}
             onPlayerPress={handleNflCardPlayerPress}
-            onCompare={() => navigate('/players/compare')}
+            // The football comparison lives on its own route; /players/compare
+            // is MLB-only and scores NFL players as 0.00 hitters (LS-10677).
+            onCompare={() => navigate('/football/players/compare')}
             onPremiumPress={handleCardFeedPremiumPress}
           />
         ) : (

@@ -1244,6 +1244,17 @@ describe('PlayerStatsRoute narrow-viewport card feed (LS-9075)', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/players/compare');
   });
 
+  // LS-10677: /players/compare is the MLB comparison — NFL players scored as
+  // 0.00 hitters there. The NFL feed must open the football comparison.
+  it('navigates to /football/players/compare from the NFL card feed overflow action', () => {
+    mockSearchParams = new URLSearchParams('sport=nfl');
+    mockMediaSm = true;
+    render(<PlayerStatsRoute />);
+    (mockFootballCardFeedProps.onCompare as () => void)?.();
+    expect(mockNavigate).toHaveBeenCalledWith('/football/players/compare');
+    expect(mockNavigate).not.toHaveBeenCalledWith('/players/compare');
+  });
+
   it('preserves other filters in the URL when the card feed opens a player deep link', () => {
     mockSearchParams = new URLSearchParams('sport=mlb&position=OF');
     mockMediaSm = true;

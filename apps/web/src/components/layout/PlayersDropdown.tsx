@@ -7,6 +7,10 @@ import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
 import { ChevronUp } from '@tamagui/lucide-icons/icons/ChevronUp';
 import { Users } from '@tamagui/lucide-icons/icons/Users';
 import {
+  parseDefaultSport,
+  USER_PREFERENCES_STORAGE_KEY,
+} from '@legacy-sports/shared-components/utils';
+import {
   DROPDOWN_BORDER,
   DropdownButton,
   DropdownContent,
@@ -17,6 +21,43 @@ import {
 } from './NavDropdownShared';
 import { BRAND_GOLD, TEXT_MUTED } from '../../constants/colors';
 import { NAV_DROPDOWN_Z_INDEX } from '../../constants/dimensions';
+import { useFeatureValue } from '../../context/GrowthBookProvider';
+
+const MLB_COMPARE_PATH = '/players/compare';
+const NFL_COMPARE_PATH = '/football/players/compare';
+
+function prefersFootball(): boolean {
+  try {
+    return (
+      parseDefaultSport(localStorage.getItem(USER_PREFERENCES_STORAGE_KEY)) ===
+      'football'
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resolve the Compare destination for the sport the user is looking at
+ * (LS-10677). /players/compare is MLB-only, so an NFL viewer must land on the
+ * football comparison instead. Mirrors PlayerStatsRoute's sport resolution:
+ * an explicit `sport` param on /players wins, any /football route is NFL, and
+ * otherwise the saved default-sport preference decides.
+ */
+export function resolveCompareHref(
+  pathname: string,
+  search: string,
+  footballEnabled: boolean,
+): string {
+  if (!footballEnabled) return MLB_COMPARE_PATH;
+  if (pathname.startsWith('/football/')) return NFL_COMPARE_PATH;
+  if (pathname === MLB_COMPARE_PATH) return MLB_COMPARE_PATH;
+  const sportParam =
+    pathname === '/players' ? new URLSearchParams(search).get('sport') : null;
+  if (sportParam === 'nfl') return NFL_COMPARE_PATH;
+  if (sportParam === 'mlb') return MLB_COMPARE_PATH;
+  return prefersFootball() ? NFL_COMPARE_PATH : MLB_COMPARE_PATH;
+}
 
 // Item title style — Big Shoulders Display uppercase.
 // Color passed separately via Tamagui `color` prop so it adapts to theme.
@@ -45,10 +86,17 @@ export const PlayersDropdown: React.FC = () => {
   const location = useLocation();
   const buttonId = 'players-menu-button';
   const menuId = 'players-menu';
+  const footballEnabled = useFeatureValue('football_enabled', true);
+  const compareHref = resolveCompareHref(
+    location.pathname,
+    location.search,
+    footballEnabled !== false,
+  );
+  const isCompareActive =
+    location.pathname === MLB_COMPARE_PATH ||
+    location.pathname === NFL_COMPARE_PATH;
 
-  const isActive =
-    location.pathname === '/players' ||
-    location.pathname === '/players/compare';
+  const isActive = location.pathname === '/players' || isCompareActive;
   const isHighlighted = isActive || isOpen;
 
   useEffect(() => {
@@ -172,31 +220,23 @@ export const PlayersDropdown: React.FC = () => {
           </Link>
 
           <Link
-            to="/players/compare"
+            to={compareHref}
             style={{ textDecoration: 'none', display: 'block' }}
           >
             <MenuItem
               onPress={() => setIsOpen(false)}
               role="menuitem"
-              active={location.pathname === '/players/compare'}
+              active={isCompareActive}
             >
               <XStack alignItems="flex-start" gap={12} flex={1}>
                 <ArrowLeftRight
                   size={17}
-                  color={
-                    location.pathname === '/players/compare'
-                      ? BRAND_GOLD
-                      : TEXT_MUTED
-                  }
+                  color={isCompareActive ? BRAND_GOLD : TEXT_MUTED}
                   style={{ flexShrink: 0, marginTop: 1 }}
                 />
                 <YStack flex={1} gap={0}>
                   <Paragraph
-                    color={
-                      location.pathname === '/players/compare'
-                        ? BRAND_GOLD
-                        : '$color'
-                    }
+                    color={isCompareActive ? BRAND_GOLD : '$color'}
                     style={titleStyle}
                   >
                     Compare Players
