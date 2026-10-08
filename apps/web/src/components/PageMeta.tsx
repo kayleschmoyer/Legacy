@@ -1,4 +1,5 @@
 import React from 'react';
+import { SITE_URL } from '../config/site';
 
 /**
  * Safe alternative to useLocation().pathname that works outside a Router context.
@@ -77,9 +78,7 @@ export function PageMeta({
 }: PageMetaProps) {
   const pathname = usePathname();
   const origin =
-    typeof window !== 'undefined'
-      ? window.location.origin
-      : 'https://legacy.sports';
+    typeof window !== 'undefined' ? window.location.origin : SITE_URL;
   const pageUrl = canonicalUrl ?? `${origin}${pathname}`;
   const image = imageUrl ?? `${origin}${DEFAULT_IMAGE_PATH}`;
   const fullTitle = formatPageTitle(title);

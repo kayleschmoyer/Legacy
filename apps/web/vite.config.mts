@@ -12,6 +12,7 @@ import {
   rollbarSourcemapPlugin,
   spaRouteFallbackPlugin,
 } from '../../tools/vite-configs';
+import { SITE_URL } from './src/config/site';
 import { visualizer } from 'rollup-plugin-visualizer';
 import istanbul from 'vite-plugin-istanbul';
 
@@ -21,6 +22,10 @@ export default defineConfig(({ mode }) => {
 
   // Merge environment variables into process.env so Vite can pick them up
   Object.assign(process.env, env);
+
+  // Fills %VITE_SITE_URL% in index.html (og:url / og:image / twitter:image),
+  // which crawlers read without running JS (LS-10765).
+  process.env.VITE_SITE_URL ||= SITE_URL;
 
   // Determine if this is a deploy build (uses deploy configuration)
   const isDeployBuild = process.env.NX_TASK_TARGET_CONFIGURATION === 'deploy';
@@ -166,7 +171,7 @@ export default defineConfig(({ mode }) => {
             rollbarSourcemapPlugin({
               accessToken: process.env.ROLLBAR_ACCESS_TOKEN,
               version: commitSha,
-              publicPath: 'https://legacy-fantasy.com',
+              publicPath: SITE_URL,
               deleteFilesAfterUpload: true,
             }),
           ]

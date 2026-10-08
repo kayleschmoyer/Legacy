@@ -189,6 +189,16 @@ jobs:
       - name: Add SPA Fallback
         run: cp ./dist/apps/web/index.html ./dist/apps/web/404.html
 
+      # Link-preview crawlers read og:url / og:image / twitter:image from the
+      # static HTML without running JS, so a dead domain or an unreplaced
+      # %VITE_*% placeholder there breaks every shared link (LS-10765).
+      - name: Verify static share-meta URLs
+        run: |
+          if grep -rlE 'legacy\.sports|%VITE_[A-Z_]+%' ./dist/apps/web --include='*.html'; then
+            echo "::error::Built HTML contains legacy.sports or an unreplaced %VITE_*% placeholder (see files above)"
+            exit 1
+          fi
+
       # Add CNAME file for custom domain
       # Required when using actions/deploy-pages (artifact-based deployment)
       # GitHub can't auto-create this since we're not using a branch
