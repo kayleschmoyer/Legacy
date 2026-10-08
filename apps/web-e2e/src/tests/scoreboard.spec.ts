@@ -440,6 +440,66 @@ test.describe('Scoreboard — DateNav arrow buttons @regression', () => {
   });
 });
 
+test.describe('Scoreboard — selected date kept in the URL (LS-10648) @regression', () => {
+  test('changing the date writes ?date= and a reload keeps it', async ({
+    page,
+  }) => {
+    await mockScoreboardGraphQL(page);
+    await page.goto('/scoreboard');
+    await page.waitForLoadState('load');
+
+    const picker = page.getByTestId('scoreboard-date-picker');
+    await picker.fill('2026-04-10');
+    await expect(page).toHaveURL(/\/scoreboard\?date=2026-04-10$/);
+
+    await page.reload();
+    await page.waitForLoadState('load');
+    await expect(page.getByTestId('scoreboard-date-picker')).toHaveValue(
+      '2026-04-10',
+    );
+  });
+
+  test('Back returns to the previously viewed date and Forward re-applies it', async ({
+    page,
+  }) => {
+    await mockScoreboardGraphQL(page);
+    await page.goto('/scoreboard?date=2026-04-10');
+    await page.waitForLoadState('load');
+
+    const picker = page.getByTestId('scoreboard-date-picker');
+    await expect(picker).toHaveValue('2026-04-10');
+    await page.getByRole('button', { name: 'Previous day' }).click();
+    await expect(picker).toHaveValue('2026-04-09');
+
+    await page.goBack();
+    await expect(page).toHaveURL(/\?date=2026-04-10$/);
+    await expect(picker).toHaveValue('2026-04-10');
+
+    await page.goForward();
+    await expect(page).toHaveURL(/\?date=2026-04-09$/);
+    await expect(picker).toHaveValue('2026-04-09');
+  });
+
+  test('an invalid ?date= falls back to today without an error', async ({
+    page,
+  }) => {
+    await mockScoreboardGraphQL(page);
+    await page.goto('/scoreboard?date=not-a-date');
+    await page.waitForLoadState('load');
+
+    await expect(page.getByTestId('scoreboard-heading')).toBeVisible();
+    // "Today" as the page computes it — the browser's local calendar date.
+    const today = await page.evaluate(() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    });
+    await expect(page.getByTestId('scoreboard-date-picker')).toHaveValue(today);
+    await expect(page.locator('body')).not.toContainText(
+      'Unexpected Application Error',
+    );
+  });
+});
+
 test.describe('Scoreboard — GameCard expand/collapse @regression', () => {
   test('clicking a game card with linescore data toggles the Linescore', async ({
     page,

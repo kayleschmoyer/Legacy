@@ -3,6 +3,7 @@
  * `ScoreboardContainer` (LS-7803). This file now owns only the web concerns:
  *  - the GraphQL query + Apollo live polling
  *  - the web-native date navigation control (`<input type="date">` + arrows)
+ *  - keeping the selected date in the URL (`?date=YYYY-MM-DD`, LS-10648)
  *
  * All page layout (marquee header, sport filter, counters, status-grouped game
  * grid, and loading/error/empty states) lives in
@@ -10,6 +11,7 @@
  * (web-canonical principle LS-7790).
  */
 import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Text, XStack, YStack } from 'tamagui';
 import {
   formatDisplayDate,
@@ -115,10 +117,55 @@ export function DateNav({
   );
 }
 
+// ─── URL date state (LS-10648) ──────────────────────────────────────────────
+
+const DATE_PARAM = 'date';
+
+/**
+ * Resolve the `?date=` search param to a selectable scoreboard date. Applies
+ * the same rules as `DateNav` — a real `YYYY-MM-DD` calendar date no later
+ * than `maxScoreboardDateISO()` — and falls back to today for a missing,
+ * malformed, or out-of-range value. Exported for unit tests.
+ */
+export function resolveScoreboardDateParam(param: string | null): string {
+  if (!param || !/^\d{4}-\d{2}-\d{2}$/.test(param)) return todayISO();
+  // Round-tripping through a Date rejects impossible dates like 2026-02-30.
+  if (offsetDate(param, 0) !== param) return todayISO();
+  if (param > maxScoreboardDateISO()) return todayISO();
+  return param;
+}
+
+/**
+ * The selected date, backed by `?date=` so reload keeps it and Back/Forward
+ * step through previously viewed dates. Each change pushes a history entry;
+ * today is kept out of the URL so the ticker's plain `/scoreboard` link (and
+ * a bookmark of it) always opens today's slate.
+ */
+function useScoreboardDateParam(): [string, (next: string) => void] {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const date = resolveScoreboardDateParam(searchParams.get(DATE_PARAM));
+
+  const setDate = React.useCallback(
+    (next: string) => {
+      // Re-selecting the current date must not add a duplicate Back step.
+      if (next === date) return;
+      setSearchParams((prev) => {
+        const params = new URLSearchParams(prev);
+        if (next === todayISO()) params.delete(DATE_PARAM);
+        else params.set(DATE_PARAM, next);
+        return params;
+      });
+    },
+    [date, setSearchParams],
+  );
+
+  return [date, setDate];
+}
+
 // ─── Main component ────────────────────────────────────────────────────────
 
 export function Scoreboard() {
-  const [date, setDate] = React.useState(todayISO());
+  const [date, setDate] = useScoreboardDateParam();
   const [sport, setSport] = React.useState<SportKey>('all');
 
   const { data, loading, error, startPolling, stopPolling } =
