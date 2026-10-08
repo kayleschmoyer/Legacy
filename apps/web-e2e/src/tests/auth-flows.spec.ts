@@ -5,6 +5,7 @@
  * and logout — both programmatic and via the profile dropdown UI.
  */
 
+import { getViolations, injectAxe } from 'axe-playwright';
 import { adminTest, expect, test, unauthTest } from '../fixtures/pages';
 import { buildAuthStorageState } from '../fixtures/auth-enhanced';
 import { withApiIsolation } from '../fixtures/api-isolation';
@@ -1551,3 +1552,32 @@ test.describe('Session Recovery After Tab/Window Close and Reopen @critical', ()
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// LS-10785: the sign-in card's "Get help accessing your account" link used
+// the dark-theme gold (#D4B24A on white = 2.04:1) in the light theme. It now
+// reads the per-theme `--goldText` var and must clear AA in both themes.
+// ---------------------------------------------------------------------------
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  unauthTest(
+    `sign-in recovery link passes color-contrast in ${colorScheme} theme (LS-10785) @regression`,
+    async ({ page }) => {
+      await page.emulateMedia({ colorScheme });
+      await page.goto('/');
+      await expect(
+        page.getByRole('link', { name: /get help accessing your account/i }),
+      ).toBeVisible({ timeout: 15_000 });
+      await injectAxe(page);
+
+      const violations = await getViolations(page, '.ll-card-recovery', {
+        runOnly: { type: 'rule', values: ['color-contrast'] },
+      });
+      expect(
+        violations.flatMap((v) =>
+          v.nodes.map((n) => `${n.target.join(' ')}: ${n.failureSummary}`),
+        ),
+      ).toEqual([]);
+    },
+  );
+}

@@ -30,8 +30,7 @@ import {
   BRAND_NAVY,
   BRAND_NAVY_DARK,
   BRAND_NAVY_LIGHT,
-  BRAND_SEAM_RED,
-  SURFACE_PANEL,
+  WHITE,
   withAlpha,
 } from '../../constants/colors';
 import { useIsPremiumStatus } from '../../hooks/useIsPremium';
@@ -332,9 +331,10 @@ const DiscountBadge = styled(XStack, {
   paddingHorizontal: '$2.5',
   paddingVertical: '$1',
   borderRadius: '$4',
-  backgroundColor: withAlpha(BRAND_SEAM_RED, 0.15),
-  borderWidth: 1,
-  borderColor: withAlpha(BRAND_SEAM_RED, 0.3),
+  // LS-10785: solid fill + white text — the badge sits on the navy selected
+  // chip, the light page and the dark page, so a translucent tint with red
+  // text can't clear AA on all three (it was 1.57:1 on the navy chip).
+  backgroundColor: '$brandSeamRed',
 });
 
 /* ─── Data ─── */
@@ -593,8 +593,11 @@ export default function PricingPage() {
     backgroundAttachment: 'fixed',
   };
 
+  // LS-10785: theme vars, not the dark-only SURFACE_PANEL — in light theme
+  // the card was a dark panel under dark text, and a stronger navy tint left
+  // `$goldText` under 4.5:1 at the gradient's start.
   const premiumCardStyle: React.CSSProperties = {
-    background: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY_LIGHT, 0.18)} 0%, ${SURFACE_PANEL} 100%)`,
+    background: `linear-gradient(135deg, var(--surfaceInteractive) 0%, var(--surfacePanel) 100%)`,
     borderColor: BRAND_NAVY_LIGHT,
   };
 
@@ -613,14 +616,14 @@ export default function PricingPage() {
           <HeroSection>
             <PlanBadge data-testid="hero-plan-badge">
               {isPremium ? (
-                <Star size={14} color={BRAND_GOLD_LIGHT} />
+                <Star size={14} color="$goldText" />
               ) : (
-                <Zap size={14} color={BRAND_GOLD_LIGHT} />
+                <Zap size={14} color="$goldText" />
               )}
               <Paragraph
                 size="$2"
                 fontWeight="600"
-                color={BRAND_GOLD_LIGHT}
+                color="$goldText"
                 marginBottom={0}
               >
                 {heroBadgeLabel}
@@ -634,7 +637,7 @@ export default function PricingPage() {
               $sm={{ fontSize: '$8' }}
             >
               The plan that fits your{'\u00a0'}
-              <Text color={BRAND_GOLD} fontWeight="800">
+              <Text color="$goldText" fontWeight="800">
                 game
               </Text>
             </H1>
@@ -659,7 +662,7 @@ export default function PricingPage() {
                 <Paragraph
                   marginBottom={0}
                   fontWeight="600"
-                  color={BRAND_GOLD_LIGHT}
+                  color="$goldText"
                   size="$3"
                 >
                   Your plan: Annual
@@ -718,7 +721,7 @@ export default function PricingPage() {
                           marginBottom={0}
                           size="$1"
                           fontWeight="700"
-                          color={BRAND_SEAM_RED}
+                          color={WHITE}
                         >
                           Save {ANNUAL_SAVINGS_PCT}
                         </Paragraph>
@@ -788,7 +791,7 @@ export default function PricingPage() {
                       justifyContent="center"
                       flexShrink={0}
                     >
-                      <Check size={12} color={BRAND_GOLD_LIGHT} />
+                      <Check size={12} color="$goldText" />
                     </YStack>
                     <Paragraph size="$3" marginBottom={0}>
                       {f.label}
@@ -809,7 +812,7 @@ export default function PricingPage() {
                   <Paragraph
                     size="$3"
                     fontWeight="700"
-                    color={BRAND_GOLD_LIGHT}
+                    color="$goldText"
                     marginBottom={0}
                   >
                     PREMIUM
@@ -828,7 +831,7 @@ export default function PricingPage() {
                     <Paragraph
                       size="$1"
                       fontWeight="700"
-                      color={BRAND_GOLD}
+                      color="$goldText"
                       marginBottom={0}
                     >
                       Most Popular
@@ -852,7 +855,7 @@ export default function PricingPage() {
                         fontSize="$10"
                         fontWeight="800"
                         marginBottom={0}
-                        color={BRAND_GOLD}
+                        color="$goldText"
                       >
                         {isAnnual && annualMonthlyIsApprox ? '~$' : '$'}
                         {isAnnual
@@ -893,7 +896,7 @@ export default function PricingPage() {
                   textAlign="center"
                   size="$2"
                   fontWeight="700"
-                  color={BRAND_GOLD_LIGHT}
+                  color="$goldText"
                   marginBottom={0}
                   data-testid="premium-plan-current"
                 >
@@ -923,7 +926,7 @@ export default function PricingPage() {
                       justifyContent="center"
                       flexShrink={0}
                     >
-                      <Check size={12} color={BRAND_GOLD_LIGHT} />
+                      <Check size={12} color="$goldText" />
                     </YStack>
                     <Paragraph size="$3" marginBottom={0}>
                       {f.label}
@@ -993,7 +996,7 @@ export default function PricingPage() {
                       <Paragraph
                         size="$3"
                         fontWeight="700"
-                        color={BRAND_GOLD_LIGHT}
+                        color="$goldText"
                         textAlign="center"
                         marginBottom={0}
                       >
@@ -1020,7 +1023,7 @@ export default function PricingPage() {
                       <TableCell tag="td" role="cell">
                         {typeof row.free === 'boolean' ? (
                           row.free ? (
-                            <Check size={16} color={BRAND_GOLD_LIGHT} />
+                            <Check size={16} color="$goldText" />
                           ) : (
                             <X size={16} color="$gray9" />
                           )
@@ -1037,7 +1040,7 @@ export default function PricingPage() {
                       <TableCell tag="td" role="cell">
                         {typeof row.premium === 'boolean' ? (
                           row.premium ? (
-                            <Check size={16} color={BRAND_GOLD_LIGHT} />
+                            <Check size={16} color="$goldText" />
                           ) : (
                             <X size={16} color="$gray9" />
                           )
@@ -1046,7 +1049,7 @@ export default function PricingPage() {
                             size="$3"
                             textAlign="center"
                             fontWeight="600"
-                            color={BRAND_GOLD_LIGHT}
+                            color="$goldText"
                             marginBottom={0}
                           >
                             {row.premium}
@@ -1127,9 +1130,9 @@ export default function PricingPage() {
                   style={{ textDecoration: 'none' }}
                 >
                   <Text
-                    color={BRAND_GOLD_LIGHT}
+                    color="$goldText"
                     cursor="pointer"
-                    hoverStyle={{ color: BRAND_GOLD }}
+                    hoverStyle={{ textDecorationLine: 'underline' }}
                   >
                     Visit our Help Center
                   </Text>
@@ -1193,7 +1196,7 @@ export default function PricingPage() {
             borderWidth={1}
             borderColor="$glassBorder"
             style={{
-              background: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY_LIGHT, 0.15)} 0%, ${SURFACE_PANEL} 100%)`,
+              background: `linear-gradient(135deg, var(--surfaceInteractive) 0%, var(--surfacePanel) 100%)`,
             }}
           >
             {/* LS-7174: a Premium subscriber is already levelled up, so they

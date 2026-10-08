@@ -22,6 +22,7 @@
   --fg4: var(--color10, #8296ca);
   --brand-gold: var(--brandGold, #c5a55a);
   --brand-gold-light: var(--brandGoldLight, #d4bb78);
+  --gold-text: var(--goldText, #c5a55a);
   --brand-navy: var(--brandNavy, #1b3a5c);
   --brand-navy-light: var(--brandNavyLight, #2c4a7c);
   --focus-ring: var(--focusRing, #4e8ed6);
@@ -94,19 +95,20 @@
   font-size: 14px;
   color: var(--fg3);
 }
+/* LS-10785: `--gold-text` clears AA on the light card (brandGoldLight was
+   ~2:1 on white), so hover underlines rather than shifting to another gold. */
 .ll-link-gold {
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 12px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--brand-gold-light);
+  color: var(--gold-text);
   text-decoration: none;
   margin-left: 8px;
-  transition: color 150ms var(--ease-standard);
 }
 .ll-link-gold:hover {
-  color: var(--brand-gold);
+  text-decoration: underline;
 }
 
 /* ── Shell / layout ── */
@@ -803,7 +805,7 @@
     background: #5865f2;
   }
   .ll-link-gold:hover {
-    color: var(--brand-gold-light);
+    text-decoration: none;
   }
 }
 

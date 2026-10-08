@@ -14,6 +14,7 @@
  * - No GraphQL calls needed (pricing page is fully static)
  */
 
+import { getViolations, injectAxe } from 'axe-playwright';
 import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
 import { useTier } from '../fixtures/shared-mocks';
 
@@ -655,3 +656,63 @@ unauthTest.describe(
     );
   },
 );
+
+// ---------------------------------------------------------------------------
+// LS-10785: the Premium column, gold accents and the red "Save X%" badge used
+// dark-theme brand constants, so in the light theme they fell to 1.6–1.9:1.
+// axe's color-contrast rule must pass in both themes, with each billing option
+// selected (the badge sits on the navy chip only while Annual is selected).
+// ---------------------------------------------------------------------------
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  unauthTest.describe(
+    `Pricing page — ${colorScheme} theme color contrast (LS-10785) @regression`,
+    () => {
+      unauthTest.beforeEach(async ({ page }) => {
+        await page.emulateMedia({ colorScheme });
+        await page.goto('/pricing');
+        await expect(
+          page.getByRole('heading', { name: /the plan that fits/i }),
+        ).toBeVisible({ timeout: 15_000 });
+        await expect(page.getByText(/save \d+%/i).first()).toBeVisible({
+          timeout: 10_000,
+        });
+        await injectAxe(page);
+      });
+
+      for (const billing of ['Monthly', 'Annual'] as const) {
+        unauthTest(
+          `has no color-contrast violations with ${billing} selected`,
+          async ({ page }) => {
+            const option = page.getByRole('radio', {
+              name: new RegExp(`^${billing}`),
+            });
+            await option.click();
+            await expect(option).toHaveAttribute('aria-checked', 'true');
+            // The chip animates its background; axe samples whatever colour
+            // is mid-transition, so wait for the selected navy to settle.
+            await expect(option).toHaveCSS(
+              'background-color',
+              'rgb(44, 74, 124)',
+            );
+            await expect(page.getByRole('radio', { checked: false })).toHaveCSS(
+              'background-color',
+              'rgba(0, 0, 0, 0)',
+            );
+
+            const violations = await getViolations(page, undefined, {
+              runOnly: { type: 'rule', values: ['color-contrast'] },
+            });
+            expect(
+              violations.flatMap((v) =>
+                v.nodes.map(
+                  (n) => `${n.target.join(' ')}: ${n.failureSummary}`,
+                ),
+              ),
+            ).toEqual([]);
+          },
+        );
+      }
+    },
+  );
+}
