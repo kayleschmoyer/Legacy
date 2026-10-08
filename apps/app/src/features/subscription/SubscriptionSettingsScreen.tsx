@@ -267,9 +267,14 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
 
   useEffect(() => {
     if (!activating) return;
-    // The webhook landed — close the window and show the premium plan.
+    // The webhook landed — close the window, show the premium plan, and confirm
+    // the upgrade. Clearing `activating` makes this fire exactly once.
     if (isPremium) {
       setActivating(false);
+      Alert.alert(
+        'Upgrade Complete',
+        'Welcome to Premium! Your subscription is now active.',
+      );
       return;
     }
     // Retry budget exhausted: stop polling and fall back to the normal view

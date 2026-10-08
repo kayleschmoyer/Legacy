@@ -739,13 +739,17 @@ describe('SubscriptionSettingsScreen — Stripe checkout return', () => {
     loading: false,
   };
 
+  let alertSpy: jest.SpyInstance;
+
   beforeEach(() => {
     jest.clearAllMocks();
     resetMocks();
+    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation();
   });
 
   afterEach(() => {
     jest.useRealTimers();
+    alertSpy.mockRestore();
   });
 
   it('shows the activation state and refetches on a successful checkout return', () => {
@@ -792,11 +796,20 @@ describe('SubscriptionSettingsScreen — Stripe checkout return', () => {
     rerender(<SubscriptionSettingsScreen />);
 
     expect(screen.queryByText(/Activating your Premium membership/)).toBeNull();
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Upgrade Complete',
+      expect.any(String),
+    );
 
     void act(() => {
       jest.advanceTimersByTime(ACTIVATION_POLL_INTERVAL_MS * 5);
     });
     expect(mockRefetch).toHaveBeenCalledTimes(2);
+
+    // Re-renders after confirmation must not re-alert.
+    rerender(<SubscriptionSettingsScreen />);
+    expect(alertSpy).toHaveBeenCalledTimes(1);
   });
 
   it('gives up after the retry budget rather than polling forever', () => {
@@ -818,6 +831,8 @@ describe('SubscriptionSettingsScreen — Stripe checkout return', () => {
     // One immediate refetch on landing plus the full retry budget, no more.
     expect(mockRefetch).toHaveBeenCalledTimes(ACTIVATION_MAX_POLLS + 1);
     expect(screen.queryByText(/Activating your Premium membership/)).toBeNull();
+    // Never confirm an upgrade the server hasn't reported.
+    expect(alertSpy).not.toHaveBeenCalled();
     // Falls back to the normal free-tier view so the user can retry.
     expect(screen.getByText(/^Upgrade —/)).toBeTruthy();
   });
@@ -829,6 +844,7 @@ describe('SubscriptionSettingsScreen — Stripe checkout return', () => {
 
     expect(mockRefetch).toHaveBeenCalledTimes(1);
     expect(screen.queryByText(/Activating your Premium membership/)).toBeNull();
+    expect(alertSpy).not.toHaveBeenCalled();
   });
 
   it('does nothing on a canceled checkout beyond landing on the screen', () => {
@@ -841,6 +857,7 @@ describe('SubscriptionSettingsScreen — Stripe checkout return', () => {
     render(<SubscriptionSettingsScreen />);
 
     expect(mockRefetch).not.toHaveBeenCalled();
+    expect(alertSpy).not.toHaveBeenCalled();
     expect(screen.queryByText(/Activating your Premium membership/)).toBeNull();
     expect(screen.getByText(/^Upgrade —/)).toBeTruthy();
   });
