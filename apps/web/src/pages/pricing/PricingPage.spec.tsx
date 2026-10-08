@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 
 import { ENTITLEMENT_LABELS, ENTITLEMENTS } from '@legacy-sports/utils';
 
-import PricingPage, { COMPARISON_ROWS } from './PricingPage';
+import PricingPage, { COMPARISON_ROWS, trialFaqAnswer } from './PricingPage';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -893,5 +893,17 @@ describe('PricingPage — annual option accessible name (LS-7168)', () => {
     expect(
       screen.getByRole('radio', { name: 'Annual billing' }),
     ).toBeInTheDocument();
+  });
+});
+
+describe('trialFaqAnswer — "Can I try Premium" FAQ (LS-10775)', () => {
+  it('says outright that there is no free trial when none is configured', () => {
+    expect(trialFaqAnswer(0)).toMatch(/^We don’t offer a free trial right now/);
+  });
+
+  it('names the trial length when a trial is configured', () => {
+    const answer = trialFaqAnswer(7);
+    expect(answer).toContain('7-day free trial');
+    expect(answer).not.toContain('don’t offer a free trial');
   });
 });

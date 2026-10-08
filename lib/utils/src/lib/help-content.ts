@@ -31,13 +31,27 @@ export interface HelpContactItem {
   action?: 'bug-report' | 'feature-request';
 }
 
+/* ─── Support channels ─── */
+
+// Declared before the FAQ items, which interpolate them (LS-10775).
+
+/** Canonical Discord invite URL — single source of truth for all help UI. */
+export const DISCORD_URL = 'https://discord.gg/JBhRrE8ZtK';
+
+/**
+ * Canonical support email address — single source of truth for every
+ * support/contact mailto across web, mobile, Help, FAQ and legal pages
+ * (LS-10761).
+ */
+export const SUPPORT_EMAIL = 'legacy.fantasy.support@gmail.com';
+
 /* ─── General FAQ ─── */
 
 export const HELP_FAQ_ITEMS: HelpFaqItem[] = [
   {
     question: 'How do I create a fantasy baseball league?',
     answer:
-      "Navigate to Baseball → Create League from the top navigation. Fill in your league name, choose your scoring settings, and set the number of teams. Once created, you can invite others with the invite link or code on the Invite Friends card in your league's Overview tab.",
+      "Choose Create League in the quick actions on your Home dashboard. Fill in your league name, choose your scoring settings, and set the number of teams. Once created, you can invite others with the invite link or code on the Invite Friends card in your league's Overview tab.",
   },
   {
     question: 'How do I invite teammates to join my league?',
@@ -65,8 +79,7 @@ export const HELP_FAQ_ITEMS: HelpFaqItem[] = [
   },
   {
     question: 'Why are my player statistics not updating?',
-    answer:
-      'Player statistics come from archived historical box scores and are loaded when games are selected for your matchup. If stats appear missing after a game has been selected, the system may still be loading data from our historical data source. This usually completes within minutes. If stats are still missing after an hour, try refreshing the page or contact support.',
+    answer: `Player statistics come from archived historical box scores and are loaded when games are selected for your matchup. If stats appear missing after a game has been selected, the system may still be loading data from our historical data source. This usually completes within minutes. If stats are still missing after an hour, try refreshing the page, then email us at ${SUPPORT_EMAIL} or ask in our Discord.`,
   },
   {
     question: 'How do I change my username or avatar?',
@@ -136,16 +149,6 @@ export const HELP_GETTING_STARTED_STEPS: HelpGettingStartedStep[] = [
 ];
 
 /* ─── Contact / support options ─── */
-
-/** Canonical Discord invite URL — single source of truth for all help UI. */
-export const DISCORD_URL = 'https://discord.gg/JBhRrE8ZtK';
-
-/**
- * Canonical support email address — single source of truth for every
- * support/contact mailto across web, mobile, Help, FAQ and legal pages
- * (LS-10761).
- */
-export const SUPPORT_EMAIL = 'legacy.fantasy.support@gmail.com';
 
 export const HELP_CONTACT_ITEMS: HelpContactItem[] = [
   {

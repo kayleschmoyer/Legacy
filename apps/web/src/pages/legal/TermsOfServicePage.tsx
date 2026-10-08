@@ -6,6 +6,7 @@ import {
   Paragraph,
   YStack,
 } from '@legacy-sports/shared-components/ui';
+import { SUPPORT_EMAIL } from '@legacy-sports/utils';
 import { styled, Text } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
 import { BRAND_GOLD } from '../../constants/colors';
@@ -55,7 +56,7 @@ export default function TermsOfServicePage() {
       <YStack gap="$2" marginBottom="$2">
         <H1>Terms of Service</H1>
         <Text color="$gray11" fontSize="$4">
-          Last updated: January 1, 2025
+          Last updated: October 8, 2026
         </Text>
       </YStack>
 
@@ -142,8 +143,11 @@ export default function TermsOfServicePage() {
       <Section>
         <SectionTitle>9. Contact</SectionTitle>
         <BodyText>
-          If you have questions about these Terms of Service, please contact us
-          through the Help page or submit a bug report.
+          If you have questions about these Terms of Service, email us at{' '}
+          <a href={`mailto:${SUPPORT_EMAIL}`} style={{ color: BRAND_GOLD }}>
+            {SUPPORT_EMAIL}
+          </a>
+          . You can also reach us through the Help page or submit a bug report.
         </BodyText>
       </Section>
 

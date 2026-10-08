@@ -6,6 +6,7 @@ import {
   Paragraph,
   YStack,
 } from '@legacy-sports/shared-components/ui';
+import { SUPPORT_EMAIL } from '@legacy-sports/utils';
 import { styled, Text } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
 import { CookieSettingsButton } from '../../consent/ConsentManager';
@@ -125,7 +126,7 @@ export default function PrivacyPolicyPage() {
       <YStack gap="$2" marginBottom="$2">
         <H1>Privacy Policy</H1>
         <Text color="$gray11" fontSize="$4">
-          Last updated: October 6, 2026
+          Last updated: October 8, 2026
         </Text>
       </YStack>
 
@@ -430,8 +431,8 @@ export default function PrivacyPolicyPage() {
         <BodyText>
           We retain your personal information for as long as your account is
           active or as needed to provide the Service. You may request deletion
-          of your account and associated data by contacting us through the Help
-          page.
+          of your account and associated data by emailing {SUPPORT_EMAIL} or
+          contacting us through the Help page.
         </BodyText>
       </Section>
 
@@ -459,7 +460,11 @@ export default function PrivacyPolicyPage() {
         <SectionTitle>10. Contact</SectionTitle>
         <BodyText>
           If you have questions about this Privacy Policy or your personal data,
-          please contact us through the Help page or submit a bug report.
+          email us at{' '}
+          <a href={`mailto:${SUPPORT_EMAIL}`} style={linkStyle}>
+            {SUPPORT_EMAIL}
+          </a>
+          . You can also reach us through the Help page or submit a bug report.
         </BodyText>
       </Section>
 

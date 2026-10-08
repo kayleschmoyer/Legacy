@@ -2,6 +2,7 @@ import React from 'react';
 import type { ComponentProps } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { SUPPORT_EMAIL } from '@legacy-sports/utils';
 import PrivacyPolicyPage from './PrivacyPolicyPage';
 import TermsOfServicePage from './TermsOfServicePage';
 
@@ -78,5 +79,30 @@ describe.each(PAGES)('$path "← Back" (LS-10768)', ({ path, Page }) => {
     renderPage(['/leagues', path]);
     fireEvent.click(screen.getByRole('button', { name: '← Back' }));
     expect(screen.getByTestId('path')).toHaveTextContent(/^\/leagues$/);
+  });
+});
+
+describe.each(PAGES)('$path contact + date (LS-10775)', ({ Page }) => {
+  function renderPage() {
+    return render(
+      <MemoryRouter>
+        <Page />
+      </MemoryRouter>,
+    );
+  }
+
+  it('links the approved support email', () => {
+    renderPage();
+    expect(screen.getByRole('link', { name: SUPPORT_EMAIL })).toHaveAttribute(
+      'href',
+      `mailto:${SUPPORT_EMAIL}`,
+    );
+  });
+
+  it('no longer shows the stale January 1, 2025 date', () => {
+    renderPage();
+    expect(screen.getByText(/Last updated:/)).toHaveTextContent(
+      'Last updated: October 8, 2026',
+    );
   });
 });

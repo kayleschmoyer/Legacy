@@ -158,9 +158,7 @@ test.describe('Help Page — FAQ accordion @regression', () => {
 
     await expect(faqButton).toHaveAttribute('aria-expanded', 'true');
     await expect(
-      page.getByText(
-        /navigate to baseball.*create league from the top navigation/i,
-      ),
+      page.getByText(/choose create league in the quick actions/i),
     ).toBeVisible({ timeout: 15000 });
   });
 

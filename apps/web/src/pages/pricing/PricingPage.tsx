@@ -439,10 +439,10 @@ export const COMPARISON_ROWS: ReadonlyArray<{
 // experience that the actual Stripe checkout does not deliver (LS-5200).
 const TRIAL_FAQ_QUESTION = 'Can I try Premium before committing?';
 
-function trialFaqAnswer(trialPeriodDays: number): string {
+export function trialFaqAnswer(trialPeriodDays: number): string {
   return trialPeriodDays > 0
     ? `We offer a ${trialPeriodDays}-day free trial for Premium. No credit card required to get started.`
-    : 'You can upgrade to Premium whenever you’re ready and cancel at any time — there’s no long-term commitment, and your Premium access continues until the end of the billing period.';
+    : 'We don’t offer a free trial right now, but you can upgrade to Premium whenever you’re ready and cancel at any time — there’s no long-term commitment, and your Premium access continues until the end of the billing period.';
 }
 
 // FAQ entries shown after the trial question (index 0 stays the trial item so
