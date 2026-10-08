@@ -24,6 +24,7 @@
  * all.
  */
 import React, { useMemo } from 'react';
+import type { LayoutChangeEvent } from 'react-native';
 import { ScrollView, Text, XStack, YStack } from 'tamagui';
 
 import { DraftSlotChip, type DraftSlotChipState } from './DraftSlotChip';
@@ -69,6 +70,11 @@ export interface DraftSquadStripProps {
    * so it reserves Android's edge-to-edge navigation bar itself.
    */
   bottomInset?: number;
+  /**
+   * Reports the strip's laid-out frame. The phone board anchors its toast and
+   * urgent-error overlays above the strip with it (LS-10822).
+   */
+  onLayout?: (event: LayoutChangeEvent) => void;
 }
 
 /** The design's `.mob-squad { padding-bottom: 12px }`, before any inset. */
@@ -81,6 +87,7 @@ export function DraftSquadStrip({
   maxRosterSize,
   onOpen,
   bottomInset = 0,
+  onLayout,
 }: DraftSquadStripProps): React.JSX.Element {
   const slots = useMemo(
     () =>
@@ -97,6 +104,7 @@ export function DraftSquadStrip({
   return (
     <YStack
       testID="draft-squad-strip"
+      onLayout={onLayout}
       borderTopWidth={1}
       borderTopColor={withAlpha(BRAND_GOLD, 0.3)}
       backgroundColor={withAlpha(BG_DARK, 0.94)}

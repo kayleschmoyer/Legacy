@@ -2,7 +2,10 @@ import React from 'react';
 import { CombinedGraphQLErrors } from '@apollo/client';
 import { useGetUserByIdQuery } from '@legacy-sports/graphql';
 import { AutomatedDraftScreen } from './DraftStateScreens';
-import { EliteDraftBoardScreen } from './EliteDraftBoardScreen';
+import {
+  compactOverlayBottom,
+  EliteDraftBoardScreen,
+} from './EliteDraftBoardScreen';
 import {
   useDraftActions,
   useDraftEffects,
@@ -15,7 +18,7 @@ import {
 } from './hooks';
 import type { DraftPickRecord, DraftPlayer, LeagueTeam } from './types';
 import { useAuth } from '../../features/auth';
-import { fireEvent, render, screen } from '../../test-utils';
+import { act, fireEvent, render, screen } from '../../test-utils';
 
 // The compact/narrow-viewport branch's local chrome (PlayerRow, GoldButton,
 // GhostButton, Eyebrow) uses these react-native primitives directly — the
@@ -538,22 +541,35 @@ jest.mock('./DraftPlayersTab', () => ({
 jest.mock('./DraftQueueTab', () => ({
   DraftQueueTab: () => <div data-testid="draft-queue-tab" />,
 }));
+type SquadStripLayoutHandler = (event: {
+  nativeEvent: { layout: { height: number } };
+}) => void;
+const mockSquadStripLayout: { current: SquadStripLayoutHandler | undefined } = {
+  current: undefined,
+};
 // Squad strip (LS-10001) — DraftSquadStrip.spec.tsx covers the strip itself;
 // here it only has to be mounted and to raise the squad sheet.
 jest.mock('./DraftSquadStrip', () => ({
+  // `onLayout` is captured so a spec can report the strip's laid-out height
+  // the way native would (LS-10822).
   DraftSquadStrip: ({
     onOpen,
     bottomInset,
+    onLayout,
   }: {
     onOpen: () => void;
     bottomInset?: number;
-  }) => (
-    <button
-      data-testid="draft-squad-strip"
-      data-bottom-inset={String(bottomInset)}
-      onClick={onOpen}
-    />
-  ),
+    onLayout?: SquadStripLayoutHandler;
+  }) => {
+    mockSquadStripLayout.current = onLayout;
+    return (
+      <button
+        data-testid="draft-squad-strip"
+        data-bottom-inset={String(bottomInset)}
+        onClick={onOpen}
+      />
+    );
+  },
 }));
 jest.mock('./DraftTeamTab', () => ({
   DraftTeamTab: () => <div data-testid="draft-team-tab" />,
@@ -2344,6 +2360,69 @@ describe('EliteDraftBoardScreen — Draft Room v2 shell (LS-9397)', () => {
     expect(
       screen.getByTestId('draft-squad-strip').getAttribute('data-bottom-inset'),
     ).toBe('0');
+  });
+});
+
+// LS-10822: on Android edge-to-edge the phone board's toasts were pinned 20px
+// from the screen edge — inside the system navigation bar and over the squad
+// strip's Positions Drafted chips. They now float above the strip, which is
+// itself what reserves the bottom safe-area inset.
+describe('EliteDraftBoardScreen — compact toast safe-area inset (LS-10822)', () => {
+  const overlayBottom = (testId: string): number =>
+    parseFloat(screen.getByTestId(testId).style.bottom);
+
+  it('lifts the toast clear of the bottom inset and the squad strip', () => {
+    setupCompactLiveDraft({
+      ui: { toastMessage: { type: 'info', text: 'Auto-pick enabled' } },
+    });
+
+    render(<EliteDraftBoardScreen {...defaultProps} bottomInset={48} />);
+
+    expect(overlayBottom('draft-toast-overlay')).toBe(
+      compactOverlayBottom(48, null),
+    );
+    expect(overlayBottom('draft-toast-overlay')).toBeGreaterThan(48 + 120);
+  });
+
+  it('lifts the urgent-error overlay the same way', () => {
+    setupCompactLiveDraft({ ui: { urgentMessage: 'Pick failed' } });
+
+    render(<EliteDraftBoardScreen {...defaultProps} bottomInset={48} />);
+
+    expect(overlayBottom('draft-urgent-overlay')).toBe(
+      compactOverlayBottom(48, null),
+    );
+    expect(overlayBottom('draft-urgent-overlay')).toBeGreaterThan(48);
+  });
+
+  it('anchors the toast to the measured squad strip once it lays out', () => {
+    setupCompactLiveDraft({
+      ui: { toastMessage: { type: 'info', text: 'Auto-pick enabled' } },
+    });
+
+    render(<EliteDraftBoardScreen {...defaultProps} bottomInset={48} />);
+    act(() => {
+      mockSquadStripLayout.current?.({
+        nativeEvent: { layout: { height: 190 } },
+      });
+    });
+
+    expect(overlayBottom('draft-toast-overlay')).toBe(198);
+  });
+});
+
+describe('compactOverlayBottom (LS-10822)', () => {
+  it('stacks the gap on the measured strip height, which includes the inset', () => {
+    expect(compactOverlayBottom(48, 170)).toBe(178);
+  });
+
+  it('estimates from the inset before the strip has laid out', () => {
+    expect(compactOverlayBottom(0, null)).toBe(128);
+    expect(compactOverlayBottom(48, null)).toBe(176);
+  });
+
+  it('ignores a negative inset', () => {
+    expect(compactOverlayBottom(-10, null)).toBe(128);
   });
 });
 

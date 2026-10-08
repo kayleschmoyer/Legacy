@@ -1,5 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  type LayoutChangeEvent,
+  Platform,
+  Pressable,
+} from 'react-native';
 import { ScrollView, Text, useMedia, XStack, YStack } from 'tamagui';
 import { Sport, useGetUserByIdQuery } from '@legacy-sports/graphql';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
@@ -73,6 +78,33 @@ import type { SportKind } from '../../config/sports';
 import { hasErrorCode } from '../../utils/graphql-errors';
 
 const CHAT_KEYBOARD_AVOIDING_STYLE = { flex: 1 } as const;
+
+/**
+ * The phone squad strip's height before its bottom safe-area padding, used
+ * until its first layout reports the real frame: border 1 + padding 9 + 44px
+ * header row + 8 gap + 46px chip track + padding 12 (DraftSquadStrip).
+ */
+const SQUAD_STRIP_BASE_HEIGHT = 120;
+/** Breathing room between the squad strip and a toast resting above it. */
+const COMPACT_OVERLAY_GAP = 8;
+
+/**
+ * Bottom offset for the phone board's toast and urgent-error overlays
+ * (LS-10822). They float above the squad strip — the board's bottom-most band,
+ * which already reserves the bottom safe-area inset (LS-9444) — so they are
+ * never drawn into Android's edge-to-edge navigation bar nor over the
+ * Positions Drafted chips. `measuredStripHeight` is the strip's laid-out
+ * height (inset included); before it is known the inset plus the strip's
+ * design height stands in.
+ */
+export function compactOverlayBottom(
+  bottomInset: number,
+  measuredStripHeight: number | null,
+): number {
+  const stripHeight =
+    measuredStripHeight ?? SQUAD_STRIP_BASE_HEIGHT + Math.max(bottomInset, 0);
+  return stripHeight + COMPACT_OVERLAY_GAP;
+}
 
 export interface EliteDraftBoardScreenProps {
   /** League ID to load (replaces route param). Null in draft-room mode. */
@@ -334,6 +366,14 @@ function CompactLiveDraftBoard({
   // which is what survived the roster tab's removal.
   const [squadSheetOpen, setSquadSheetOpen] = useState(false);
 
+  // Toast / urgent-error anchor (LS-10822): measured from the squad strip so
+  // the overlays clear both it and the bottom safe-area inset it reserves.
+  const [squadStripHeight, setSquadStripHeight] = useState<number | null>(null);
+  const handleSquadStripLayout = useCallback((event: LayoutChangeEvent) => {
+    setSquadStripHeight(event.nativeEvent.layout.height);
+  }, []);
+  const overlayBottom = compactOverlayBottom(bottomInset, squadStripHeight);
+
   const boardTeams =
     queries.boardOrderedTeams.length > 0
       ? queries.boardOrderedTeams
@@ -572,6 +612,7 @@ function CompactLiveDraftBoard({
         maxRosterSize={queries.maxRosterSize ?? null}
         onOpen={() => setSquadSheetOpen(true)}
         bottomInset={bottomInset}
+        onLayout={handleSquadStripLayout}
       />
 
       {/* ---- Squad sheet (LS-10001): the expanded strip ----
@@ -795,8 +836,9 @@ function CompactLiveDraftBoard({
       {/* Toast overlay */}
       {ui.toastMessage && (
         <YStack
+          testID="draft-toast-overlay"
           position="absolute"
-          bottom={20}
+          bottom={overlayBottom}
           left={16}
           right={16}
           zIndex={100}
@@ -830,8 +872,9 @@ function CompactLiveDraftBoard({
           below so pick failures are visible on every screen size. */}
       {ui.urgentMessage && !ui.toastMessage && (
         <YStack
+          testID="draft-urgent-overlay"
           position="absolute"
-          bottom={20}
+          bottom={overlayBottom}
           left={16}
           right={16}
           zIndex={100}
