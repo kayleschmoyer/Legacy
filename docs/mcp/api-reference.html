@@ -658,7 +658,7 @@ td.param-desc {
         </div>
         <div class="stat">
           <dt>Parameters</dt>
-          <dd>964</dd>
+          <dd>966</dd>
         </div>
         <div class="stat">
           <dt>Run locally</dt>
@@ -6242,7 +6242,7 @@ td.param-desc {
         },
         {
           "name": "github_list_runners",
-          "description": "List self-hosted GitHub Actions runners: id, name, OS, status, busy, labels. Also returns a full-pool summary (counts + per-label) for capacity triage.",
+          "description": "List self-hosted GitHub Actions runners: id, name, OS, status, busy, labels. Also returns a full-pool summary (counts + per-label) for capacity triage. Rows capped at limit (default 50).",
           "inputs": {
             "status": {
               "type": "enum",
@@ -6257,6 +6257,24 @@ td.param-desc {
               "type": "boolean",
               "optional": true,
               "description": "Filter rows by busy."
+            },
+            "label": {
+              "type": "string",
+              "optional": true,
+              "constraints": [
+                "min 1"
+              ],
+              "description": "Filter by label."
+            },
+            "limit": {
+              "type": "number",
+              "optional": true,
+              "constraints": [
+                "coerced",
+                "integer",
+                "\u003e 0"
+              ],
+              "description": "Max rows (default 50)."
             },
             "summaryOnly": {
               "type": "boolean",

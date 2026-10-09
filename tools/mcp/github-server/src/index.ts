@@ -2138,19 +2138,36 @@ export function createServer(): McpServer {
   );
 
   // --- github_list_runners ---
-  server.tool(
+  server.registerTool(
     'github_list_runners',
-    'List self-hosted GitHub Actions runners: id, name, OS, status, busy, labels. Also returns a full-pool summary (counts + per-label) for capacity triage.',
     {
-      status: z
-        .enum(['online', 'offline'])
-        .optional()
-        .describe('Filter rows by status.'),
-      busy: z.boolean().optional().describe('Filter rows by busy.'),
-      summaryOnly: z
-        .boolean()
-        .optional()
-        .describe('Return only summary counts.'),
+      description:
+        'List self-hosted GitHub Actions runners: id, name, OS, status, busy, labels. Also returns a full-pool summary (counts + per-label) for capacity triage. Rows capped at limit (default 50).',
+      inputSchema: z
+        .object({
+          status: z
+            .enum(['online', 'offline'])
+            .optional()
+            .describe('Filter rows by status.'),
+          busy: z.boolean().optional().describe('Filter rows by busy.'),
+          label: z
+            .string()
+            .trim()
+            .min(1)
+            .optional()
+            .describe('Filter by label.'),
+          limit: z.coerce
+            .number()
+            .int()
+            .positive()
+            .optional()
+            .describe('Max rows (default 50).'),
+          summaryOnly: z
+            .boolean()
+            .optional()
+            .describe('Return only summary counts.'),
+        })
+        .strict(),
     },
     async (params) => listRunners(params),
   );

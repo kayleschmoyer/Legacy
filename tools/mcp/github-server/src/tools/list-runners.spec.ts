@@ -102,6 +102,41 @@ describe('listRunners (LS-8021 token-efficient output, LS-9548 busy filter + sum
     expect(text).toContain('_summary:');
     expect(text).toContain('"total":3');
   });
+
+  it('label filter keeps only runners carrying that label', async () => {
+    mockedRest.mockResolvedValueOnce({ total_count: 3, runners: RUNNERS });
+
+    const text = (await listRunners({ label: 'ci-runner-android' })).content[0]
+      .text;
+    expect(text).toContain('2|runner-2');
+    expect(text).toContain('3|runner-3');
+    expect(text).not.toContain('1|runner-1');
+  });
+
+  it('limit truncates rows with a note while the summary stays full-pool', async () => {
+    mockedRest.mockResolvedValueOnce({ total_count: 3, runners: RUNNERS });
+
+    const text = (await listRunners({ limit: 1 })).content[0].text;
+    expect(text).toContain('1|runner-1');
+    expect(text).not.toContain('2|runner-2');
+    expect(text).toContain('_truncated: showing 1 of 3 matching runners');
+    expect(text).toContain('"total":3');
+  });
+
+  it('applies a default row limit and omits the note when nothing is cut', async () => {
+    const many = Array.from({ length: 60 }, (_, i) => ({
+      ...RUNNERS[2],
+      id: 1000 + i,
+      name: `spot-${i}`,
+    }));
+    mockedRest.mockResolvedValueOnce({ total_count: 60, runners: many });
+    const capped = (await listRunners({})).content[0].text;
+    expect(capped).toContain('_truncated: showing 50 of 60');
+
+    mockedRest.mockResolvedValueOnce({ total_count: 3, runners: RUNNERS });
+    const full = (await listRunners({})).content[0].text;
+    expect(full).not.toContain('_truncated');
+  });
 });
 
 describe('summarizeRunners', () => {

@@ -301,12 +301,14 @@ List reviews on a PR, or many PRs in one batched GraphQL call. Returns reviewer,
 
 ### `github_list_runners`
 
-List self-hosted GitHub Actions runners: id, name, OS, status, busy, labels. Also returns a full-pool summary (counts + per-label) for capacity triage.
+List self-hosted GitHub Actions runners: id, name, OS, status, busy, labels. Also returns a full-pool summary (counts + per-label) for capacity triage. Rows capped at limit (default 50).
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
 | `status` | enum |  | — | Filter rows by status. |
 | `busy` | boolean |  | — | Filter rows by busy. |
+| `label` | string |  | min 1 | Filter by label. |
+| `limit` | number |  | coerced, integer, > 0 | Max rows (default 50). |
 | `summaryOnly` | boolean |  | — | Return only summary counts. |
 
 ### `github_manage_labels`

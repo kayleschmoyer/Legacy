@@ -5523,7 +5523,7 @@
         },
         {
           "name": "github_list_runners",
-          "description": "List self-hosted GitHub Actions runners: id, name, OS, status, busy, labels. Also returns a full-pool summary (counts + per-label) for capacity triage.",
+          "description": "List self-hosted GitHub Actions runners: id, name, OS, status, busy, labels. Also returns a full-pool summary (counts + per-label) for capacity triage. Rows capped at limit (default 50).",
           "inputs": {
             "status": {
               "type": "enum",
@@ -5538,6 +5538,24 @@
               "type": "boolean",
               "optional": true,
               "description": "Filter rows by busy."
+            },
+            "label": {
+              "type": "string",
+              "optional": true,
+              "constraints": [
+                "min 1"
+              ],
+              "description": "Filter by label."
+            },
+            "limit": {
+              "type": "number",
+              "optional": true,
+              "constraints": [
+                "coerced",
+                "integer",
+                "> 0"
+              ],
+              "description": "Max rows (default 50)."
             },
             "summaryOnly": {
               "type": "boolean",

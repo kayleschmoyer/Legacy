@@ -32,9 +32,15 @@ export interface ListRunnersParams {
   status?: 'online' | 'offline';
   /** Filter by the runner's busy flag, composable with `status`. */
   busy?: boolean;
+  /** Keep only runners carrying this label, composable with the other filters. */
+  label?: string;
+  /** Max rows in the table (default {@link DEFAULT_RUNNER_LIMIT}); summary is unaffected. */
+  limit?: number;
   /** Skip the per-runner rows and return only the summary counts. */
   summaryOnly?: boolean;
 }
+
+export const DEFAULT_RUNNER_LIMIT = 50;
 
 interface LabelCounts {
   total: number;
@@ -127,10 +133,19 @@ export async function listRunners(
     const filtered = allRunners.filter(
       (r) =>
         (params.status === undefined || r.status === params.status) &&
-        (params.busy === undefined || r.busy === params.busy),
+        (params.busy === undefined || r.busy === params.busy) &&
+        (params.label === undefined ||
+          r.labels.some((l) => l.name === params.label)),
     );
 
-    const runners = filtered.map((r) => ({
+    const limit = params.limit ?? DEFAULT_RUNNER_LIMIT;
+    const shown = filtered.slice(0, limit);
+    const truncationNote =
+      filtered.length > shown.length
+        ? `\n\n_truncated: showing ${shown.length} of ${filtered.length} matching runners — narrow with status/busy/label or raise limit_`
+        : '';
+
+    const runners = shown.map((r) => ({
       id: r.id,
       name: r.name,
       os: r.os,
@@ -142,7 +157,7 @@ export async function listRunners(
     const text =
       runners.length === 0
         ? `No runners found.\n\n${summaryLine}`
-        : `${markdownTable(runners, { columns: RUNNER_COLUMNS })}\n\n${summaryLine}`;
+        : `${markdownTable(runners, { columns: RUNNER_COLUMNS })}${truncationNote}\n\n${summaryLine}`;
 
     return {
       content: [{ type: 'text', text }],
