@@ -498,6 +498,10 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await leaguePage.expandSection('waiver-budget');
 
     await leaguePage.text('Waiver System').expectVisible();
+    // The default (premium) identity lands with FAAB pre-checked (LS-6910).
+    await leaguePage.text('FAAB: weekly blind bidding').expectVisible();
+
+    await leaguePage.testId('create-league-waiver-type-standard').tap();
     await leaguePage.text('Teams have a priority order').expectVisible();
   });
 
@@ -735,7 +739,11 @@ test.describe('League Creation — Advanced Settings @regression', () => {
       // Expand the Waivers, Budget & Salary Cap section
       await leaguePage.expandSection('waiver-budget');
 
-      // Cap limit input should not be visible initially
+      // Premium users land with the salary cap pre-checked (LS-6910)
+      await leaguePage.placeholder('e.g. 50000000').expectVisible();
+
+      // Turning it off hides the cap limit input
+      await leaguePage.clickButton('Off', { exact: true });
       await leaguePage.placeholder('e.g. 50000000').expectHidden();
 
       // Click the "On" button in the Enable Salary Cap PillToggle

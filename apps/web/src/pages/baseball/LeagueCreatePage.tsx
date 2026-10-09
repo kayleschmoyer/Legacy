@@ -64,6 +64,7 @@ import {
   LEAGUE_SUBMIT_ERROR_FALLBACK,
   RosterContinuityField,
   SalaryCapField,
+  SUGGESTED_CAP_PER_ROSTER_SPOT,
   WaiverSystemField,
   ROSTER_SIZE_OPTIONS_BY_SPORT as WIZARD_ROSTER_SIZE_OPTIONS_BY_SPORT,
   TEAM_COUNT_OPTIONS_BY_SPORT as WIZARD_TEAM_COUNT_OPTIONS_BY_SPORT,
@@ -2368,6 +2369,35 @@ export function LeagueCreatePage(): React.JSX.Element {
     null,
   );
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // ── Premium fast track (LS-6910) ─────────────────────────────────────────
+  // Premium users land here with their perks pre-checked (FAAB waivers and the
+  // salary cap) and Fast Lane on, so the league is created from recommended
+  // settings with no extra clicks. Premium status resolves after mount, so
+  // this runs once when it does — and only on an untouched baseball form, so
+  // it never overrides a deep-linked prefill or something the user already
+  // changed. The snapshot ref moves with it so Cancel doesn't see the
+  // pre-checked defaults as unsaved edits.
+  const premiumDefaultsAppliedRef = useRef(false);
+  useEffect(() => {
+    if (premiumDefaultsAppliedRef.current) return;
+    if (premiumLoading || !isPremium) return;
+    premiumDefaultsAppliedRef.current = true;
+    if (selectedSport !== 'baseball' || hasUnsavedChanges) return;
+    const applyDefaults = (
+      prev: CreateLeagueFormData,
+    ): CreateLeagueFormData => ({
+      ...prev,
+      waiverType: 'faab',
+      salaryCapEnabled: true,
+      salaryCap: prev.maxRosterSize * SUGGESTED_CAP_PER_ROSTER_SPOT,
+    });
+    initialFormDataRef.current = applyDefaults(initialFormDataRef.current);
+    setFormData(applyDefaults);
+    setOpenSections(new Set(['basic']));
+    setFastLane(true);
+    trackFastLaneToggled(true, selectedSport);
+  }, [isPremium, premiumLoading, selectedSport, hasUnsavedChanges]);
 
   // ── Duplicate from existing league (LS-6062) ──────────────────────────────
   // Only leagues the current user commissions, matching the sport tab

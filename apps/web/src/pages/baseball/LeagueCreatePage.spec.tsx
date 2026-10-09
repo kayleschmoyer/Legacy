@@ -427,6 +427,14 @@ function renderPage(initialPath = '/baseball/league/create') {
 
 /** Expand all collapsible sections so era / pool controls are mounted. */
 function expandAllSections() {
+  // Premium users start with Fast Lane on (LS-6910), which locks the sections.
+  const fastLaneOff = within(screen.getByTestId('fast-lane-toggle')).getByRole(
+    'button',
+    { name: '⚡ Off' },
+  );
+  if (fastLaneOff.getAttribute('aria-pressed') === 'false') {
+    fireEvent.click(fastLaneOff);
+  }
   fireEvent.click(screen.getByRole('button', { name: /Expand all/i }));
 }
 
@@ -3817,6 +3825,78 @@ describe('LeagueCreatePage — Fast Lane (LS-9128)', () => {
       );
     });
     expect(mockCreateLeague).not.toHaveBeenCalled();
+  });
+});
+
+describe('LeagueCreatePage — premium fast track (LS-6910)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+    mockIsPremiumLoading = false;
+    mockFootballEnabled = true;
+  });
+
+  const submitNamedLeague = async () => {
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Premium League' },
+    });
+    fireEvent.click(screen.getByTestId('create-league-submit'));
+    await waitFor(() => expect(mockCreateLeague).toHaveBeenCalled());
+    return mockCreateLeague.mock.calls[0][0].variables.input;
+  };
+
+  it('pre-checks FAAB and the salary cap and turns Fast Lane on for premium users', async () => {
+    mockIsPremium = true;
+    renderPage('/baseball/league/create');
+
+    expect(screen.getByTestId('section-toggle-era-history')).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    const input = await submitNamedLeague();
+    expect(input.waiverType).toBe('faab');
+    expect(input.salaryCapEnabled).toBe(true);
+    expect(input.salaryCap).toBe(input.maxRosterSize * 1_000_000);
+  });
+
+  it('does not treat the pre-checked defaults as unsaved edits', () => {
+    mockIsPremium = true;
+    renderPage('/baseball/league/create');
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+    expect(screen.queryByText(/discard/i)).not.toBeInTheDocument();
+  });
+
+  it('leaves free users on the standard defaults with Fast Lane off', async () => {
+    renderPage('/baseball/league/create');
+
+    expect(screen.getByTestId('section-toggle-era-history')).toHaveAttribute(
+      'aria-disabled',
+      'false',
+    );
+    const input = await submitNamedLeague();
+    expect(input.waiverType).toBe('standard');
+    expect(input.salaryCapEnabled).toBe(false);
+  });
+
+  it('applies nothing while premium status is still loading', () => {
+    mockIsPremium = false;
+    mockIsPremiumLoading = true;
+    renderPage('/baseball/league/create');
+    expect(screen.getByTestId('section-toggle-era-history')).toHaveAttribute(
+      'aria-disabled',
+      'false',
+    );
+  });
+
+  it('does not pre-check premium defaults on the football create page', () => {
+    mockIsPremium = true;
+    renderPage('/football/league/create');
+    expect(screen.getByTestId('section-toggle-era-history')).toHaveAttribute(
+      'aria-disabled',
+      'false',
+    );
   });
 });
 

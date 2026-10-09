@@ -636,9 +636,19 @@ export class LeaguePage extends BaseScreen {
   async expandSection(sectionId: string): Promise<void> {
     const toggle = this.driver.byTestId(`section-toggle-${sectionId}`);
     await toggle.expectVisible();
-    if ((await toggle.attribute('aria-expanded')) !== 'true') {
-      await toggle.tap();
-      await toggle.expectAttribute('aria-expanded', 'true');
+    // Premium users land with Fast Lane on (LS-6910), which locks every
+    // section but Basic. Premium status resolves after the form mounts, so
+    // Fast Lane can switch on (and collapse the section) just after the first
+    // pass; it engages at most once, so a second pass settles it.
+    for (let pass = 0; pass < 2; pass += 1) {
+      if ((await toggle.attribute('aria-disabled')) === 'true') {
+        await this.button('⚡ Off', { exact: true }).tap();
+        await toggle.expectAttribute('aria-disabled', 'false');
+      }
+      if ((await toggle.attribute('aria-expanded')) !== 'true') {
+        await toggle.tap();
+        await toggle.expectAttribute('aria-expanded', 'true');
+      }
     }
   }
 

@@ -48,6 +48,7 @@
 import { breakpoints } from '@legacy-sports/design-tokens';
 
 import { expect, leagueTest as test } from '../fixtures/pages';
+import { useTier } from '../fixtures/shared-mocks';
 import { createGraphQLRouter, fulfillJson } from '../mocks/graphql/router';
 
 /** Design-token `xl` band lower bound — the first width at which `$lg` stops applying. */
@@ -316,7 +317,11 @@ test.describe('Breakpoint alignment — $xs/$gtXs fire on the design-token scale
  */
 const SM_BOUNDARY = breakpoints.md;
 
-/** A create-form section that is collapsed, with a summary, on first load. */
+/**
+ * A create-form section that is collapsed, with a summary, on first load.
+ * These probes run as a free user: premium users start with Fast Lane on
+ * (LS-6910), which locks the sections and replaces their summaries.
+ */
 const SM_PROBE_SECTION = 'roster-schedule';
 
 test.describe('Breakpoint alignment — $sm/$gtSm fire on the design-token scale @regression', () => {
@@ -325,6 +330,7 @@ test.describe('Breakpoint alignment — $sm/$gtSm fire on the design-token scale
     leaguePage,
   }) => {
     await page.setViewportSize({ width: SM_BOUNDARY - 1, height: 900 });
+    await useTier(page, 'free');
     await leaguePage.gotoCreate();
     await leaguePage.leagueNameInput.expectVisible();
 
@@ -337,6 +343,7 @@ test.describe('Breakpoint alignment — $sm/$gtSm fire on the design-token scale
     leaguePage,
   }) => {
     await page.setViewportSize({ width: SM_BOUNDARY, height: 900 });
+    await useTier(page, 'free');
     await leaguePage.gotoCreate();
     await leaguePage.leagueNameInput.expectVisible();
 
@@ -352,6 +359,7 @@ test.describe('Breakpoint alignment — $sm/$gtSm fire on the design-token scale
     // `maxWidth: 800`, so an 830px viewport was already outside it. 830 is
     // now inside the `sm` band. This assertion fails against the stock config.
     await page.setViewportSize({ width: 830, height: 900 });
+    await useTier(page, 'free');
     await leaguePage.gotoCreate();
     await leaguePage.leagueNameInput.expectVisible();
 
@@ -367,6 +375,7 @@ test.describe('Breakpoint alignment — $sm/$gtSm fire on the design-token scale
     // not bleed into each other. At 860 `$sm` has stopped applying while the
     // wider `$gtMd` has not yet started.
     await page.setViewportSize({ width: SM_BOUNDARY, height: 900 });
+    await useTier(page, 'free');
     await leaguePage.gotoCreate();
     await leaguePage.leagueNameInput.expectVisible();
     await leaguePage.sectionSummary(SM_PROBE_SECTION).expectVisible();
