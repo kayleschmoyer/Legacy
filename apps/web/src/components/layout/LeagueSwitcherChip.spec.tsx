@@ -44,6 +44,64 @@ const renderChip = () =>
     </MemoryRouter>,
   );
 
+let mockLastVisited: { leagueId: number } | null = null;
+
+jest.mock('../../lib/last-visited-league', () => ({
+  getLastVisitedLeagueForUser: () => mockLastVisited,
+}));
+
+afterEach(() => {
+  mockLastVisited = null;
+});
+
+describe('LeagueSwitcherChip — LS-10458 current league off a league route', () => {
+  beforeEach(() => {
+    mockLastVisited = null;
+    mockUserLeagues = [
+      { id: 1, name: 'QA New League', playerPool: 'baseball' },
+      { id: 2, name: 'QA Test Sluggers', playerPool: 'baseball' },
+    ];
+  });
+
+  const renderAt = (path: string) =>
+    render(
+      <MemoryRouter initialEntries={[path]}>
+        <LeagueSwitcherChip />
+      </MemoryRouter>,
+    );
+
+  it('shows the last-visited league on a non-league route', () => {
+    mockLastVisited = { leagueId: 2 };
+    renderAt('/');
+    expect(screen.getByTestId('league-switcher-chip')).toHaveTextContent(
+      'QA Test Sluggers',
+    );
+  });
+
+  it('falls back to the first league when nothing was visited', () => {
+    renderAt('/');
+    expect(screen.getByTestId('league-switcher-chip')).toHaveTextContent(
+      'QA New League',
+    );
+  });
+
+  it('falls back to the first league when the last-visited league is gone', () => {
+    mockLastVisited = { leagueId: 99 };
+    renderAt('/');
+    expect(screen.getByTestId('league-switcher-chip')).toHaveTextContent(
+      'QA New League',
+    );
+  });
+
+  it('prefers the league in the URL over the last-visited one', () => {
+    mockLastVisited = { leagueId: 2 };
+    renderAt('/baseball/league/1');
+    expect(screen.getByTestId('league-switcher-chip')).toHaveTextContent(
+      'QA New League',
+    );
+  });
+});
+
 describe('LeagueSwitcherChip — LS-9127 create-league sport routing', () => {
   beforeEach(() => {
     mockNavigate.mockReset();

@@ -25,6 +25,7 @@ import {
 } from '../../constants/colors';
 import { NAV_DROPDOWN_Z_INDEX } from '../../constants/dimensions';
 import { useThemeContext } from '../../context/ThemeContext';
+import { getLastVisitedLeagueForUser } from '../../lib/last-visited-league';
 import { BaseballIcon, FootballIcon } from '../icons/SportIcons';
 
 const CHIP_STYLES: React.CSSProperties = {
@@ -181,8 +182,18 @@ export const LeagueSwitcherChip: React.FC<Props> = ({
   // Detect current league from URL
   const leagueIdMatch = location.pathname.match(/\/baseball\/league\/(\d+)/);
   const currentLeagueId = leagueIdMatch ? parseInt(leagueIdMatch[1], 10) : null;
+  // Off a league route (dashboard, /games, …) fall back to the league the user
+  // last opened — persisted in localStorage, so it follows them across tabs and
+  // reloads — before defaulting to the first league (LS-10458).
+  const lastVisitedLeagueId =
+    currentLeagueId == null
+      ? (getLastVisitedLeagueForUser(auth?.user?.id)?.leagueId ?? null)
+      : null;
   const currentLeague =
-    leagues.find((l) => l.id === currentLeagueId) ?? leagues[0] ?? null;
+    leagues.find((l) => l.id === currentLeagueId) ??
+    leagues.find((l) => l.id === lastVisitedLeagueId) ??
+    leagues[0] ??
+    null;
 
   // Sync sport filter to current league
   useEffect(() => {
