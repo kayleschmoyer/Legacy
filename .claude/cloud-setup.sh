@@ -188,6 +188,27 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Install yamllint so pc-workflows lints instead of silently skipping (LS-10185)
+# ---------------------------------------------------------------------------
+# CI enforces yamllint (scripts/validate-workflows.js, pinned in
+# ci-pipeline.yml), but the CCR image has none, so `pc-workflows` used to print
+# "yamllint DID NOT RUN" and still report passed: true — a false green on the
+# one chunk a workflow-only diff depends on. Version matches ci-pipeline.yml
+# (the version .yamllint.yml was verified against). Best-effort and idempotent:
+# a failed install only warns.
+YAMLLINT_VERSION=1.38.0
+if ! python3 -m yamllint --version 2>/dev/null | grep -q '^yamllint '; then
+  echo "Installing yamllint ${YAMLLINT_VERSION} (LS-10185)..."
+  python3 -m pip install --quiet "yamllint==${YAMLLINT_VERSION}" 2>/dev/null \
+    || python3 -m pip install --quiet --break-system-packages "yamllint==${YAMLLINT_VERSION}" 2>/dev/null \
+    || echo "WARNING: yamllint install failed — pc-workflows will not lint workflow YAML"
+fi
+# Decision (LS-10185 AC3): make a missing yamllint fatal in agent sessions
+# rather than a passing warning. Exported (this script is sourced) like the
+# other session-wide vars here.
+export REQUIRE_YAMLLINT=1
+
+# ---------------------------------------------------------------------------
 # Export GITHUB_REPO_OWNER / GITHUB_REPO_NAME for the github-server MCP
 # ---------------------------------------------------------------------------
 # In cloud sessions, git remote URLs may be proxy URLs that don't expose the
@@ -263,4 +284,4 @@ else
   echo "NOTE: local Postgres fallback not bootstrapped (postgresql-16 package, cluster, or admin access unavailable) — DB_* env vars not set. 'pnpm db:*' scripts will still fail until DB_PASSWORD is set manually; use the hosted legacy-sports-db MCP server (db_query/db_migration_status) instead if it's available in this session."
 fi
 
-echo "=== Cloud setup complete (merge-base, pnpm deps, GitHub repo identity, local Postgres fallback) ==="
+echo "=== Cloud setup complete (merge-base, pnpm deps, yamllint, GitHub repo identity, local Postgres fallback) ==="
