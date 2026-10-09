@@ -107,7 +107,24 @@ export function isStaleConflictSignalOnly(
     !signals.sources.includes('mergeable:CONFLICTING') &&
     !signals.sources.includes('mergeState:DIRTY') &&
     inputs.mergeable === 'MERGEABLE' &&
-    (inputs.mergeStateStatus === 'CLEAN' ||
-      inputs.mergeStateStatus === 'UNSTABLE')
+    inputs.mergeStateStatus != null &&
+    LIVE_CONFLICT_FREE_MERGE_STATES.has(inputs.mergeStateStatus)
   );
 }
+
+/**
+ * `mergeStateStatus` values that, paired with `mergeable=MERGEABLE`, prove the
+ * branch has no conflict with its base. LS-10288: the original LS-9945 check
+ * accepted only CLEAN/UNSTABLE, but a PR whose required checks are pending or
+ * red — exactly when agents ask why it is blocked — reads BLOCKED (or BEHIND /
+ * HAS_HOOKS), so the lagging label still won and a conflict-free branch was
+ * reported as MERGE_CONFLICT. DIRTY (conflict) and UNKNOWN (still computing)
+ * are deliberately excluded.
+ */
+const LIVE_CONFLICT_FREE_MERGE_STATES: ReadonlySet<string> = new Set([
+  'CLEAN',
+  'UNSTABLE',
+  'BLOCKED',
+  'BEHIND',
+  'HAS_HOOKS',
+]);

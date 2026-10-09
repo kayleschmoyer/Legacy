@@ -118,6 +118,31 @@ describe('isStaleConflictSignalOnly (LS-9945)', () => {
     ).toBe(true);
   });
 
+  // LS-10288 regression: the original check accepted only CLEAN/UNSTABLE, but a
+  // PR with pending/red required checks reads BLOCKED while mergeable=MERGEABLE.
+  it.each(['BLOCKED', 'BEHIND', 'HAS_HOOKS'])(
+    'is true for a label-only verdict when mergeable=MERGEABLE and mergeStateStatus=%s (LS-10288)',
+    (mergeStateStatus) => {
+      expect(
+        isStaleConflictSignalOnly(labelOnly, {
+          mergeable: 'MERGEABLE',
+          mergeStateStatus,
+        }),
+      ).toBe(true);
+    },
+  );
+
+  it('negative control: false when mergeable=MERGEABLE but mergeStateStatus is UNKNOWN or missing', () => {
+    for (const mergeStateStatus of ['UNKNOWN', null, undefined]) {
+      expect(
+        isStaleConflictSignalOnly(labelOnly, {
+          mergeable: 'MERGEABLE',
+          mergeStateStatus,
+        }),
+      ).toBe(false);
+    }
+  });
+
   it('negative control: false while mergeable is UNKNOWN (not yet confirmed clear)', () => {
     expect(
       isStaleConflictSignalOnly(labelOnly, {

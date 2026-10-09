@@ -197,6 +197,28 @@ describe('diagnose', () => {
       expect(result.reason).not.toBe('MERGE_CONFLICT');
     });
 
+    // LS-10288: PRs #8170/#8143/#8138/#8230 — label-only signal while GitHub
+    // read mergeable=MERGEABLE + mergeStateStatus=BLOCKED (required checks
+    // pending), so the CLEAN/UNSTABLE-only override missed it.
+    it('does not report MERGE_CONFLICT from a stale label when mergeable=MERGEABLE and mergeStateStatus=BLOCKED (LS-10288)', () => {
+      const pr = withLabel(
+        makePR({ mergeable: 'MERGEABLE', mergeStateStatus: 'BLOCKED' }),
+        'CI: Conflicts',
+      );
+      const result = diagnose(pr, NO_CI);
+      expect(result.reason).not.toBe('MERGE_CONFLICT');
+    });
+
+    it('MERGE_CONFLICT nextAction recommends merging the base and a plain push, never a force-push (LS-10288)', () => {
+      const result = diagnose(
+        makePR({ mergeable: 'CONFLICTING', mergeStateStatus: 'DIRTY' }),
+        NO_CI,
+      );
+      expect(result.reason).toBe('MERGE_CONFLICT');
+      expect(result.nextAction).toContain('Merge main into the branch');
+      expect(result.nextAction).not.toMatch(/force-push the branch/i);
+    });
+
     it('still reports MERGE_CONFLICT from the label when mergeStateStatus has not confirmed the branch is clean', () => {
       const pr = withLabel(
         makePR({ mergeable: 'MERGEABLE', mergeStateStatus: 'UNKNOWN' }),

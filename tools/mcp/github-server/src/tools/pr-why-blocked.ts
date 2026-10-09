@@ -7,6 +7,7 @@ import {
 } from '../ci-run-diagnosis.js';
 import type { NeverRegisteredDiagnosis } from '../ci-run-diagnosis.js';
 import {
+  CONFLICT_LABEL,
   detectConflictSignals,
   isConflictCheckFailure,
   isStaleConflictSignalOnly,
@@ -290,7 +291,7 @@ export function diagnose(
         signals: conflictSignals.sources,
         ...(otherFailing.length > 0 ? { alsoFailingChecks: otherFailing } : {}),
       },
-      nextAction: `Rebase onto ${pr.baseRefName} to resolve conflicts, then force-push the branch.`,
+      nextAction: `Merge ${pr.baseRefName} into the branch, resolve conflicts, and push (plain push — do not rewrite history). If the only signal is the "${CONFLICT_LABEL}" label, first verify with \`git merge-tree --write-tree HEAD origin/${pr.baseRefName}\`; the label can lag a resolved conflict.`,
     };
   }
 
