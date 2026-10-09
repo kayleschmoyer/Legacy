@@ -88,6 +88,7 @@ import {
 import { rerereForgetPaths } from './rerere-forget';
 import { filterAndLimitWorktrees } from './filter-and-limit-worktrees';
 import { resolveAmendAddArgs } from './resolve-amend-add-args';
+import { mergeCommitRefusal, parseUnmergedPaths } from './merge-in-progress';
 import { resolveCommitArgs } from './resolve-commit-args';
 import { resolveCommitMessage } from './resolve-commit-message';
 import { resolveCommitish } from './resolve-commitish';
@@ -3659,6 +3660,7 @@ const handleCallTool = async (
       const cwd = target.path;
 
       // Safety: refuse main, detached HEAD, and in-progress rebase/merge
+      let mergeInProgress = false;
       try {
         const branch = run('git branch --show-current', cwd).trim();
         if (!branch) {
@@ -3692,15 +3694,19 @@ const handleCallTool = async (
         // Check for in-progress merge
         const gitDir = run('git rev-parse --absolute-git-dir', cwd).trim();
         if (existsSync(join(gitDir, 'MERGE_HEAD'))) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: 'Refused: merge is in progress. Complete or abort the merge first.',
-              },
-            ],
-            isError: true,
-          };
+          mergeInProgress = true;
+          const refusal = mergeCommitRefusal(
+            parseUnmergedPaths(
+              run('git diff --name-only --diff-filter=U', cwd),
+            ),
+            Boolean(amend),
+          );
+          if (refusal) {
+            return {
+              content: [{ type: 'text', text: refusal }],
+              isError: true,
+            };
+          }
         }
       } catch {
         return {
@@ -3875,7 +3881,7 @@ const handleCallTool = async (
         } else {
           // Stage all modified files, but check for dangerous files first
           const status = run('git status --porcelain', cwd).trim();
-          if (!status && !amend && !allowEmpty) {
+          if (!status && !amend && !allowEmpty && !mergeInProgress) {
             return {
               content: [
                 {
