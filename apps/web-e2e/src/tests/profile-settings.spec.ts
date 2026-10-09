@@ -573,6 +573,140 @@ test.describe('Profile Settings Page — Linked Identities (LS-7825) @regression
 });
 
 // ---------------------------------------------------------------------------
+// LS-7669: Provider disconnect is gated by the shared design-system Dialog
+// (not window.confirm). Hermetic: GraphQL and the oauth-proxy unlink endpoint
+// are both fulfilled in-spec.
+// ---------------------------------------------------------------------------
+
+const DISCORD_UNLINK_URL = 'http://localhost:5001/discord/unlink';
+
+async function setupDisconnectFlow(
+  page: import('@playwright/test').Page,
+  unlink: { status: number; body: Record<string, unknown> },
+) {
+  const state = { unlinkCalls: 0, nativeDialogs: 0 };
+  page.on('dialog', async (dialog) => {
+    state.nativeDialogs += 1;
+    await dialog.dismiss();
+  });
+
+  await page.route(DISCORD_UNLINK_URL, async (route) => {
+    if (route.request().method() === 'OPTIONS') {
+      await route.fallback();
+      return;
+    }
+    state.unlinkCalls += 1;
+    await route.fulfill({
+      status: unlink.status,
+      contentType: 'application/json',
+      body: JSON.stringify(unlink.body),
+    });
+  });
+
+  await page.route(
+    (url) => isGraphQLEndpoint(url),
+    async (route, request) => {
+      const body = request.postDataJSON() as { operationName?: string };
+
+      if (body.operationName === 'GetUserById') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: MOCK_USER_DATA }),
+        });
+        return;
+      }
+
+      if (body.operationName === 'MyIdentities') {
+        // After a successful unlink the refetch no longer returns discord.
+        const identities =
+          state.unlinkCalls > 0 && unlink.status < 400
+            ? MOCK_IDENTITIES_MULTI.filter((i) => i.provider !== 'discord')
+            : MOCK_IDENTITIES_MULTI;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { myIdentities: identities } }),
+        });
+        return;
+      }
+
+      await unmockedGraphQLFallback(route);
+    },
+  );
+
+  return state;
+}
+
+test.describe('Profile Settings Page — Disconnect confirm dialog (LS-7669) @regression', () => {
+  test('clicking "Disconnect" opens the shared dialog naming the provider, not a native confirm', async ({
+    page,
+    settingsPage,
+  }) => {
+    const state = await setupDisconnectFlow(page, { status: 200, body: {} });
+    await settingsPage.profile.goto();
+
+    await settingsPage.profile.clickLastDisconnect();
+
+    await settingsPage.profile.expectDisconnectDialog('Discord');
+    expect(state.nativeDialogs).toBe(0);
+    expect(state.unlinkCalls).toBe(0);
+  });
+
+  test('canceling the dialog makes no unlink call and keeps both identities linked', async ({
+    page,
+    settingsPage,
+  }) => {
+    const state = await setupDisconnectFlow(page, { status: 200, body: {} });
+    await settingsPage.profile.goto();
+
+    await settingsPage.profile.clickLastDisconnect();
+    await settingsPage.profile.expectDisconnectDialog('Discord');
+    await settingsPage.profile.cancelDisconnectDialog();
+
+    await settingsPage.profile.expectDisconnectDialogClosed();
+    await settingsPage.profile.expectDisconnectButtonCount(2);
+    expect(state.unlinkCalls).toBe(0);
+    expect(state.nativeDialogs).toBe(0);
+  });
+
+  test('confirming unlinks the provider and removes the identity', async ({
+    page,
+    settingsPage,
+  }) => {
+    const state = await setupDisconnectFlow(page, { status: 200, body: {} });
+    await settingsPage.profile.goto();
+
+    await settingsPage.profile.clickLastDisconnect();
+    await settingsPage.profile.expectDisconnectDialog('Discord');
+    await settingsPage.profile.confirmDisconnectDialog();
+
+    await expect.poll(() => state.unlinkCalls, { timeout: 5000 }).toBe(1);
+    await settingsPage.profile.expectDisconnectDialogClosed();
+    await settingsPage.profile.expectDisconnectButtonCount(1);
+    expect(state.nativeDialogs).toBe(0);
+  });
+
+  test('a failed unlink shows the inline error and keeps both identities linked', async ({
+    page,
+    settingsPage,
+  }) => {
+    const state = await setupDisconnectFlow(page, {
+      status: 500,
+      body: { message: 'Discord unlink exploded' },
+    });
+    await settingsPage.profile.goto();
+
+    await settingsPage.profile.clickLastDisconnect();
+    await settingsPage.profile.confirmDisconnectDialog();
+
+    await expect.poll(() => state.unlinkCalls, { timeout: 5000 }).toBe(1);
+    await settingsPage.profile.expectUnlinkError('Discord unlink exploded');
+    await settingsPage.profile.expectDisconnectButtonCount(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // LS-3507: Accessibility regression — /profile/settings
 //
 // An automated scan flagged an empty alt attribute on the logo image and

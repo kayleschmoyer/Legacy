@@ -593,6 +593,69 @@ class ProfileSurface {
     await this.#driver.byText('Disconnect').first().expectVisible();
   }
 
+  // ── Provider disconnect confirm dialog (LS-7669) ──────────────────
+
+  /**
+   * Click the last row's "Disconnect" button (opens the confirm dialog).
+   * EditButton does not forward data-testid in the web build, so locate by
+   * role + name; the mock identity list orders discord after google.
+   */
+  async clickLastDisconnect(): Promise<void> {
+    await this.#linkedIdentities
+      .byRole('button', { name: 'Disconnect' })
+      .last()
+      .tap();
+  }
+
+  /** Assert the disconnect confirm dialog is open and names `providerLabel`. */
+  async expectDisconnectDialog(providerLabel: string): Promise<void> {
+    const dialog = this.#driver.byRole('dialog');
+    await dialog.expectVisible();
+    await dialog.expectContainsText(`Disconnect ${providerLabel}?`);
+    await dialog.expectContainsText(
+      `You will no longer be able to sign in with ${providerLabel}.`,
+    );
+  }
+
+  /** Assert the disconnect confirm dialog is closed. */
+  async expectDisconnectDialogClosed(): Promise<void> {
+    await this.#driver.byRole('dialog').expectHidden();
+  }
+
+  /** Dismiss the disconnect dialog via its "Keep connected" button. */
+  async cancelDisconnectDialog(): Promise<void> {
+    await this.#driver
+      .byRole('dialog')
+      .byRole('button', { name: 'Keep connected' })
+      .tap();
+  }
+
+  /** Confirm the disconnect dialog via its destructive "Disconnect" button. */
+  async confirmDisconnectDialog(): Promise<void> {
+    await this.#driver
+      .byRole('dialog')
+      .byRole('button', { name: 'Disconnect', exact: true })
+      .tap();
+  }
+
+  /**
+   * Assert how many "Disconnect" buttons the Linked Identities section shows.
+   * Counted by button (one per linked non-local identity) rather than by
+   * provider name: once discord is unlinked and a Discord client id is
+   * configured, the section renders a "Connect" row whose label is also
+   * "Discord".
+   */
+  async expectDisconnectButtonCount(count: number): Promise<void> {
+    await this.#linkedIdentities
+      .byRole('button', { name: 'Disconnect' })
+      .expectCount(count);
+  }
+
+  /** Assert the inline unlink error message is shown. */
+  async expectUnlinkError(text: string): Promise<void> {
+    await this.#linkedIdentities.byText(text).expectVisible();
+  }
+
   // ── Assertions: a11y landmarks (LS-3507) ──────────────────────────
 
   /** Assert the header logo is attached to the DOM. */
