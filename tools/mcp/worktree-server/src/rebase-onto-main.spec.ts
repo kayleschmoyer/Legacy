@@ -29,6 +29,8 @@ interface RebasePayload {
   head?: string;
   onto?: string;
   log?: string;
+  conflictedFiles?: string[];
+  conflictCount?: number;
 }
 
 function parsePayload(text: string): RebasePayload {
@@ -98,6 +100,41 @@ describe('rebaseOntoMain', () => {
     const payload = parsePayload(result.content[0].text);
     expect(payload.conflictDetected).toBe(true);
     expect(payload.message).toMatch(/conflicts/);
+  });
+
+  it('captures conflictedFiles before aborting the rebase (LS-10421)', () => {
+    let aborted = false;
+    jest.mocked(deps.runGit).mockImplementation((args) => {
+      if (args[0] === 'rev-parse' && args[1] === '--abbrev-ref') {
+        return 'feature-branch\n';
+      }
+      if (args[0] === 'rev-parse') return 'abc123\n';
+      if (args[0] === 'rev-list') return '1\n';
+      if (args[0] === 'rebase' && args[1] === '--abort') {
+        aborted = true;
+        return '';
+      }
+      if (args[0] === 'rebase') {
+        throw Object.assign(new Error('rebase fail'), {
+          stdout: 'CONFLICT (content): Merge conflict in a.ts',
+          stderr: '',
+        });
+      }
+      return '';
+    });
+    // Unmerged paths only exist until the abort restores the pre-rebase tree.
+    jest
+      .mocked(deps.runShell)
+      .mockImplementation((cmd) =>
+        cmd.includes('--diff-filter=U') && !aborted ? 'a.ts\nb.ts\n' : '',
+      );
+
+    const result = rebaseOntoMain('/cwd', OPTS, deps);
+    expect(result.isError).toBe(true);
+    const payload = parsePayload(result.content[0].text);
+    expect(payload.conflictedFiles).toEqual(['a.ts', 'b.ts']);
+    expect(payload.conflictCount).toBe(2);
+    expect(payload.message).toMatch(/worktree_conflict_info/);
   });
 
   it('returns conflict-marker error when rerere silently committed markers', () => {

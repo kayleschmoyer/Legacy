@@ -128,6 +128,8 @@ For a stack of N PRs, each parent's merge repeats this once per child (N-1 rebas
 
 ## Check for Conflicts After Rebase
 
+> **Which tool leaves a conflicted rebase in progress:** `worktree_rebase` leaves it in place so `worktree_conflict_info` / `worktree_resolve_conflict` / `worktree_rebase_continue` can resolve it. `worktree_rebase_onto_main` aborts on conflict (tree is clean afterwards) and instead returns the conflicting paths in `conflictedFiles` / `conflictCount`.
+
 After `worktree_rebase` (or any `git rebase`), call `worktree_conflict_info()` to get a structured list of files still in an **unresolved conflict state** (files with unmerged index entries) along with their conflict marker line ranges and content previews.
 
 ```

@@ -123,13 +123,9 @@ export function rebaseOntoMain(
     const hasConflicts =
       output.includes('CONFLICT') || output.includes('could not apply');
 
-    // Abort the rebase to leave the tree clean
-    try {
-      runGit(['rebase', '--abort'], cwd, { env: nonInteractiveEnv });
-    } catch {
-      // Ignore abort failure
-    }
-
+    // Capture the unmerged paths BEFORE aborting: `git rebase --abort` restores
+    // the pre-rebase tree, after which `--diff-filter=U` is always empty and
+    // the caller can no longer learn which files conflicted (LS-10421).
     const conflictedFiles = (() => {
       try {
         return runShell('git diff --name-only --diff-filter=U', cwd)
@@ -140,6 +136,13 @@ export function rebaseOntoMain(
         return [];
       }
     })();
+
+    // Abort the rebase to leave the tree clean
+    try {
+      runGit(['rebase', '--abort'], cwd, { env: nonInteractiveEnv });
+    } catch {
+      // Ignore abort failure
+    }
 
     // A wide add/add conflict spread (near-every-file) after fetch+deepen is
     // the shallow-history signature, not a bad rerere replay (LS-9967). Flag
@@ -164,9 +167,12 @@ export function rebaseOntoMain(
                   'rerere resolution) is the likely cause of this many simultaneous add/add-style ' +
                   'conflicts. The automatic `git fetch --unshallow` attempted before this rebase did not ' +
                   'resolve it; retry once the deepen succeeds, or run `git fetch --unshallow origin` manually.'
-                : `Rebase onto origin/${onto} encountered conflicts. Rebase aborted — resolve conflicts manually then use worktree_rebase + worktree_push.`
+                : `Rebase onto origin/${onto} encountered conflicts. Rebase aborted, so nothing is left in progress — conflictedFiles lists what conflicted. ` +
+                  'To resolve, run worktree_rebase (it leaves the conflicted rebase in place), then ' +
+                  'worktree_conflict_info / worktree_resolve_conflict, worktree_rebase_continue and worktree_push.'
               : `Rebase failed: ${output.slice(0, 500)}`,
             conflictedFiles,
+            conflictCount: conflictedFiles.length,
           }),
         },
       ],
