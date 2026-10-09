@@ -602,6 +602,39 @@ describe('MatchupRosterEditorView', () => {
       );
     });
 
+    // LS-10353: the e2e spec reads the player name from this testid instead of
+    // guessing it with a shape regex, so it must resolve for any name shape.
+    it.each([
+      ['José', 'Ramírez'],
+      ['Mike', 'de la Cruz'],
+      ['Ken', 'Griffey Jr.'],
+      ['J.D.', 'Martinez'],
+      ['Jean-Luc', "O'Neill"],
+    ])(
+      'emits data-testid="matchup-player-name-{id}" with the exact name for "%s %s"',
+      (firstName, lastName) => {
+        const players: MatchupPlayerData[] = [
+          {
+            ...makePlayer('p1', 101),
+            player: { firstName, lastName, eligiblePositions: ['SP'] },
+          },
+        ];
+        const { container } = render(
+          <MatchupRosterEditorView
+            players={players}
+            positionMap={new Map<number, string>([[101, 'SP']])}
+            positionOptions={[SP_SLOT]}
+            onSwapPositions={noop}
+            onMoveToPosition={noop}
+          />,
+        );
+        expect(
+          container.querySelector('[data-testid="matchup-player-name-p1"]')
+            ?.textContent,
+        ).toBe(`${firstName} ${lastName}`);
+      },
+    );
+
     it('emits data-testid on bench rows as well', () => {
       const players = [makePlayer('b1', null)];
       const { container } = render(

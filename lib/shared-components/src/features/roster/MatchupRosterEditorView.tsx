@@ -452,6 +452,7 @@ export function MatchupRosterEditorView({
         {/* Player info */}
         <YStack flex={1} minWidth={0}>
           <Text
+            testID={`matchup-player-name-${player.id}`}
             fontSize="$3"
             fontWeight="600"
             color={isSelected ? '$yellow10' : '$gray12'}

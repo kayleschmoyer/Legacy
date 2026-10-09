@@ -60,15 +60,6 @@ interface RosterEditorState {
 let state: RosterEditorState;
 
 /**
- * Regex matching player names ("First Last") while excluding UI header text
- * like "Edit Lineup" or "Current Lineup" that also match the two-word pattern.
- *
- * Handles common MLB name formats: initials ("A.J. Burnett"), hyphens
- * ("Shin-Soo Choo"), and apostrophes ("O'Brien").
- */
-const PLAYER_NAME_RE = /^(?!Edit |Current )[A-Z][-\w.']* [A-Z][-\w.']*/;
-
-/**
  * Wait for a specific GraphQL operation by name. The bench/assign/swap flows in
  * MatchupRosterEditor fire multiple GraphQL POSTs per click (a network-only
  * pre-flight matchup-status fetch, then the mutation, then a refetch). A bare
@@ -572,15 +563,17 @@ test.describe
         .filter({ hasText: 'STARTERS' })
         .first();
 
-      // Capture a visible starter name from within the first player row, not
-      // from the broader editorCard. Scoping to the row prevents PLAYER_NAME_RE
-      // from matching the league name (e.g. "Roster Editor E2E …"), whose first
-      // two words happen to pass the regex's negative lookahead (LS-3781).
+      // Capture the first starter's name via its dedicated testid inside the
+      // first player row. No name-shape regex: accented, particle, suffix and
+      // initials names all resolve (LS-10353), and scoping to the row keeps the
+      // league name out of play (LS-3781).
       const firstStarterRow = editorCard
         .getByTestId(/^matchup-player-row-/)
         .first();
       await expect(firstStarterRow).toBeVisible({ timeout: 15_000 });
-      const playerNameEl = firstStarterRow.getByText(PLAYER_NAME_RE).first();
+      const playerNameEl = firstStarterRow
+        .getByTestId(/^matchup-player-name-/)
+        .first();
       await expect(playerNameEl).toBeVisible({ timeout: 5_000 });
       state.benchedPlayerName = ((await playerNameEl.textContent()) ?? '')
         .replace(/\s+/g, ' ')
