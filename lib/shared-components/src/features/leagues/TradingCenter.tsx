@@ -100,9 +100,14 @@ export interface TradingCenterProps {
   leagueId: number;
   userTeamId: number;
   isCommissioner?: boolean;
-  /** Whether the current user/league has the `premium` entitlement. When true,
-   * the Premium Analysis Tools panel is unlocked. */
+  /** Whether the current user/league has the `premium` entitlement. This prop
+   * controls general premium features, including league trade voting. For the
+   * Premium Trade Tools panel, use `canUseTradeTools` instead. */
   isPremium?: boolean;
+  /** Whether the viewer holds the `trade_analyzer` entitlement. Unlocks the
+   * Premium Trade Tools panel only (not league trade voting). Falls back to
+   * `isPremium` when omitted. */
+  canUseTradeTools?: boolean;
   /** Called when a non-premium user clicks "Upgrade to Premium" in the
    * Premium Analysis Tools gate overlay. */
   onUpgradePremium?: () => void;
@@ -1597,6 +1602,7 @@ export function TradingCenter({
   userTeamId,
   isCommissioner = false,
   isPremium = false,
+  canUseTradeTools,
   onUpgradePremium,
   onSubscribeRefresh,
   deepLinkOfferId,
@@ -2439,7 +2445,7 @@ export function TradingCenter({
       <PremiumTradeTools
         userTeamId={userTeamId}
         pendingTrades={pendingTrades}
-        isPremium={isPremium}
+        isPremium={canUseTradeTools ?? isPremium}
         onUpgrade={onUpgradePremium}
       />
 

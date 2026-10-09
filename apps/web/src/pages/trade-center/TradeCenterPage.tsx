@@ -287,6 +287,8 @@ function LeagueTradesView({
     permissionLevel === 'general_manager' ||
     permissionLevel === 'assistant_manager' ||
     permissionLevel === 'commissioner';
+  const canUseTradeTools = useHasEntitlement(ENTITLEMENTS.trade_analyzer);
+  const navigate = useNavigate();
 
   if (teamLoading || leagueLoading) {
     return (
@@ -369,6 +371,8 @@ function LeagueTradesView({
           userTeamId={userTeamId}
           isCommissioner={isCommissioner}
           deepLinkOfferId={deepLinkOfferId}
+          canUseTradeTools={canUseTradeTools}
+          onUpgradePremium={() => navigate('/profile/subscription')}
         />
       )}
     </YStack>

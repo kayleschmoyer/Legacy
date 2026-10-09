@@ -1,5 +1,8 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { type LeagueFragment } from '@legacy-sports/graphql';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
+import { useHasEntitlement } from '../../../../hooks/useIsPremium';
 import { TradingCenter } from '../../../../features/baseball/TradingCenter';
 import { I } from '../Icons';
 import { Banner, Empty, Section } from '../Shared';
@@ -18,6 +21,8 @@ export const TradesTab: React.FC<TradesTabProps> = ({
   isCommissioner = false,
 }) => {
   const leagueId = league.id ?? 0;
+  const navigate = useNavigate();
+  const canUseTradeTools = useHasEntitlement(ENTITLEMENTS.trade_analyzer);
 
   if (!league.id) {
     return <Empty title="Trades unavailable" sub="League is missing an id." />;
@@ -50,6 +55,8 @@ export const TradesTab: React.FC<TradesTabProps> = ({
       leagueId={leagueId}
       userTeamId={myTeamId}
       isCommissioner={isCommissioner}
+      canUseTradeTools={canUseTradeTools}
+      onUpgradePremium={() => navigate('/profile/subscription')}
     />
   );
 };

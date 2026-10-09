@@ -164,8 +164,10 @@ jest.mock('../../_screenErrorBoundary', () => ({
 }));
 
 let mockIsPremium = false;
+let mockHasTradeAnalyzer = false;
 jest.mock('../../../../features/subscription/useSubscription', () => ({
   useSubscription: () => ({ isPremium: mockIsPremium }),
+  useHasEntitlement: () => mockHasTradeAnalyzer,
 }));
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -180,6 +182,7 @@ beforeEach(() => {
   capturedNativeProps = null;
   mockSearchParams = {};
   mockIsPremium = false;
+  mockHasTradeAnalyzer = false;
   mockNavigate.mockReset();
   const sharedMocks: { useWebSocket: jest.Mock } = jest.requireMock(
     '@legacy-sports/shared-components',
@@ -411,6 +414,29 @@ describe('TradeCenterPage — surface contract (parity assertions)', () => {
       expect(capturedNativeProps?.isPremium).toBe(true);
     });
   });
+
+  it.each([true, false])(
+    'injects canUseTradeTools=%s from the trade_analyzer entitlement (LS-10520)',
+    async (entitled) => {
+      // Set general premium to the opposite value to prove the tools gate
+      // follows the trade_analyzer entitlement, not isPremium.
+      mockIsPremium = !entitled;
+      mockHasTradeAnalyzer = entitled;
+      mockUserLeagues = {
+        userLeagues: [{ id: 1, name: 'My League', leaguePhase: 'active' }],
+      };
+      mockUserTeamId = 42;
+      mockLeague = { league: { id: 1, owner: 99 } };
+      render(<TradeCenterPage />);
+
+      fireEvent.press(screen.getByLabelText('View trades for My League'));
+
+      await waitFor(() => {
+        expect(capturedNativeProps?.canUseTradeTools).toBe(entitled);
+        expect(capturedNativeProps?.isPremium).toBe(!entitled);
+      });
+    },
+  );
 
   it('injects onUpgradePremium that navigates to subscription-settings', async () => {
     mockUserLeagues = {

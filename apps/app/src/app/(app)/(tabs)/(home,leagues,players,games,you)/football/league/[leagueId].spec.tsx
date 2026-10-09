@@ -250,8 +250,10 @@ jest.mock('@legacy-sports/shared-components', () => {
     ),
     TradingCenter: (props: {
       onSubscribeRefresh?: (refetch: () => void) => (() => void) | void;
+      canUseTradeTools?: boolean;
     }) => {
       mockCapturedTradesSubscribeRefresh = props.onSubscribeRefresh ?? null;
+      mockCapturedCanUseTradeTools = props.canUseTradeTools;
       return <View testID="trading-center" />;
     },
     usePlayoffBracket: jest.fn(() => ({
@@ -509,8 +511,12 @@ jest.mock('../../../../../../common/auth/AuthHooks', () => ({
 }));
 
 const mockUseSubscription = jest.fn(() => ({ isPremium: false }));
+let mockHasTradeAnalyzer = false;
+let mockCapturedCanUseTradeTools: boolean | undefined;
+
 jest.mock('../../../../../../features/subscription/useSubscription', () => ({
   useSubscription: () => mockUseSubscription(),
+  useHasEntitlement: () => mockHasTradeAnalyzer,
 }));
 
 // Captures the options passed to useLeagueWebSocket by LeagueWSPageHandler so
@@ -601,6 +607,8 @@ jest.mock('@legacy-sports/graphql', () => ({
 
 describe('FootballLeagueId', () => {
   beforeEach(() => {
+    mockHasTradeAnalyzer = false;
+    mockCapturedCanUseTradeTools = undefined;
     jest.clearAllMocks();
     mockCapturedTradesSubscribeRefresh = null;
     mockCapturedWaiverSubscribeRefresh.length = 0;
@@ -1487,6 +1495,17 @@ describe('FootballLeagueId', () => {
       expect(mockCapturedTradesSubscribeRefresh).toBeInstanceOf(Function);
       expect(mockCapturedWaiverSubscribeRefresh[0]).toBeInstanceOf(Function);
     });
+
+    it.each([true, false])(
+      'passes canUseTradeTools=%s from the trade_analyzer entitlement to TradingCenter (LS-10520)',
+      (entitled) => {
+        mockHasTradeAnalyzer = entitled;
+        render(<FootballLeagueId />);
+        fireEvent.press(screen.getByTestId('tab-trades'));
+
+        expect(mockCapturedCanUseTradeTools).toBe(entitled);
+      },
+    );
 
     it('wires the Waivers-tab PendingWaiverClaims to its own onSubscribeRefresh', () => {
       render(<FootballLeagueId />);

@@ -11,6 +11,7 @@ import { ShoppingCart } from '@tamagui/lucide-icons/icons/ShoppingCart';
 import { Alert, Platform, ScrollView, Share } from 'react-native';
 import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 import {
   isDraftPaused,
   isDraftRoomReachable,
@@ -61,7 +62,10 @@ import {
 } from '../../../../../../common/auth/AuthHooks';
 import { setLastVisitedLeague } from '../../../../../../common/utilities/lastVisitedLeague';
 import { HOME_TAB_HREF } from '../../../../../../common/utilities/RouteUtils';
-import { useSubscription } from '../../../../../../features/subscription/useSubscription';
+import {
+  useHasEntitlement,
+  useSubscription,
+} from '../../../../../../features/subscription/useSubscription';
 import { LeagueWebSocketContext } from '../../../../../../context/LeagueWebSocketContext';
 import { useLeagueWebSocketLifecycle } from '../../../../../../hooks/useLeagueWebSocketLifecycle';
 import { useLeagueWebSocket } from '../../../../../../hooks/useLeagueWebSocket';
@@ -352,6 +356,7 @@ export default function LeagueId(): React.JSX.Element {
   const setRole = useCallback((r: LeagueRole) => setRolePref(r), []);
 
   const { isPremium } = useSubscription();
+  const canUseTradeTools = useHasEntitlement(ENTITLEMENTS.trade_analyzer);
 
   const [season, setSeason] = useState<string>(
     String(league?.seasonNumber ?? new Date().getFullYear()),
@@ -867,6 +872,7 @@ export default function LeagueId(): React.JSX.Element {
                       isCommissioner={isCommissioner}
                       onSubscribeRefresh={onTradesSubscribeRefresh}
                       isPremium={isPremium}
+                      canUseTradeTools={canUseTradeTools}
                       onUpgradePremium={() =>
                         router.navigate('subscription-settings')
                       }

@@ -39,6 +39,18 @@ jest.mock('../../../../features/baseball/TradingCenter', () => ({
   },
 }));
 
+let mockHasTradeAnalyzer = false;
+const mockNavigate = jest.fn();
+
+jest.mock('../../../../hooks/useIsPremium', () => ({
+  useHasEntitlement: () => mockHasTradeAnalyzer,
+}));
+
+jest.mock('react-router-dom', () => ({
+  ...jest.requireActual<typeof import('react-router-dom')>('react-router-dom'),
+  useNavigate: () => mockNavigate,
+}));
+
 jest.mock('../Shared', () => ({
   Banner: ({
     title,
@@ -152,19 +164,34 @@ describe('TradesTab — spectator guard', () => {
   });
 });
 
-describe('TradesTab — premium gating contract (LS-7516 — TC-019-P)', () => {
-  // The Trades tab has no page-level premium UI (no equivalent of the web
-  // TradeAnalyzerCard). isPremium and onUpgradePremium must NOT be injected at
-  // this level — the shared TradingCenter manages its own premium state via
-  // PremiumTradeTools and the isPremium prop only if a caller explicitly provides it.
-  it('does not inject isPremium into TradingCenter — tab has no page-level premium gating', () => {
+describe('TradesTab — premium gating contract (LS-10520)', () => {
+  // TradingCenter defaults its premium switches to false, so the tab must
+  // inject the viewer's trade_analyzer entitlement or paying users only ever
+  // see the lock card.
+  beforeEach(() => {
+    mockHasTradeAnalyzer = false;
+    mockNavigate.mockClear();
+  });
+
+  it.each([true, false])(
+    'passes canUseTradeTools=%s from the trade_analyzer entitlement',
+    (entitled) => {
+      mockHasTradeAnalyzer = entitled;
+      render(<TradesTab league={baseLeague} isMember myTeamId={42} />);
+      expect(capturedProps?.canUseTradeTools).toBe(entitled);
+    },
+  );
+
+  it('does not inject isPremium — league trade voting is unchanged', () => {
+    mockHasTradeAnalyzer = true;
     render(<TradesTab league={baseLeague} isMember myTeamId={42} />);
     expect(capturedProps?.isPremium).toBeUndefined();
   });
 
-  it('does not inject onUpgradePremium into TradingCenter — tab has no premium upsell flow', () => {
+  it('wires onUpgradePremium to the subscription page', () => {
     render(<TradesTab league={baseLeague} isMember myTeamId={42} />);
-    expect(capturedProps?.onUpgradePremium).toBeUndefined();
+    (capturedProps?.onUpgradePremium as () => void)();
+    expect(mockNavigate).toHaveBeenCalledWith('/profile/subscription');
   });
 });
 

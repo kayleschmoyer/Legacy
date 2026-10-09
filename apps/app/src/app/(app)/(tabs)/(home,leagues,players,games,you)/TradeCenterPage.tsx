@@ -14,6 +14,7 @@ import { Button, Card, Spinner, Text, XStack, YStack } from 'tamagui';
 import { config } from '@legacy-sports/app-config/native';
 import { TradingCenter, useWebSocket } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 
 import {
   useGetLeagueByIdQuery,
@@ -23,7 +24,10 @@ import {
 import { useAuthorizedUserInfo } from '../../../../common/auth/AuthorizedUserContext';
 import { readKeychainValue, Secret } from '../../../../common/auth/AuthHooks';
 import { useSystemBackAction } from '../../../../common/hooks/useSystemBackAction';
-import { useSubscription } from '../../../../features/subscription/useSubscription';
+import {
+  useHasEntitlement,
+  useSubscription,
+} from '../../../../features/subscription/useSubscription';
 
 // ── LeagueTrades ──────────────────────────────────────────────────────────────
 
@@ -40,6 +44,7 @@ function LeagueTrades({
 }: LeagueTradesProps) {
   const router = useRouter();
   const { isPremium } = useSubscription();
+  const canUseTradeTools = useHasEntitlement(ENTITLEMENTS.trade_analyzer);
   const [wsToken, setWsToken] = useState<string | undefined>();
 
   useEffect(() => {
@@ -141,6 +146,7 @@ function LeagueTrades({
           deepLinkOfferId={tradeOfferId}
           onSubscribeRefresh={onSubscribeRefresh}
           isPremium={isPremium}
+          canUseTradeTools={canUseTradeTools}
           onUpgradePremium={() => router.navigate('subscription-settings')}
         />
       </ScrollView>

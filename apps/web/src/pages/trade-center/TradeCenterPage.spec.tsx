@@ -14,7 +14,7 @@ let mockLeaguesError: unknown = undefined;
 let mockUserTeamId: number | null;
 let mockLeague: unknown;
 let mockTeamTradeOffers: unknown[];
-let mockIsPremium = false;
+let mockHasTradeAnalyzer = false;
 const mockUseHasEntitlement = jest.fn<boolean, [string]>();
 
 const mockNavigate = jest.fn();
@@ -54,15 +54,23 @@ jest.mock('../../features/baseball/TradingCenter', () => ({
     leagueId,
     deepLinkOfferId,
     isPremium,
+    canUseTradeTools,
+    onUpgradePremium,
   }: {
     leagueId: number;
     deepLinkOfferId?: number;
     isPremium?: boolean;
+    canUseTradeTools?: boolean;
+    onUpgradePremium?: () => void;
   }) => (
     <div
       data-testid={`trading-center-${leagueId}`}
       data-deep-link-offer-id={deepLinkOfferId ?? ''}
       data-is-premium={isPremium == null ? '' : String(isPremium)}
+      data-can-use-trade-tools={
+        canUseTradeTools == null ? '' : String(canUseTradeTools)
+      }
+      onClick={onUpgradePremium}
     />
   ),
 }));
@@ -182,11 +190,13 @@ beforeEach(() => {
   mockUserTeamId = null;
   mockLeague = undefined;
   mockTeamTradeOffers = [];
-  mockIsPremium = false;
+  mockHasTradeAnalyzer = false;
   mockNavigate.mockReset();
   mockUseHasEntitlement.mockReset();
-  // Read the current mockIsPremium value at call time (per test).
-  mockUseHasEntitlement.mockImplementation((_key: string) => mockIsPremium);
+  // Read the current mockHasTradeAnalyzer value at call time (per test).
+  mockUseHasEntitlement.mockImplementation(
+    (_key: string) => mockHasTradeAnalyzer,
+  );
 });
 
 describe('TradeCenterPage', () => {
@@ -510,7 +520,7 @@ describe('TradeCenterPage', () => {
     });
 
     it('shows PREMIUM badge and PremiumGate with isPremium=false for free users', () => {
-      mockIsPremium = false;
+      mockHasTradeAnalyzer = false;
       mockUserLeagues = { userLeagues: [] };
       renderPage();
       expect(screen.getByText('PREMIUM')).toBeInTheDocument();
@@ -525,7 +535,7 @@ describe('TradeCenterPage', () => {
     });
 
     it('passes a featureDescription to PremiumGate', () => {
-      mockIsPremium = false;
+      mockHasTradeAnalyzer = false;
       mockUserLeagues = { userLeagues: [] };
       renderPage();
       const gate = screen.getByTestId('premium-gate');
@@ -535,21 +545,21 @@ describe('TradeCenterPage', () => {
     });
 
     it('hides PREMIUM badge for premium users', () => {
-      mockIsPremium = true;
+      mockHasTradeAnalyzer = true;
       mockUserLeagues = { userLeagues: [] };
       renderPage();
       expect(screen.queryByText('PREMIUM')).not.toBeInTheDocument();
     });
 
     it('shows coming soon message for premium users', () => {
-      mockIsPremium = true;
+      mockHasTradeAnalyzer = true;
       mockUserLeagues = { userLeagues: [] };
       renderPage();
       expect(screen.getByText(/Coming soon/i)).toBeInTheDocument();
     });
 
     it('passes isPremium=true to PremiumGate for premium users', () => {
-      mockIsPremium = true;
+      mockHasTradeAnalyzer = true;
       mockUserLeagues = { userLeagues: [] };
       renderPage();
       const gate = screen.getByTestId('premium-gate');
@@ -700,7 +710,7 @@ describe('TradeCenterPage', () => {
   // color so users with many leagues across sports can scan the list.
   describe('premium variant — sport icon and phase color (TC-003-P)', () => {
     beforeEach(() => {
-      mockIsPremium = true;
+      mockHasTradeAnalyzer = true;
     });
 
     it('shows baseball sport icon for premium users', () => {
@@ -839,7 +849,7 @@ describe('TradeCenterPage', () => {
   // impossible (draft/offseason) and hit a server-side proposeTrade rejection.
   describe('premium variant — active-phase filter (TC-001-P)', () => {
     beforeEach(() => {
-      mockIsPremium = true;
+      mockHasTradeAnalyzer = true;
     });
 
     it('shows only active leagues when premium user belongs to leagues across all phases', () => {
@@ -938,51 +948,45 @@ describe('TradeCenterPage', () => {
   });
 });
 
-// ── Premium gating parity (LS-7516 — TC-019-P) ───────────────────────────────
-// The web /trade-center page gates premium features at the PAGE level via
-// TradeAnalyzerCard (which uses useIsPremium() independently). The per-league
-// TradingCenter instance rendered by LeagueTradesView does NOT receive isPremium
-// — premium status is not threaded through from the page to the component.
-// This is intentional: TradingCenter can render its own PremiumTradeTools section
-// independently using the caller-supplied isPremium prop, but this surface does
-// not supply it.
-describe('TradeCenterPage — premium gating parity (LS-7516 — TC-019-P)', () => {
-  it('does not inject isPremium into TradingCenter even when the user is a premium subscriber', async () => {
-    mockIsPremium = true;
+// ── Premium gating (LS-10520) ────────────────────────────────────────────────
+// TradingCenter defaults its premium switches to false, so this surface must
+// inject the trade_analyzer entitlement (and an upgrade path) itself. League
+// trade voting (isPremium) is intentionally left untouched.
+describe('TradeCenterPage — premium trade tools gating (LS-10520)', () => {
+  async function openLeague() {
     mockUserLeagues = {
       userLeagues: [{ id: 5, name: 'My League', leaguePhase: 'active' }],
     };
     mockUserTeamId = 10;
     mockLeague = { league: { id: 5, owner: 99 } };
     renderPage();
-
     fireEvent.click(
       screen.getByRole('button', { name: /View trades for My League/i }),
     );
+    return screen.findByTestId('trading-center-5');
+  }
 
-    await waitFor(() => {
-      const el = screen.getByTestId('trading-center-5');
-      // data-is-premium is empty string when isPremium prop is not provided
-      expect(el.getAttribute('data-is-premium')).toBe('');
-    });
+  it.each([true, false])(
+    'injects canUseTradeTools=%s from the trade_analyzer entitlement',
+    async (entitled) => {
+      mockHasTradeAnalyzer = entitled;
+      const el = await openLeague();
+      expect(el.getAttribute('data-can-use-trade-tools')).toBe(
+        String(entitled),
+      );
+    },
+  );
+
+  it('does not inject isPremium (league trade voting is unchanged)', async () => {
+    mockHasTradeAnalyzer = true;
+    const el = await openLeague();
+    expect(el.getAttribute('data-is-premium')).toBe('');
   });
 
-  it('does not inject isPremium into TradingCenter for free users either', async () => {
-    mockIsPremium = false;
-    mockUserLeagues = {
-      userLeagues: [{ id: 5, name: 'My League', leaguePhase: 'active' }],
-    };
-    mockUserTeamId = 10;
-    mockLeague = { league: { id: 5, owner: 99 } };
-    renderPage();
-
-    fireEvent.click(
-      screen.getByRole('button', { name: /View trades for My League/i }),
-    );
-
-    await waitFor(() => {
-      const el = screen.getByTestId('trading-center-5');
-      expect(el.getAttribute('data-is-premium')).toBe('');
-    });
+  it('wires onUpgradePremium to the subscription page', async () => {
+    mockHasTradeAnalyzer = false;
+    const el = await openLeague();
+    fireEvent.click(el);
+    expect(mockNavigate).toHaveBeenCalledWith('/profile/subscription');
   });
 });
