@@ -1854,7 +1854,14 @@ export function PlayerDetailModal({
                 {effectiveActiveTab === 'batting' &&
                   battingTableRows.length > 0 && (
                     <>
-                      <SectionHead title="Season by Season · Batting" />
+                      <SectionHead
+                        title="Season by Season · Batting"
+                        meta={
+                          hasAdvancedBatting
+                            ? undefined
+                            : 'OPS, BABIP and OPS+ with Premium'
+                        }
+                      />
                       <EditorialTable
                         caption="Season batting statistics"
                         headers={
@@ -1897,7 +1904,14 @@ export function PlayerDetailModal({
                 {effectiveActiveTab === 'pitching' &&
                   pitchingTableRows.length > 0 && (
                     <>
-                      <SectionHead title="Season by Season · Pitching" />
+                      <SectionHead
+                        title="Season by Season · Pitching"
+                        meta={
+                          hasPremiumPitching
+                            ? undefined
+                            : 'FIP, WHIP, K/9 and BB/9 with Premium'
+                        }
+                      />
                       <EditorialTable
                         caption="Season pitching statistics"
                         headers={[
@@ -1920,7 +1934,14 @@ export function PlayerDetailModal({
                 {effectiveActiveTab === 'fielding' &&
                   fieldingTableRows.length > 0 && (
                     <>
-                      <SectionHead title="Season by Season · Fielding" />
+                      <SectionHead
+                        title="Season by Season · Fielding"
+                        meta={
+                          hasPremiumFielding
+                            ? undefined
+                            : 'DRS, UZR and OAA with Premium'
+                        }
+                      />
                       <EditorialTable
                         caption="Season fielding statistics"
                         headers={

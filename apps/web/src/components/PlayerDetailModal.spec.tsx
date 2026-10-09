@@ -833,6 +833,43 @@ describe('PlayerDetailModal — active tab reset (LS-6992)', () => {
     ).not.toBeInTheDocument();
   });
 
+  it.each([
+    [false, true],
+    [true, false],
+  ])(
+    'premium=%s shows the Premium hint on advanced season tables: %s',
+    (premium, hintShown) => {
+      mockHasEntitlement = premium;
+      mockUseAllPlayerSeasonStats.mockReturnValue({
+        ...EMPTY_SEASON,
+        data: {
+          ...EMPTY_SEASON.data,
+          playerSeasonBatting: [battingSeason()],
+          playerSeasonPitching: [pitchingSeason()],
+        },
+      });
+      render(
+        <PlayerDetailModal
+          playerId={1}
+          playerName="Two-Way One"
+          position="SP"
+          open
+          onOpenChange={jest.fn()}
+        />,
+      );
+      const battingHint = screen.queryByText(
+        'OPS, BABIP and OPS+ with Premium',
+      );
+      expect(battingHint !== null).toBe(hintShown);
+
+      fireEvent.click(screen.getByText('Pitching'));
+      const pitchingHint = screen.queryByText(
+        'FIP, WHIP, K/9 and BB/9 with Premium',
+      );
+      expect(pitchingHint !== null).toBe(hintShown);
+    },
+  );
+
   it('preserves a user-picked tab when switching to a player who also has that tab', () => {
     // Two-way player, so both tabs exist and Batting is the default.
     mockUseAllPlayerSeasonStats.mockReturnValue({
