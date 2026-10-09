@@ -11,18 +11,60 @@ type RunShellFn = (cmd: string, cwd: string) => string;
  * `getConflictInfo`'s own line-based parsing) so a `<<<<<<<` substring inside
  * a string literal, comment, or doc example isn't mistaken for a real
  * conflict marker. Exits 1 (throws) when no matches, which we treat as empty.
+ *
+ * When `paths` is given, only those files are scanned (an empty list scans
+ * nothing). Callers pass the files the replayed commits modified so docs that
+ * arrive via the rebase base and legitimately contain marker examples are not
+ * flagged (LS-10282).
  */
 export function scanStagedForConflictMarkers(
   cwd: string,
   runGit: RunGitFn,
+  paths?: string[],
 ): string[] {
+  if (paths && paths.length === 0) return [];
   try {
-    return runGit(['grep', '--cached', '-l', '-E', '^<<<<<<<'], cwd)
+    return runGit(
+      [
+        'grep',
+        '--cached',
+        '-l',
+        '-E',
+        '^<<<<<<<',
+        ...(paths ? ['--', ...paths] : []),
+      ],
+      cwd,
+    )
       .trim()
       .split('\n')
       .filter(Boolean);
   } catch {
     return [];
+  }
+}
+
+/**
+ * Files modified by the commits a just-finished rebase replayed: the diff from
+ * the fork point (merge-base of the pre-rebase tip `ORIG_HEAD` and `HEAD`) to
+ * `ORIG_HEAD`. Files that only arrived via the new base are excluded.
+ * Returns null when this can't be determined, so callers fall back to a full
+ * scan rather than silently skipping detection.
+ */
+export function listReplayedCommitFiles(
+  cwd: string,
+  runGit: RunGitFn,
+): string[] | null {
+  try {
+    const forkPoint = runGit(['merge-base', 'ORIG_HEAD', 'HEAD'], cwd).trim();
+    if (!forkPoint) return null;
+    return runGit(
+      ['diff', '--name-only', '--diff-filter=d', '-z', forkPoint, 'ORIG_HEAD'],
+      cwd,
+    )
+      .split('\0')
+      .filter(Boolean);
+  } catch {
+    return null;
   }
 }
 

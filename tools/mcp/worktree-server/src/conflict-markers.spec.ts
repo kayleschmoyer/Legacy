@@ -13,6 +13,7 @@ import { join } from 'node:path';
 
 import {
   getConflictInfo,
+  listReplayedCommitFiles,
   scanStagedForConflictMarkers,
   scanWorkingTreeForConflictMarkers,
 } from './conflict-markers';
@@ -91,6 +92,95 @@ describe('scanStagedForConflictMarkers against a real git repo (LS-9943)', () =>
     expect(scanStagedForConflictMarkers(workDir, realRunGit)).toEqual([
       'foo.ts',
     ]);
+  });
+});
+
+describe('post-rebase scan scoped to replayed commits (LS-10282)', () => {
+  let workDir: string;
+  const git = (...args: string[]): string =>
+    execFileSync('git', args, { cwd: workDir, encoding: 'utf-8' });
+  const realRunGit = (args: string[], cwd: string): string =>
+    execFileSync('git', args, { cwd, encoding: 'utf-8' });
+  const markerDoc = [
+    '# Resolving conflicts',
+    '```',
+    '<<<<<<< HEAD',
+    'ours',
+    '=======',
+    'theirs',
+    '>>>>>>> main',
+    '```',
+  ].join('\n');
+
+  beforeEach(() => {
+    workDir = mkdtempSync(join(tmpdir(), 'worktree-replayed-scan-test-'));
+    git('init', '-q', '-b', 'main');
+    git('config', 'user.email', 'test@example.com');
+    git('config', 'user.name', 'Test');
+    writeFileSync(join(workDir, 'a.txt'), 'a\n');
+    git('add', '.');
+    git('commit', '-qm', 'init');
+    git('checkout', '-q', '-b', 'feature');
+    writeFileSync(join(workDir, 'feature.ts'), 'export const x = 1;\n');
+    git('add', '.');
+    git('commit', '-qm', 'feature work');
+    // main gains a doc that documents conflict markers
+    git('checkout', '-q', 'main');
+    writeFileSync(join(workDir, 'guide.md'), markerDoc);
+    git('add', '.');
+    git('commit', '-qm', 'add marker guide');
+    git('checkout', '-q', 'feature');
+    git('rebase', 'main');
+    // `git rebase` leaves ORIG_HEAD at the pre-rebase tip
+  });
+
+  afterEach(() => {
+    rmSync(workDir, { recursive: true, force: true });
+  });
+
+  it('lists only files the replayed commits modified', () => {
+    expect(listReplayedCommitFiles(workDir, realRunGit)).toEqual([
+      'feature.ts',
+    ]);
+  });
+
+  it('does not flag a marker-documenting doc that arrived via the base', () => {
+    // Unscoped, the staged scan false-positives on guide.md.
+    expect(scanStagedForConflictMarkers(workDir, realRunGit)).toEqual([
+      'guide.md',
+    ]);
+    const scoped = listReplayedCommitFiles(workDir, realRunGit) ?? undefined;
+    expect(scanStagedForConflictMarkers(workDir, realRunGit, scoped)).toEqual(
+      [],
+    );
+  });
+
+  it('still flags a real committed marker in a replayed file', () => {
+    writeFileSync(
+      join(workDir, 'feature.ts'),
+      ['<<<<<<< HEAD', 'a', '=======', 'b', '>>>>>>> main'].join('\n'),
+    );
+    git('add', '.');
+    git('commit', '-qm', 'bad resolution');
+    const files = ['feature.ts'];
+    expect(scanStagedForConflictMarkers(workDir, realRunGit, files)).toEqual([
+      'feature.ts',
+    ]);
+  });
+
+  it('scans nothing when the replayed set is empty', () => {
+    const runGit = jest.fn<(args: string[], cwd: string) => string>();
+    expect(scanStagedForConflictMarkers('/cwd', runGit, [])).toEqual([]);
+    expect(runGit).not.toHaveBeenCalled();
+  });
+
+  it('returns null when the replayed set cannot be determined', () => {
+    const runGit = jest
+      .fn<(args: string[], cwd: string) => string>()
+      .mockImplementation(() => {
+        throw new Error('no ORIG_HEAD');
+      });
+    expect(listReplayedCommitFiles('/cwd', runGit)).toBeNull();
   });
 });
 

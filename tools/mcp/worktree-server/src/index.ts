@@ -55,6 +55,7 @@ import { detectDirectBranchCcrCwd } from './direct-branch-ccr';
 import { isTwigNotFoundError } from './twig-rebase-fallback';
 import {
   getConflictInfo,
+  listReplayedCommitFiles,
   scanStagedForConflictMarkers,
 } from './conflict-markers';
 import { resolveDiffBase } from './diff-utils';
@@ -6094,7 +6095,13 @@ const handleCallTool = async (
         }
 
         // Scan staged files for conflict markers — rerere can silently commit them
-        const markerFiles = scanStagedForConflictMarkers(cwd, runGit);
+        // Scoped to files the replayed commits modified: docs that arrive via
+        // the base and document marker syntax must not trip the scan (LS-10282).
+        const markerFiles = scanStagedForConflictMarkers(
+          cwd,
+          runGit,
+          listReplayedCommitFiles(cwd, runGit) ?? undefined,
+        );
         if (markerFiles.length > 0) {
           const stillShallow = isShallowRepository({ runGit }, cwd);
           return {
