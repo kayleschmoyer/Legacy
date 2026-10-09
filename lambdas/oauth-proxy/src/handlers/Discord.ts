@@ -582,6 +582,109 @@ export const handleDiscordAuth = async (
   );
 };
 
+interface NativeLinkBody {
+  code?: string;
+  code_verifier: string;
+  redirect_uri?: string;
+}
+
+/**
+ * Detect the native link shape without throwing: a malformed or non-object body
+ * (or one without a string `code_verifier`) is not native, so the web path
+ * handles it exactly as before.
+ */
+function peekNativeLinkBody(rawBody: string | null): NativeLinkBody | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawBody ?? '{}');
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null) return null;
+  const body = parsed as Record<string, unknown>;
+  if (typeof body['code_verifier'] !== 'string' || !body['code_verifier']) {
+    return null;
+  }
+  return {
+    code: typeof body['code'] === 'string' ? body['code'] : undefined,
+    code_verifier: body['code_verifier'],
+    redirect_uri:
+      typeof body['redirect_uri'] === 'string'
+        ? body['redirect_uri']
+        : undefined,
+  };
+}
+
+/**
+ * Native (mobile) Discord link via PKCE. As with native sign-in, the in-app
+ * browser cannot replay the HttpOnly state cookie, so the device's PKCE
+ * `code_verifier` (checked by Discord at the token endpoint) replaces the state
+ * cookie, and the allow-listed `redirect_uri` stops the code being redirected
+ * elsewhere. The link is bound solely to the user in the Bearer JWT: the
+ * Authorization header is mandatory (no cookie fallback, so no CSRF surface) and
+ * every failure before the link write fails closed without touching the DB.
+ * Discord codes are single-use, so a replayed code fails the exchange (401).
+ */
+async function handleDiscordLinkNative(
+  event: APIGatewayEvent,
+  body: NativeLinkBody,
+): Promise<APIGatewayProxyResult> {
+  const authHeader =
+    event.headers?.['Authorization'] ?? event.headers?.['authorization'];
+  if (!authHeader?.startsWith('Bearer ')) {
+    return errorResponse(401, 'Authentication required');
+  }
+  const auth = await getAuthenticatedUser(event);
+  if (!auth.ok) return auth.response;
+
+  if (!body.code) {
+    return errorResponse(400, 'Missing authorization code');
+  }
+  if (!body.redirect_uri || !isAllowedNativeRedirectUri(body.redirect_uri)) {
+    LOGGER.warn('Discord native link rejected: redirect_uri not allow-listed');
+    return errorResponse(400, 'Invalid redirect_uri');
+  }
+
+  let discordUser: DiscordUser;
+  try {
+    discordUser = await exchangeCodeForUser(body.code, {
+      codeVerifier: body.code_verifier,
+      redirectUri: body.redirect_uri,
+    });
+  } catch (error) {
+    LOGGER.error(
+      'Discord native link exchange failed',
+      error instanceof Error ? error.message : String(error),
+    );
+    return errorResponse(
+      401,
+      'Discord authentication failed',
+      'exchange_failed',
+    );
+  }
+
+  return withDbClient(async (db) => {
+    // Same core as the web path: the generic 409 messages never name the
+    // account that holds the link (LS-2549).
+    const linked = await linkProviderIdentity(db, auth.user.id, {
+      provider: 'discord',
+      providerAccountId: discordUser.id,
+      providerEmail: discordUser.email,
+      emailVerified: discordUser.verified,
+      providerUsername: discordUser.username,
+      providerAvatar: discordUser.avatar,
+    });
+    if (!linked.ok) {
+      return errorResponse(
+        linked.statusCode,
+        linked.message,
+        linked.statusCode === 409 ? 'link_conflict' : undefined,
+      );
+    }
+    return { statusCode: 200, body: JSON.stringify({ ok: true }) };
+  });
+}
+
 /**
  * POST /oauth/discord/link
  * Links a Discord account to the authenticated user.
@@ -590,10 +693,20 @@ export const handleDiscordAuth = async (
  * tricks a victim into linking the attacker's Discord account. The cookie is
  * also bound to the LS user who started the flow; a callback completed under a
  * different session is rejected before the code is exchanged (LS-7214).
+ *
+ * Also accepts the native (mobile) shape { code, code_verifier, redirect_uri }
+ * authenticated by `Authorization: Bearer` — see {@link handleDiscordLinkNative}.
+ * The presence of `code_verifier` selects that path; everything else below it
+ * is the unchanged web cookie + CSRF + state flow.
  */
 export const handleDiscordLink = async (
   event: APIGatewayEvent,
 ): Promise<APIGatewayProxyResult> => {
+  const nativeBody = peekNativeLinkBody(event.body);
+  if (nativeBody) {
+    return handleDiscordLinkNative(event, nativeBody);
+  }
+
   const csrfError = requireCsrf(event);
   if (csrfError) return csrfError;
 

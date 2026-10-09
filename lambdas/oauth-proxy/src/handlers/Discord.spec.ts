@@ -768,6 +768,261 @@ describe('handleDiscordLink (LS-2549 — no Discord account enumeration)', () =>
   });
 });
 
+describe('handleDiscordLink — native PKCE + Bearer path (LS-10412)', () => {
+  const NATIVE_REDIRECT = 'legacysports://discord-callback';
+  let fetchSpy: jest.SpyInstance;
+
+  function makeNativeEvent(
+    body: Record<string, unknown>,
+    headers: Record<string, string> = { Authorization: 'Bearer good-token' },
+  ): APIGatewayEvent {
+    const event = makeEvent({
+      code: 'native-code',
+      code_verifier: 'pkce-verifier-123',
+      redirect_uri: NATIVE_REDIRECT,
+      ...body,
+    });
+    event.headers = headers;
+    return event;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env['DISCORD_CLIENT_ID'] = 'test-client-id';
+    process.env['DISCORD_REDIRECT_URI'] = 'https://example.com/callback';
+    process.env['DISCORD_NATIVE_REDIRECT_URIS'] = NATIVE_REDIRECT;
+    mockGetAuthenticatedUser.mockResolvedValue({
+      ok: true,
+      user: { id: 77, email: 'bearer@example.com' },
+    });
+    // If the native path ever consulted the cookie flow these would fail it.
+    mockRequireCsrf.mockReturnValue({
+      statusCode: 403,
+      body: JSON.stringify({ error: 'CSRF validation failed' }),
+    });
+    mockVerifyLinkState.mockReturnValue({
+      ok: false,
+      reason: 'invalid_state',
+    });
+    mockGetAuthenticatedUserId.mockResolvedValue(null);
+
+    fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(makeDiscordTokenResponse())
+      .mockResolvedValueOnce(makeDiscordUserResponse());
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  it('links the Discord identity to the Bearer user using PKCE, with no cookie, CSRF or state check', async () => {
+    mockLinkProviderIdentity.mockResolvedValue({ ok: true });
+
+    const result = await handleDiscordLink(makeNativeEvent({}));
+
+    expect(result.statusCode).toBe(200);
+    expect(JSON.parse(result.body)).toEqual({ ok: true });
+    expect(mockLinkProviderIdentity).toHaveBeenCalledWith(
+      expect.anything(),
+      77,
+      expect.objectContaining({
+        provider: 'discord',
+        providerAccountId: 'discord-123',
+      }),
+    );
+    expect(mockRequireCsrf).not.toHaveBeenCalled();
+    expect(mockVerifyLinkState).not.toHaveBeenCalled();
+    expect(mockGetAuthenticatedUserId).not.toHaveBeenCalled();
+    const calls = fetchSpy.mock.calls as [string, RequestInit][];
+    const tokenBody = calls[0][1].body as URLSearchParams;
+    expect(tokenBody.get('code_verifier')).toBe('pkce-verifier-123');
+    expect(tokenBody.get('redirect_uri')).toBe(NATIVE_REDIRECT);
+    expect(result.multiValueHeaders).toBeUndefined();
+  });
+
+  it('rejects a redirect_uri that is not on the allow-list (400) before exchanging the code', async () => {
+    const result = await handleDiscordLink(
+      makeNativeEvent({ redirect_uri: 'evil://attacker-callback' }),
+    );
+
+    expect(result.statusCode).toBe(400);
+    expect(JSON.parse(result.body)).toMatchObject({
+      error: 'Invalid redirect_uri',
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockLinkProviderIdentity).not.toHaveBeenCalled();
+  });
+
+  it('rejects a missing redirect_uri (400)', async () => {
+    const result = await handleDiscordLink(
+      makeNativeEvent({ redirect_uri: undefined }),
+    );
+
+    expect(result.statusCode).toBe(400);
+    expect(JSON.parse(result.body)).toMatchObject({
+      error: 'Invalid redirect_uri',
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects everything when no native redirect URIs are configured', async () => {
+    delete process.env['DISCORD_NATIVE_REDIRECT_URIS'];
+
+    const result = await handleDiscordLink(makeNativeEvent({}));
+
+    expect(result.statusCode).toBe(400);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockLinkProviderIdentity).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when the authorization code is missing', async () => {
+    const result = await handleDiscordLink(
+      makeNativeEvent({ code: undefined }),
+    );
+
+    expect(result.statusCode).toBe(400);
+    expect(JSON.parse(result.body)).toMatchObject({
+      error: 'Missing authorization code',
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockLinkProviderIdentity).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 without a Bearer token and never exchanges the code', async () => {
+    const result = await handleDiscordLink(makeNativeEvent({}, {}));
+
+    expect(result.statusCode).toBe(401);
+    expect(mockGetAuthenticatedUser).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockLinkProviderIdentity).not.toHaveBeenCalled();
+  });
+
+  it('does not fall back to cookie auth: a cookie + CSRF header without Bearer is 401', async () => {
+    const result = await handleDiscordLink(
+      makeNativeEvent(
+        {},
+        {
+          Cookie: 'legacy-sports-internal-jwt=cookie-jwt',
+          'x-csrf-token': 'c',
+        },
+      ),
+    );
+
+    expect(result.statusCode).toBe(401);
+    expect(mockGetAuthenticatedUser).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockLinkProviderIdentity).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 for an invalid or expired Bearer token and never exchanges the code', async () => {
+    mockGetAuthenticatedUser.mockResolvedValue({
+      ok: false,
+      response: {
+        statusCode: 401,
+        body: JSON.stringify({ error: 'Invalid token' }),
+      },
+    });
+
+    const result = await handleDiscordLink(makeNativeEvent({}));
+
+    expect(result.statusCode).toBe(401);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockLinkProviderIdentity).not.toHaveBeenCalled();
+  });
+
+  it('maps an account already linked to another user to a 409 that does not name that user', async () => {
+    mockLinkProviderIdentity.mockResolvedValue({
+      ok: false,
+      statusCode: 409,
+      message: 'Could not link discord account',
+    });
+
+    const result = await handleDiscordLink(makeNativeEvent({}));
+
+    expect(result.statusCode).toBe(409);
+    expect(JSON.parse(result.body)).toEqual({
+      error: 'Could not link discord account',
+      code: 'link_conflict',
+    });
+  });
+
+  it('maps a user who already has a Discord account linked to a 409', async () => {
+    mockLinkProviderIdentity.mockResolvedValue({
+      ok: false,
+      statusCode: 409,
+      message:
+        'A different discord account is already linked — unlink it first',
+    });
+
+    const result = await handleDiscordLink(makeNativeEvent({}));
+
+    expect(result.statusCode).toBe(409);
+    expect(JSON.parse(result.body)).toMatchObject({ code: 'link_conflict' });
+  });
+
+  it('returns 401 exchange_failed and links nothing when Discord rejects the PKCE verifier', async () => {
+    fetchSpy.mockReset();
+    fetchSpy.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 400 }),
+    );
+
+    const result = await handleDiscordLink(
+      makeNativeEvent({ code_verifier: 'wrong-verifier' }),
+    );
+
+    expect(result.statusCode).toBe(401);
+    expect(JSON.parse(result.body)).toMatchObject({ code: 'exchange_failed' });
+    expect(mockLinkProviderIdentity).not.toHaveBeenCalled();
+  });
+
+  it('rejects a replayed authorization code: the second exchange fails and links nothing', async () => {
+    mockLinkProviderIdentity.mockResolvedValue({ ok: true });
+    const first = await handleDiscordLink(makeNativeEvent({}));
+    expect(first.statusCode).toBe(200);
+
+    // Discord invalidates a code after first use.
+    fetchSpy.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 400 }),
+    );
+    const replay = await handleDiscordLink(makeNativeEvent({}));
+
+    expect(replay.statusCode).toBe(401);
+    expect(mockLinkProviderIdentity).toHaveBeenCalledTimes(1);
+  });
+
+  it('links to the Bearer user even if the body claims another user id', async () => {
+    mockLinkProviderIdentity.mockResolvedValue({ ok: true });
+
+    await handleDiscordLink(makeNativeEvent({ userId: 1, user_id: 1 }));
+
+    expect(mockLinkProviderIdentity).toHaveBeenCalledWith(
+      expect.anything(),
+      77,
+      expect.anything(),
+    );
+  });
+
+  it('keeps the web cookie + state path when code_verifier is absent or empty', async () => {
+    mockRequireCsrf.mockReturnValue(null);
+    mockGetAuthenticatedUserId.mockResolvedValue(42);
+    mockVerifyLinkState.mockReturnValue({ ok: true });
+    mockLinkProviderIdentity.mockResolvedValue({ ok: true });
+
+    const result = await handleDiscordLink(
+      makeEvent({ code: 'web-code', state: 's', code_verifier: '' }),
+    );
+
+    expect(result.statusCode).toBe(200);
+    expect(mockVerifyLinkState).toHaveBeenCalledTimes(1);
+    expect(mockGetAuthenticatedUser).not.toHaveBeenCalled();
+    const calls = fetchSpy.mock.calls as [string, RequestInit][];
+    const tokenBody = calls[0][1].body as URLSearchParams;
+    expect(tokenBody.get('code_verifier')).toBeNull();
+    expect(tokenBody.get('redirect_uri')).toBe('https://example.com/callback');
+  });
+});
+
 describe('handleDiscordUnlink', () => {
   const withHeaders = (headers: Record<string, string>): APIGatewayEvent => ({
     ...makeEvent({}),
