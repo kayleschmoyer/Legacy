@@ -293,7 +293,7 @@ List files at a git ref without checkout (git ls-tree).
 
 ### `worktree_merge_main`
 
-Semantic one-shot merge: fetch origin/main → merge it into the current branch → push. Complements worktree_rebase_onto_main for the merge-resolution path AGENTS.md sanctions for PR merge-conflict notices ("merge the base branch ... into your PR head — or rebase"). On conflict, leaves the merge in progress (does not abort) and returns the same structured conflict info worktree_conflict_info provides (conflicted file list + marker locations) — resolve, then worktree_commit + worktree_push, or worktree_run(command: "git merge --abort") to back out. Refuses to operate on the main branch. `dryRun: true` — see that param.
+Semantic one-shot merge: fetch origin/main → merge it into the current branch → push. Complements worktree_rebase_onto_main for the merge-resolution path AGENTS.md sanctions for PR merge-conflict notices ("merge the base branch ... into your PR head — or rebase"). On conflict, leaves the merge in progress (does not abort) and returns the same structured conflict info worktree_conflict_info provides (conflicted file list + marker locations) — resolve, then worktree_commit + worktree_push, or worktree_run(command: "git merge --abort") to back out. Refuses to operate on the main branch. `dryRun: true`/`push: false` — see those params.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
@@ -301,6 +301,7 @@ Semantic one-shot merge: fetch origin/main → merge it into the current branch 
 | `from` | string |  | — | Branch to merge from (default: "main"). |
 | `pushTimeoutMs` | number |  | — | Timeout for git push in milliseconds (default: 120000). |
 | `dryRun` | boolean |  | — | No mutation: report mergeable/conflicted + conflicting files (default: false). |
+| `push` | boolean |  | — | Push the merge (default: true). false: merge only; push later. |
 
 ### `worktree_mv`
 

@@ -22,6 +22,7 @@ interface MergePayload {
   merged?: boolean;
   alreadyUpToDate?: boolean;
   pushed?: boolean;
+  pushSkipped?: boolean;
   pushError?: string;
   message?: string;
   head?: string;
@@ -95,6 +96,47 @@ describe('mergeFromMain', () => {
     expect(payload.merged).toBe(true);
     expect(payload.pushed).toBe(true);
     expect(payload.conflictDetected).toBe(false);
+  });
+
+  it('push: false merges locally and never pushes', () => {
+    let call = 0;
+    jest.mocked(deps.runGit).mockImplementation((args) => {
+      call++;
+      if (call === 1) return 'feature-branch\n';
+      if (args[0] === 'rev-parse' && call === 3) return 'abc123\n';
+      if (args[0] === 'rev-parse') return 'def456\n';
+      return '';
+    });
+    const result = mergeFromMain('/cwd', { ...OPTS, push: false }, deps);
+    expect(result.isError).toBeFalsy();
+    const payload = parsePayload(result.content[0].text);
+    expect(payload.merged).toBe(true);
+    expect(payload.pushed).toBe(false);
+    expect(payload.pushSkipped).toBe(true);
+    expect(payload.head).toBe('def456');
+    expect(deps.runGit).not.toHaveBeenCalledWith(
+      ['push'],
+      '/cwd',
+      expect.anything(),
+    );
+  });
+
+  it('push: true (explicit) behaves like the default and pushes', () => {
+    let call = 0;
+    jest.mocked(deps.runGit).mockImplementation((args) => {
+      call++;
+      if (call === 1) return 'feature-branch\n';
+      if (args[0] === 'rev-parse' && call === 3) return 'abc123\n';
+      if (args[0] === 'rev-parse') return 'def456\n';
+      return '';
+    });
+    const result = mergeFromMain('/cwd', { ...OPTS, push: true }, deps);
+    expect(parsePayload(result.content[0].text).pushed).toBe(true);
+    expect(deps.runGit).toHaveBeenCalledWith(
+      ['push'],
+      '/cwd',
+      expect.anything(),
+    );
   });
 
   it('reports alreadyUpToDate and skips push when head is unchanged', () => {

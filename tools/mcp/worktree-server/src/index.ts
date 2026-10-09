@@ -3080,7 +3080,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         'On conflict, leaves the merge in progress (does not abort) and returns the same structured ' +
         'conflict info worktree_conflict_info provides (conflicted file list + marker locations) — ' +
         'resolve, then worktree_commit + worktree_push, or worktree_run(command: "git merge --abort") to back out. ' +
-        'Refuses to operate on the main branch. `dryRun: true` — see that param.',
+        'Refuses to operate on the main branch. `dryRun: true`/`push: false` — see those params.',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -3102,6 +3102,11 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             type: 'boolean',
             description:
               'No mutation: report mergeable/conflicted + conflicting files (default: false).',
+          },
+          push: {
+            type: 'boolean',
+            description:
+              'Push the merge (default: true). false: merge only; push later.',
           },
         },
         required: [],
@@ -6723,11 +6728,13 @@ const handleCallTool = async (
         from: fromRaw,
         pushTimeoutMs: pushTimeoutRaw,
         dryRun,
+        push,
       } = args as {
         worktree?: string;
         from?: string;
         pushTimeoutMs?: number;
         dryRun?: boolean;
+        push?: boolean;
       };
 
       const from = fromRaw ?? 'main';
@@ -6748,7 +6755,12 @@ const handleCallTool = async (
       try {
         return mergeFromMain(
           cwd,
-          { from, pushTimeoutMs, dryRun: dryRun === true },
+          {
+            from,
+            pushTimeoutMs,
+            dryRun: dryRun === true,
+            push: push !== false,
+          },
           {
             runGit,
             runShell: run,

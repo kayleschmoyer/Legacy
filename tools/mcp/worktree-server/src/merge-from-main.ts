@@ -15,6 +15,12 @@ export interface MergeFromMainOpts {
    * push) — safe to call from a clean or dirty worktree at any time.
    */
   dryRun?: boolean;
+  /**
+   * Push the merge commit after a successful merge (default true). `false`
+   * merges locally and leaves the push to `worktree_push`, so the merge can be
+   * validated (tests/lint/typecheck) before it is published.
+   */
+  push?: boolean;
 }
 
 export interface MergeDeps {
@@ -63,7 +69,7 @@ export function mergeFromMain(
   opts: MergeFromMainOpts,
   deps: MergeDeps,
 ): ToolResult {
-  const { from, pushTimeoutMs, dryRun } = opts;
+  const { from, pushTimeoutMs, dryRun, push = true } = opts;
   const { runGit, runShell, nonInteractiveEnv, ensureSufficientDepth } = deps;
   const log: string[] = [`[cwd: ${cwd}]`];
 
@@ -201,6 +207,28 @@ export function mergeFromMain(
             pushed: false,
             head: afterSha,
             from: `origin/${from}`,
+            log: log.join('\n'),
+          }),
+        },
+      ],
+    };
+  }
+
+  // push: false — leave the merge commit local for validation before publishing.
+  if (!push) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            conflictDetected: false,
+            merged: true,
+            pushed: false,
+            pushSkipped: true,
+            head: afterSha,
+            from: `origin/${from}`,
+            message:
+              'Merged locally; push skipped (push: false). Validate, then publish with worktree_push.',
             log: log.join('\n'),
           }),
         },
