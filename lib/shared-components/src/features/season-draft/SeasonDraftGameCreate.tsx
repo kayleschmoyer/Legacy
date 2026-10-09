@@ -84,7 +84,11 @@ export const SeasonDraftGameCreate: React.FC<SeasonDraftGameCreateProps> = ({
   }, [playerType]);
 
   const stats = playerType === 'pitcher' ? PITCHER_STATS : HITTER_STATS;
+  const isMostTeams = gameMode === 'most_teams';
   const currentStat = stats.find((s) => s.key === statKey) ?? stats[0];
+  // Most Teams scores distinct teams, not the pool's stat — mirror the game screen.
+  const previewStatLabel = isMostTeams ? 'TM' : currentStat.label;
+  const previewStatName = isMostTeams ? 'Teams' : currentStat.name;
   const nameError = getSeasonDraftNameError(name);
   const nameCharsLeft = SEASON_DRAFT_NAME_MAX_LENGTH - name.length;
 
@@ -98,7 +102,7 @@ export const SeasonDraftGameCreate: React.FC<SeasonDraftGameCreateProps> = ({
       const result = await createGame({
         variables: {
           name: name.trim(),
-          statKey,
+          statKey: isMostTeams ? 'teams_played' : statKey,
           gameMode,
           playerType,
           sport: sport === 'football' ? Sport.Football : Sport.Baseball,
@@ -210,20 +214,26 @@ export const SeasonDraftGameCreate: React.FC<SeasonDraftGameCreateProps> = ({
                   justifyContent="center"
                 >
                   <Text
+                    testID="season-draft-preview-stat-label"
                     fontSize={20}
                     fontWeight="800"
                     color="$brandGoldLight"
                     letterSpacing={1}
                   >
-                    {currentStat.label}
+                    {previewStatLabel}
                   </Text>
                 </Stack>
                 <YStack flex={1}>
                   <Text color="$textMuted" fontSize={11} letterSpacing={1.4}>
                     SCORE STAT
                   </Text>
-                  <Text color="$color" fontWeight="700" fontSize={16}>
-                    {currentStat.name}
+                  <Text
+                    testID="season-draft-preview-stat-name"
+                    color="$color"
+                    fontWeight="700"
+                    fontSize={16}
+                  >
+                    {previewStatName}
                   </Text>
                 </YStack>
               </XStack>

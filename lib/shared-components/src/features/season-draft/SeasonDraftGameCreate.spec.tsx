@@ -171,3 +171,45 @@ describe('SeasonDraftGameCreate — game name limits (LS-10675)', () => {
     expect(mockLoggerError).not.toHaveBeenCalled();
   });
 });
+
+describe('SeasonDraftGameCreate — Most Teams preview (LS-10497)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const previewStat = () => [
+    screen.getByTestId('season-draft-preview-stat-label'),
+    screen.getByTestId('season-draft-preview-stat-name'),
+  ];
+
+  it.each([
+    ['Hitters', 'HR', 'Home Runs'],
+    ['Pitchers', 'W', 'Wins'],
+  ])('shows Teams instead of the %s stat in Most Teams mode', (pool, label) => {
+    render(<SeasonDraftGameCreate onCreated={jest.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: pool }));
+    expect(previewStat()[0]).toHaveTextContent(label);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Most Teams' }));
+    const [stat, name] = previewStat();
+    expect(stat).toHaveTextContent('TM');
+    expect(name).toHaveTextContent('Teams');
+  });
+
+  it('submits statKey teams_played in Most Teams mode', async () => {
+    mockCreateGame.mockResolvedValueOnce({
+      data: { createSeasonDraftGame: 9 },
+    });
+    render(<SeasonDraftGameCreate onCreated={jest.fn()} />);
+    typeName('Teams Race');
+    fireEvent.click(screen.getByRole('button', { name: 'Most Teams' }));
+    fireEvent.click(createButton());
+
+    await waitFor(() => expect(mockCreateGame).toHaveBeenCalled());
+    const [[{ variables }]] = mockCreateGame.mock.calls as [
+      [{ variables: { statKey: string; gameMode: string } }],
+    ];
+    expect(variables.statKey).toBe('teams_played');
+    expect(variables.gameMode).toBe('most_teams');
+  });
+});
