@@ -17,6 +17,7 @@ query GetPlayerCareerArc($playerId: Int!) {
     season
     team
     games
+    plateAppearances
     hits
     atBats
     homeRuns

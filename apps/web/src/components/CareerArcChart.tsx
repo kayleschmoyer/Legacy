@@ -46,6 +46,8 @@ interface ChartDataPoint {
   awards: string | null;
   isPeak: boolean;
   games: number;
+  /** Sample size: plate appearances (batting) or innings pitched (pitching) */
+  sample: number;
 }
 
 interface MilestoneMarker {
@@ -147,6 +149,7 @@ function buildBattingData(seasons: BattingSeason[]): ChartDataPoint[] {
         awards: s.awardSummary ?? null,
         isPeak: false,
         games: s.games ?? 0,
+        sample: s.plateAppearances ?? 0,
       })),
   ).sort((a, b) => a.season - b.season);
 }
@@ -169,15 +172,52 @@ function buildPitchingData(seasons: PitchingSeason[]): ChartDataPoint[] {
         awards: s.awardSummary ?? null,
         isPeak: false,
         games: s.games ?? 0,
+        sample: s.inningsPitched ?? 0,
       })),
   ).sort((a, b) => a.season - b.season);
 }
 
-function markPeakSeasons(data: ChartDataPoint[], topN = 3): ChartDataPoint[] {
+/**
+ * Minimum sample (plate appearances / innings pitched) for a season to count
+ * toward the Peak and Career Avg summaries. A games-played threshold excludes
+ * every starting pitcher and every pitcher's batting arc (LS-10496).
+ */
+const MIN_QUALIFYING_SAMPLE: Record<CareerArcMode, number> = {
+  batting: 300,
+  pitching: 100,
+};
+
+function qualifyingSeasons(
+  data: ChartDataPoint[],
+  mode: CareerArcMode,
+): ChartDataPoint[] {
+  return data.filter((d) => d.sample >= MIN_QUALIFYING_SAMPLE[mode]);
+}
+
+/** Sample-weighted career average over qualifying seasons, or null if none. */
+function summarizeCareerArc(
+  data: ChartDataPoint[],
+  mode: CareerArcMode,
+): { avgValue: number; peakValue: number } | null {
+  const qualified = qualifyingSeasons(data, mode);
+  if (qualified.length === 0) return null;
+  const totalSample = qualified.reduce((sum, d) => sum + d.sample, 0);
+  return {
+    avgValue:
+      qualified.reduce((sum, d) => sum + d.value * d.sample, 0) / totalSample,
+    peakValue: Math.max(...qualified.map((d) => d.value)),
+  };
+}
+
+function markPeakSeasons(
+  data: ChartDataPoint[],
+  mode: CareerArcMode,
+  topN = 3,
+): ChartDataPoint[] {
   if (data.length === 0) return data;
-  const sorted = [...data]
-    .filter((d) => d.games >= 50)
-    .sort((a, b) => b.value - a.value);
+  const sorted = qualifyingSeasons(data, mode).sort(
+    (a, b) => b.value - a.value,
+  );
   const peakSeasons = new Set(sorted.slice(0, topN).map((d) => d.season));
   return data.map((d) => ({ ...d, isPeak: peakSeasons.has(d.season) }));
 }
@@ -291,20 +331,14 @@ export function CareerArcChart({
       mode === 'batting'
         ? buildBattingData(battingSeasons ?? [])
         : buildPitchingData(pitchingSeasons ?? []);
-    return markPeakSeasons(raw);
+    return markPeakSeasons(raw, mode);
   }, [battingSeasons, pitchingSeasons, mode]);
 
   const milestones = useMemo(() => getAwardMarkers(data), [data]);
 
-  const { avgValue, peakValue } = useMemo(() => {
-    if (data.length === 0) return { avgValue: 0, peakValue: 0 };
-    const qualifiedSeasons = data.filter((d) => d.games >= 50);
-    const vals = qualifiedSeasons.map((d) => d.value);
-    const avg =
-      vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
-    const peak = vals.length > 0 ? Math.max(...vals) : 0;
-    return { avgValue: avg, peakValue: peak };
-  }, [data]);
+  const summary = useMemo(() => summarizeCareerArc(data, mode), [data, mode]);
+  const avgValue = summary?.avgValue ?? 0;
+  const peakValue = summary?.peakValue ?? 0;
 
   // Detect team changes for visual indicators
   const teamChanges = useMemo(() => {
@@ -337,7 +371,10 @@ export function CareerArcChart({
   const gradientId = `careerArcGradient-${mode}`;
   const accentColor = mode === 'batting' ? BRAND_GOLD_LIGHT : BRAND_SEAM_RED;
 
-  const chartAriaLabel = `Career arc: ${mode} performance across ${data.length} season${data.length !== 1 ? 's' : ''}. Peak ${metricLabel}: ${mode === 'batting' ? peakValue.toFixed(3) : peakValue}. Career average ${metricLabel}: ${mode === 'batting' ? avgValue.toFixed(3) : avgValue.toFixed(0)}.`;
+  const formatMetric = (v: number) =>
+    mode === 'batting' ? v.toFixed(3) : v.toFixed(0);
+
+  const chartAriaLabel = `Career arc: ${mode} performance across ${data.length} season${data.length !== 1 ? 's' : ''}. ${summary ? `Peak ${metricLabel}: ${formatMetric(peakValue)}. Career average ${metricLabel}: ${formatMetric(avgValue)}.` : 'No qualifying seasons for peak or average.'}`;
 
   return (
     <YStack gap="$3" role="region" aria-label={chartAriaLabel}>
@@ -349,7 +386,7 @@ export function CareerArcChart({
               Peak {metricLabel}
             </Text>
             <Text fontSize="$5" fontWeight="700" color={accentColor}>
-              {mode === 'batting' ? peakValue.toFixed(3) : peakValue}
+              {summary ? formatMetric(peakValue) : '—'}
             </Text>
           </YStack>
           <YStack>
@@ -357,9 +394,14 @@ export function CareerArcChart({
               Career Avg {metricLabel}
             </Text>
             <Text fontSize="$5" fontWeight="700" color={TEXT_MUTED}>
-              {mode === 'batting' ? avgValue.toFixed(3) : avgValue.toFixed(0)}
+              {summary ? formatMetric(avgValue) : '—'}
             </Text>
           </YStack>
+          {!summary && (
+            <Text fontSize="$2" color={TEXT_MUTED}>
+              No qualifying seasons
+            </Text>
+          )}
           <YStack>
             <Text fontSize="$2" color={TEXT_MUTED} fontWeight="600">
               Seasons
@@ -433,13 +475,13 @@ export function CareerArcChart({
             />
 
             {/* Career average reference line */}
-            {!compact && avgValue > 0 && (
+            {!compact && summary && (
               <ReferenceLine
                 y={avgValue}
                 stroke={withAlpha(TEXT_MUTED, 0.4)}
                 strokeDasharray="6 4"
                 label={{
-                  value: `Avg ${mode === 'batting' ? avgValue.toFixed(3) : avgValue.toFixed(0)}`,
+                  value: `Avg ${formatMetric(avgValue)}`,
                   fill: TEXT_MUTED,
                   fontSize: 10,
                   position: 'right',

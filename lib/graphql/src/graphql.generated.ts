@@ -9497,6 +9497,7 @@ export type GetPlayerCareerArcQuery = {
     season?: number | null;
     team?: string | null;
     games?: number | null;
+    plateAppearances?: number | null;
     hits?: number | null;
     atBats?: number | null;
     homeRuns?: number | null;
@@ -23885,6 +23886,7 @@ export const GetPlayerCareerArc = gql`
       season
       team
       games
+      plateAppearances
       hits
       atBats
       homeRuns

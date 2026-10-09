@@ -61,6 +61,7 @@ function makeBattingSeason(
   overrides: Partial<{
     season: number;
     games: number;
+    plateAppearances: number;
     onBasePlusSlugging: number;
     homeRuns: number;
     team: string;
@@ -70,6 +71,7 @@ function makeBattingSeason(
   return {
     season: 2020,
     games: 60,
+    plateAppearances: 500,
     onBasePlusSlugging: 0.9,
     homeRuns: 10,
     team: 'NYY',
@@ -82,6 +84,7 @@ function makePitchingSeason(
   overrides: Partial<{
     season: number;
     games: number;
+    inningsPitched: number;
     earnedRunAveragePlus: number;
     strikeouts: number;
     team: string;
@@ -91,6 +94,7 @@ function makePitchingSeason(
   return {
     season: 2020,
     games: 12,
+    inningsPitched: 150,
     earnedRunAveragePlus: 130,
     strikeouts: 90,
     team: 'LAD',
@@ -282,6 +286,111 @@ describe('CareerArcChart — accessibility (LS-6968)', () => {
       expect(rows).toHaveLength(3);
       expect(within(table).getAllByText('CHC').length).toBeGreaterThan(0);
       expect(within(table).getAllByText('NYM').length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('summary qualifier (LS-10496)', () => {
+    const summaryOf = (label: RegExp) =>
+      screen.getByText(label).nextElementSibling?.textContent;
+
+    it('batter: peak is the best qualifying season and average is PA-weighted', () => {
+      render(
+        <CareerArcChart
+          battingSeasons={[
+            makeBattingSeason({
+              season: 2019,
+              plateAppearances: 600,
+              onBasePlusSlugging: 0.8,
+            }),
+            makeBattingSeason({
+              season: 2020,
+              plateAppearances: 200,
+              onBasePlusSlugging: 1.2,
+            }),
+            makeBattingSeason({
+              season: 2021,
+              plateAppearances: 300,
+              onBasePlusSlugging: 1.0,
+            }),
+          ]}
+          pitchingSeasons={null}
+          mode="batting"
+        />,
+      );
+
+      // 200-PA season is excluded; (0.8*600 + 1.0*300) / 900 = 0.867
+      expect(summaryOf(/^Peak OPS/)).toBe('1.000');
+      expect(summaryOf(/^Career Avg OPS/)).toBe('0.867');
+    });
+
+    it('starter: seasons well under 50 games still qualify via innings pitched', () => {
+      render(
+        <CareerArcChart
+          battingSeasons={null}
+          pitchingSeasons={[
+            makePitchingSeason({
+              season: 1981,
+              games: 21,
+              inningsPitched: 149,
+              earnedRunAveragePlus: 195,
+            }),
+            makePitchingSeason({
+              season: 1982,
+              games: 35,
+              inningsPitched: 250,
+              earnedRunAveragePlus: 120,
+            }),
+          ]}
+          mode="pitching"
+        />,
+      );
+
+      expect(summaryOf(/^Peak ERA\+/)).toBe('195');
+      // (195*149 + 120*250) / 399 = 148
+      expect(summaryOf(/^Career Avg ERA\+/)).toBe('148');
+    });
+
+    it('reliever: a high-game, low-IP season does not qualify', () => {
+      render(
+        <CareerArcChart
+          battingSeasons={null}
+          pitchingSeasons={[
+            makePitchingSeason({
+              season: 2018,
+              games: 70,
+              inningsPitched: 65,
+              earnedRunAveragePlus: 300,
+            }),
+            makePitchingSeason({
+              season: 2019,
+              games: 60,
+              inningsPitched: 100,
+              earnedRunAveragePlus: 140,
+            }),
+          ]}
+          mode="pitching"
+        />,
+      );
+
+      expect(summaryOf(/^Peak ERA\+/)).toBe('140');
+      expect(summaryOf(/^Career Avg ERA\+/)).toBe('140');
+    });
+
+    it('shows "—" and an empty-state note instead of 0 / 0.000 when nothing qualifies', () => {
+      render(
+        <CareerArcChart
+          battingSeasons={[
+            makeBattingSeason({ games: 30, plateAppearances: 40 }),
+          ]}
+          pitchingSeasons={null}
+          mode="batting"
+        />,
+      );
+
+      expect(summaryOf(/^Peak OPS/)).toBe('—');
+      expect(summaryOf(/^Career Avg OPS/)).toBe('—');
+      expect(screen.getByText(/no qualifying seasons/i)).toBeInTheDocument();
+      expect(screen.queryByText('0.000')).toBeNull();
     });
   });
 
