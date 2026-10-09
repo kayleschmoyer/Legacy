@@ -18,6 +18,7 @@ import { useRouter } from 'expo-router';
 import { LOGGER } from '@legacy-sports/logging';
 import { PermissionStatus } from 'expo-modules-core';
 import { useRegisterDeviceTokenMutation } from '@legacy-sports/graphql';
+import { ANDROID_NOTIFICATION_CHANNELS } from '@legacy-sports/utils';
 import { isPhysicalDevice } from '../../../common/utilities/DeviceUtils';
 import { getEasProjectId } from '../getEasProjectId';
 import {
@@ -103,12 +104,17 @@ export function usePushNotifications(userId: number | null | undefined) {
 
       // Additional Android channel setup
       if (Platform.OS === 'android') {
-        await setNotificationChannelAsync('default', {
-          name: 'Default',
-          importance: AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: '#FF231F7C',
-        });
+        // One channel per shared definition so users can mute or re-prioritize
+        // categories in OS settings (LS-7650). The server picks the channel via
+        // the same list (getAndroidChannelId).
+        for (const channel of ANDROID_NOTIFICATION_CHANNELS) {
+          await setNotificationChannelAsync(channel.id, {
+            name: channel.name,
+            importance: AndroidImportance[channel.importance],
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#FF231F7C',
+          });
+        }
       }
 
       // The Expo projectId is required to mint a valid push token on EAS builds

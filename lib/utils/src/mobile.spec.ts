@@ -1,9 +1,11 @@
 import {
+  ANDROID_NOTIFICATION_CHANNELS,
   cleanDescription,
   DEFAULT_BASEBALL_ROSTER_POSITIONS,
   DEFAULT_FOOTBALL_ROSTER_POSITIONS,
   extractPlayerNameFromDescription,
   formatDraftDate,
+  getAndroidChannelId,
   getSeasonDraftNameError,
   SEASON_DRAFT_NAME_MAX_LENGTH,
   stripDiacritics,
@@ -81,5 +83,12 @@ describe('mobile entry point (LS-10675)', () => {
     expect(typeof getSeasonDraftNameError).toBe('function');
     expect(getSeasonDraftNameError('HR Challenge')).toBeNull();
     expect(SEASON_DRAFT_NAME_MAX_LENGTH).toBe(60);
+  });
+});
+
+describe('mobile entry point Android channels (LS-7650)', () => {
+  it('re-exports the shared Android channel list and resolver', () => {
+    expect(ANDROID_NOTIFICATION_CHANNELS.length).toBeGreaterThan(1);
+    expect(getAndroidChannelId('TRADE_OFFER')).toBe('league-activity');
   });
 });

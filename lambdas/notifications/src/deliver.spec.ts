@@ -362,7 +362,24 @@ describe('deliverNotification', () => {
           title: 'Matchup Started',
           body: 'Your matchup has started!',
           sound: 'default',
+          channelId: 'default',
         }),
+      ]);
+    });
+
+    it.each([
+      ['DRAFT_ON_THE_CLOCK', 'drafts'],
+      ['TRADE_OFFER', 'league-activity'],
+      ['SOMETHING_UNMAPPED', 'default'],
+    ])('sets channelId for %s -> %s', async (notificationType, channelId) => {
+      mockGetUserNotificationPreferences.mockResolvedValue(null);
+      mockGetUserDeviceTokens.mockResolvedValue([makeDeviceToken()]);
+      mockSendPushNotificationsAsync.mockResolvedValue([{ status: 'ok' }]);
+
+      await deliverNotification(makeEvent({ notificationType }));
+
+      expect(mockSendPushNotificationsAsync).toHaveBeenCalledWith([
+        expect.objectContaining({ channelId }),
       ]);
     });
 

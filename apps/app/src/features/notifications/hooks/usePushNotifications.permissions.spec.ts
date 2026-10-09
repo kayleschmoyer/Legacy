@@ -1,6 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { ANDROID_NOTIFICATION_CHANNELS } from '@legacy-sports/utils';
 import { usePushNotifications } from './usePushNotifications';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
@@ -46,7 +47,7 @@ jest.mock('expo-notifications', () => ({
     mockSetNotificationChannelAsync(channel, config),
   getExpoPushTokenAsync: (options?: unknown) =>
     mockGetExpoPushTokenAsync(options),
-  AndroidImportance: { MAX: 5 },
+  AndroidImportance: { MAX: 5, HIGH: 4, DEFAULT: 3 },
   PermissionStatus: { GRANTED: 'granted', DENIED: 'denied' },
 }));
 
@@ -136,14 +137,23 @@ describe('usePushNotifications — permission prompt', () => {
 });
 
 describe('usePushNotifications — Android channel setup', () => {
-  it('creates the default Android notification channel with MAX importance before registering', async () => {
+  it('registers one Android channel per shared definition before registering the token', async () => {
     renderHook(() => usePushNotifications(1));
 
     await waitFor(() =>
-      expect(mockSetNotificationChannelAsync).toHaveBeenCalledWith(
-        'default',
-        expect.objectContaining({ name: 'Default', importance: 5 }),
+      expect(mockSetNotificationChannelAsync).toHaveBeenCalledTimes(
+        ANDROID_NOTIFICATION_CHANNELS.length,
       ),
+    );
+    for (const channel of ANDROID_NOTIFICATION_CHANNELS) {
+      expect(mockSetNotificationChannelAsync).toHaveBeenCalledWith(
+        channel.id,
+        expect.objectContaining({ name: channel.name }),
+      );
+    }
+    expect(mockSetNotificationChannelAsync).toHaveBeenCalledWith(
+      'default',
+      expect.objectContaining({ name: 'General', importance: 5 }),
     );
     await waitFor(() => expect(mockRegisterDeviceToken).toHaveBeenCalled());
   });

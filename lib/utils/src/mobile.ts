@@ -25,6 +25,9 @@ export * from './lib/help-content';
 // Invite-code input normalizer used by shared-components' join screens
 // (LS-10652); missing here it is `undefined` on device.
 export * from './lib/invite-code';
+// Android channel ids/definitions consumed by usePushNotifications (LS-7650);
+// missing here they are `undefined` on device.
+export * from './lib/android-notification-channels';
 export * from './lib/notification-types';
 // Pure, Hermes-safe percentage rounding consumed by the mobile matchup
 // win-probability panel. Metro resolves '@legacy-sports/utils' to this file

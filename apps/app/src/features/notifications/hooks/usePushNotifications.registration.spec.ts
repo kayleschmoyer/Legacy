@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ANDROID_NOTIFICATION_CHANNELS } from '@legacy-sports/utils';
 
 import { usePushNotifications } from './usePushNotifications';
 
@@ -51,7 +52,7 @@ jest.mock('expo-notifications', () => ({
     mockSetNotificationChannelAsync(...args),
   getExpoPushTokenAsync: (options?: unknown) =>
     mockGetExpoPushTokenAsync(options),
-  AndroidImportance: { MAX: 5 },
+  AndroidImportance: { MAX: 5, HIGH: 4, DEFAULT: 3 },
   PermissionStatus: { GRANTED: 'granted', DENIED: 'denied' },
 }));
 
@@ -164,17 +165,22 @@ describe('usePushNotifications — token registration', () => {
     expect(mockLoggerError).not.toHaveBeenCalled();
   });
 
-  it('sets up the default notification channel on Android only', async () => {
+  it('sets up the notification channels on Android only', async () => {
     mockPlatformOS = 'android';
     mockExtra = { eas: { projectId: 'proj-9999' } };
 
     const android = renderHook(() => usePushNotifications(1));
     await waitFor(() => expect(mockRegisterDeviceToken).toHaveBeenCalled());
-    expect(mockSetNotificationChannelAsync).toHaveBeenCalledTimes(1);
-    expect(mockSetNotificationChannelAsync).toHaveBeenCalledWith(
-      'default',
-      expect.anything(),
+    // One channel per shared definition (LS-7650), 'default' among them.
+    expect(mockSetNotificationChannelAsync).toHaveBeenCalledTimes(
+      ANDROID_NOTIFICATION_CHANNELS.length,
     );
+    for (const channel of ANDROID_NOTIFICATION_CHANNELS) {
+      expect(mockSetNotificationChannelAsync).toHaveBeenCalledWith(
+        channel.id,
+        expect.anything(),
+      );
+    }
     android.unmount();
 
     jest.clearAllMocks();

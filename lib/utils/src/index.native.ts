@@ -12,6 +12,9 @@ export * from './lib/DbOptions.native';
 export * from './lib/format-draft-date';
 export * from './lib/help-content';
 export * from './lib/invite-code';
+// Android channel ids/definitions consumed by usePushNotifications (LS-7650);
+// missing here they are `undefined` on device.
+export * from './lib/android-notification-channels';
 export * from './lib/notification-types';
 export * from './lib/percentage';
 export * from './lib/sport-defaults';

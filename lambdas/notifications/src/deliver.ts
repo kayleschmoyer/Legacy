@@ -3,6 +3,7 @@ import webpush from 'web-push';
 import { LOGGER } from '@legacy-sports/logging';
 import { createNotificationService as createWsNotificationService } from '@legacy-sports/aws-utils';
 import { createDatabaseService } from '@legacy-sports/db-client';
+import { getAndroidChannelId } from '@legacy-sports/utils';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import type { NotificationEvent, SendResult } from './types';
 
@@ -103,6 +104,8 @@ export async function deliverNotification(
       body,
       data: { ...data, notificationType },
       sound: 'default',
+      // Expo ignores channelId for iOS tokens, so no per-platform branching.
+      channelId: getAndroidChannelId(notificationType),
     });
   }
 

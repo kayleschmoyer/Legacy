@@ -21,6 +21,7 @@ export * from './lib/league-dues';
 export * from './lib/league-utils';
 export * from './lib/lineup-optimizer';
 export * from './lib/notification-copy';
+export * from './lib/android-notification-channels';
 export * from './lib/notification-types';
 export * from './lib/percentage';
 export * from './lib/sanitize-name';
