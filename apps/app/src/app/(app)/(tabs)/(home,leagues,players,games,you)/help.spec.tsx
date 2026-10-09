@@ -44,6 +44,16 @@ jest.mock('../../../../features/bug-report/BugReportModal', () => ({
   },
 }));
 
+jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn() }) }));
+
+jest.mock('@legacy-sports/shared-components', () => ({
+  OnboardingTutorial: ({ onClose }: { onClose: () => void }) => {
+    const { Text } =
+      jest.requireActual<typeof import('react-native')>('react-native');
+    return <Text onPress={onClose}>tutorial-open</Text>;
+  },
+}));
+
 jest.mock('tamagui', () => {
   const {
     View,
@@ -64,6 +74,7 @@ jest.mock('tamagui', () => {
     H1: passthrough(RNText),
     H3: passthrough(RNText),
     Text: passthrough(RNText),
+    Button: passthrough(RNText),
     Separator: () => <View />,
     XStack: passthrough(View),
     YStack: passthrough(View),
@@ -188,5 +199,18 @@ describe('HelpScreen — Suggest a Feature action routing (LS-9247)', () => {
 
     fireEvent.press(screen.getByText('Report a Bug'));
     expect(mockReportKind).toHaveBeenLastCalledWith('bug');
+  });
+});
+
+describe('HelpScreen — Launch Tutorial (LS-10384)', () => {
+  it('opens the shared tutorial from the button and closes it again', () => {
+    render(<HelpScreen />);
+    expect(screen.queryByText('tutorial-open')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('help-launch-tutorial'));
+    expect(screen.getByText('tutorial-open')).toBeTruthy();
+
+    fireEvent.press(screen.getByText('tutorial-open'));
+    expect(screen.queryByText('tutorial-open')).toBeNull();
   });
 });

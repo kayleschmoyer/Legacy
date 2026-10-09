@@ -8,7 +8,9 @@ import {
 } from '@legacy-sports/utils';
 import React, { useState } from 'react';
 import { Linking, ScrollView } from 'react-native';
-import { H1, H3, Separator, Text, XStack, YStack } from 'tamagui';
+import { useRouter } from 'expo-router';
+import { Button, H1, H3, Separator, Text, XStack, YStack } from 'tamagui';
+import { OnboardingTutorial } from '@legacy-sports/shared-components';
 import { brand } from '@legacy-sports/design-tokens';
 import { config } from '@legacy-sports/app-config/native';
 import BugReportModal, {
@@ -69,9 +71,21 @@ function FaqItem({ question, answer }: FaqItemProps) {
 
 export default function HelpScreen(): React.JSX.Element {
   const [reportKind, setReportKind] = useState<ReportKind | null>(null);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  const router = useRouter();
 
   return (
     <>
+      {/* Replay only: closing never touches the completion flag (LS-10384). */}
+      {tutorialOpen && (
+        <OnboardingTutorial
+          onClose={() => setTutorialOpen(false)}
+          onNavigate={(href) => {
+            setTutorialOpen(false);
+            router.push(href);
+          }}
+        />
+      )}
       <BugReportModal
         visible={reportKind !== null}
         kind={reportKind ?? 'bug'}
@@ -91,6 +105,27 @@ export default function HelpScreen(): React.JSX.Element {
               Find answers to common questions and learn how to get the most out
               of Legacy Sports.
             </Text>
+          </YStack>
+
+          {/* Launch Tutorial */}
+          <YStack
+            borderRadius="$6"
+            borderWidth={1}
+            borderColor="$borderColor"
+            padding="$5"
+            gap="$3"
+          >
+            <H3 color="$color">Take the Tutorial</H3>
+            <Text color="$colorPress" lineHeight={22}>
+              Runs in under 2 minutes. Skip or resume any time.
+            </Text>
+            <Button
+              testID="help-launch-tutorial"
+              backgroundColor={brand.gold}
+              onPress={() => setTutorialOpen(true)}
+            >
+              Launch Tutorial
+            </Button>
           </YStack>
 
           {/* FAQ */}
