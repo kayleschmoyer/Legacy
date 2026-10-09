@@ -24,7 +24,7 @@ import {
   PREMIUM_FEATURES,
 } from './constants';
 import { useStripePrices } from './useStripePrices';
-import { useIAP } from './useIAP';
+import { IAP_PRODUCTS, useIAP } from './useIAP';
 import { useGooglePlayBilling } from './useGooglePlayBilling';
 import { StepUpModal } from './StepUpModal';
 import { useCurrentUserInfo } from '../../common/auth/AuthHooks';
@@ -234,6 +234,7 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
   // tap (or a double-tap on the iOS Alert's "Continue") can slip in before the
   // Upgrade button is disabled. This ref is a synchronous re-entrancy lock.
   const checkoutSubmittingRef = useRef(false);
+  const purchaseSubmittingRef = useRef(false);
 
   const isPremiumRef = useRef(isPremium);
   isPremiumRef.current = isPremium;
@@ -312,6 +313,30 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
     }
   }, [restoreError, clearRestoreError]);
 
+  // iOS purchases go through StoreKit (App Store Guideline 3.1.1). Like restore,
+  // the outcome lands asynchronously in the shared useIAP state, so track that a
+  // purchase was started here and report it from effects.
+  const purchaseInitiated = useRef(false);
+
+  useEffect(() => {
+    if (iapRestore.isSubscribed && purchaseInitiated.current) {
+      purchaseInitiated.current = false;
+      void refetch();
+      Alert.alert(
+        'Upgrade Complete',
+        'Welcome to Premium! Your subscription is now active.',
+      );
+    }
+  }, [iapRestore.isSubscribed, refetch]);
+
+  useEffect(() => {
+    if (iapRestore.error && purchaseInitiated.current) {
+      purchaseInitiated.current = false;
+      Alert.alert('Purchase Failed', iapRestore.error);
+      iapRestore.clearError();
+    }
+  }, [iapRestore]);
+
   const {
     monthlyPriceDisplay,
     annualPriceDisplay,
@@ -333,33 +358,45 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
   // The selectedPriceId guard in handleUpgrade handles the case where price
   // IDs are genuinely unavailable.
   const isLoading = subLoading || checkoutLoading || portalLoading;
+  // useIAP's `loading` covers an in-flight StoreKit purchase on iOS.
+  const iapPurchasing = Platform.OS === 'ios' && iapRestore.loading;
+
+  const handleIapPurchase = async () => {
+    // `loading` only flips after useIAP re-renders, so lock synchronously
+    // against a second tap starting a second StoreKit purchase.
+    if (purchaseSubmittingRef.current) return;
+    purchaseSubmittingRef.current = true;
+    iapRestore.clearError();
+    purchaseInitiated.current = true;
+    try {
+      await iapRestore.purchase(
+        billingCycle === 'annual' ? IAP_PRODUCTS.ANNUAL : IAP_PRODUCTS.MONTHLY,
+      );
+    } finally {
+      purchaseSubmittingRef.current = false;
+    }
+  };
 
   const handleUpgradeAction = async () => {
-    if (!selectedPriceId) {
-      Alert.alert(
-        'Subscription unavailable',
-        'We could not load the selected subscription price yet. Please try again in a moment.',
-      );
-      return;
-    }
-
-    // iOS: Platform-aware purchase flow.
+    // iOS: digital subscriptions must be sold through StoreKit, never Stripe web
+    // checkout (App Store Guideline 3.1.1), so no Stripe price is needed here.
     if (Platform.OS === 'ios') {
       // The Upgrade card renders from a cache-first `isPremium`, which can lag
-      // the server by a moment. A user who is already Premium must not get the
-      // "continuing to our website" alert, so send them to manage-subscription.
+      // the server by a moment. A user who is already Premium must not start a
+      // second purchase, so send them to manage-subscription (LS-7420).
       // Read via a ref: the step-up gate can defer this callback past a render.
       if (isPremiumRef.current) {
         await handleManageSubscriptionAction();
         return;
       }
+      await handleIapPurchase();
+      return;
+    }
+
+    if (!selectedPriceId) {
       Alert.alert(
-        'Subscribe via App Store',
-        "In-App Purchase through the App Store is coming soon. For now, you'll be taken to our website to complete your subscription.",
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Continue', onPress: () => void handleStripeCheckout() },
-        ],
+        'Subscription unavailable',
+        'We could not load the selected subscription price yet. Please try again in a moment.',
       );
       return;
     }
@@ -477,6 +514,7 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
     // Android: restore via Google Play Billing and sync the purchase token
     // server-side through restoreGooglePurchases.
     clearRestoreError();
+    purchaseInitiated.current = false;
     restoreInitiated.current = true;
     await restorePurchases();
   };
@@ -768,16 +806,18 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
                 )}
 
                 <Button
-                  disabled={isLoading}
+                  disabled={isLoading || iapPurchasing}
                   onPress={handleUpgrade}
                   backgroundColor={brand.gold}
                   borderRadius="$4"
                   pressStyle={{ opacity: 0.85, scale: 0.98 }}
                 >
                   <Text color={brand.navyLight} fontWeight="700" fontSize="$4">
-                    {checkoutLoading
-                      ? 'Opening…'
-                      : `Upgrade — ${billingCycle === 'annual' ? annualPriceDisplay + '/yr' : monthlyPriceDisplay + '/mo'}`}
+                    {iapPurchasing
+                      ? 'Purchasing…'
+                      : checkoutLoading
+                        ? 'Opening…'
+                        : `Upgrade — ${billingCycle === 'annual' ? annualPriceDisplay + '/yr' : monthlyPriceDisplay + '/mo'}`}
                   </Text>
                 </Button>
 

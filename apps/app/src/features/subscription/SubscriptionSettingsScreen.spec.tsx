@@ -69,13 +69,23 @@ jest.mock('./StepUpModal', () => ({
 }));
 
 jest.mock('tamagui', () => {
-  const { View, Text } = jest.requireActual<typeof import('react-native')>(
+  const { Text } = jest.requireActual<typeof import('react-native')>(
     'react-native',
   ) as RNComponents;
+  const { Pressable } =
+    jest.requireActual<typeof import('react-native')>('react-native');
   const passthrough =
     (testID?: string) =>
-    ({ children }: { children?: React.ReactNode }) => (
-      <View testID={testID}>{children}</View>
+    ({
+      children,
+      onPress,
+    }: {
+      children?: React.ReactNode;
+      onPress?: () => void;
+    }) => (
+      <Pressable testID={testID} onPress={onPress}>
+        {children}
+      </Pressable>
     );
   return {
     createTokens: (tokens: unknown) => tokens,
@@ -147,15 +157,21 @@ jest.mock('./useStripePrices', () => ({
 }));
 
 const mockRestorePurchases = jest.fn();
+const mockPurchase = jest.fn();
 const mockClearError = jest.fn();
 let mockIapState: {
   restorePurchases: jest.Mock;
+  purchase: jest.Mock;
   loading: boolean;
   error: string | null;
   isSubscribed: boolean;
   clearError: jest.Mock;
 };
 jest.mock('./useIAP', () => ({
+  IAP_PRODUCTS: {
+    MONTHLY: 'com.legacysports.app.premium.monthly',
+    ANNUAL: 'com.legacysports.app.premium.annual',
+  },
   useIAP: () => mockIapState,
 }));
 
@@ -193,6 +209,7 @@ function resetMocks() {
   mockUseBillingPortalSession.mockReturnValue([jest.fn(), { loading: false }]);
   mockIapState = {
     restorePurchases: mockRestorePurchases,
+    purchase: mockPurchase,
     loading: false,
     error: null,
     isSubscribed: false,
@@ -552,33 +569,26 @@ describe('SubscriptionSettingsScreen — step-up gate (LS-5029)', () => {
       });
     });
 
-    it('creates one checkout session when the iOS Continue button is pressed twice', async () => {
+    it('starts one StoreKit purchase when Upgrade is pressed twice on iOS', async () => {
       Object.defineProperty(Platform, 'OS', { value: 'ios' });
       const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation();
-      let resolveCheckout: (v: unknown) => void = () => undefined;
-      const mockCreateCheckout = jest.fn(
+      let resolvePurchase: () => void = () => undefined;
+      mockPurchase.mockImplementation(
         () =>
-          new Promise((resolve) => {
-            resolveCheckout = resolve;
+          new Promise<void>((resolve) => {
+            resolvePurchase = resolve;
           }),
       );
-      mockUseCheckoutSession.mockReturnValue([
-        mockCreateCheckout,
-        { loading: false },
-      ]);
 
       render(<SubscriptionSettingsScreen />);
-      fireEvent.press(screen.getAllByText(/^Upgrade/).slice(-1)[0]);
+      const upgrade = screen.getAllByText(/^Upgrade/).slice(-1)[0];
+      fireEvent.press(upgrade);
+      fireEvent.press(upgrade);
 
-      const buttons = alertSpy.mock.calls[0][2] ?? [];
-      const proceed = buttons.find((b) => b.text === 'Continue');
-      proceed?.onPress?.();
-      proceed?.onPress?.();
-
-      expect(mockCreateCheckout).toHaveBeenCalledTimes(1);
+      expect(mockPurchase).toHaveBeenCalledTimes(1);
 
       await act(async () => {
-        resolveCheckout({ data: { createCheckoutSession: { url: null } } });
+        resolvePurchase();
         await Promise.resolve();
       });
       alertSpy.mockRestore();
@@ -702,11 +712,9 @@ describe('SubscriptionSettingsScreen — step-up gate (LS-5029)', () => {
       expect(openUrlSpy).toHaveBeenCalledWith('https://billing/x');
     });
 
-    it('still shows the App Store alert and checks out on Continue for a free user', () => {
+    it('starts a StoreKit purchase instead of Stripe checkout for a free user', async () => {
       mockRequireStepUp.mockImplementation((action: () => void) => action());
-      const mockCreateCheckout = jest.fn().mockResolvedValue({
-        data: { createCheckoutSession: { url: null } },
-      });
+      const mockCreateCheckout = jest.fn();
       mockUseCheckoutSession.mockReturnValue([
         mockCreateCheckout,
         { loading: false },
@@ -715,14 +723,15 @@ describe('SubscriptionSettingsScreen — step-up gate (LS-5029)', () => {
       render(<SubscriptionSettingsScreen />);
       fireEvent.press(screen.getAllByText(/^Upgrade/).slice(-1)[0]);
 
-      expect(alertSpy).toHaveBeenCalledWith(
+      await waitFor(() => {
+        expect(mockPurchase).toHaveBeenCalledTimes(1);
+      });
+      expect(alertSpy).not.toHaveBeenCalledWith(
         'Subscribe via App Store',
-        expect.any(String),
-        expect.any(Array),
+        expect.anything(),
+        expect.anything(),
       );
-      const buttons = alertSpy.mock.calls[0][2] ?? [];
-      buttons.find((b) => b.text === 'Continue')?.onPress?.();
-      expect(mockCreateCheckout).toHaveBeenCalledTimes(1);
+      expect(mockCreateCheckout).not.toHaveBeenCalled();
     });
   });
 
@@ -1149,5 +1158,152 @@ describe('SubscriptionSettingsScreen — Past Purchases receipts (LS-10399)', ()
     render(<SubscriptionSettingsScreen />);
 
     expect(screen.queryByText('Past Purchases')).toBeNull();
+  });
+});
+
+describe('SubscriptionSettingsScreen — iOS native IAP upgrade (LS-7415)', () => {
+  const originalOS = Platform.OS;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetMocks();
+    mockUseSubscription.mockReturnValue({
+      subscription: null,
+      isPremium: false,
+      tier: 'free',
+      loading: false,
+      refetch: mockRefetch,
+    });
+    mockRequireStepUp.mockImplementation((action: () => void) => action());
+    mockPurchase.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    Object.defineProperty(Platform, 'OS', { value: originalOS });
+    jest.restoreAllMocks();
+  });
+
+  function pressUpgrade() {
+    fireEvent.press(screen.getAllByText(/^Upgrade —/).slice(-1)[0]);
+  }
+
+  it('buys the annual App Store SKU by default with no web-checkout alert', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'ios' });
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation();
+    const mockCreateCheckout = jest.fn();
+    mockUseCheckoutSession.mockReturnValue([
+      mockCreateCheckout,
+      { loading: false },
+    ]);
+
+    render(<SubscriptionSettingsScreen />);
+    pressUpgrade();
+
+    await waitFor(() => {
+      expect(mockPurchase).toHaveBeenCalledWith(
+        'com.legacysports.app.premium.annual',
+      );
+    });
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(mockCreateCheckout).not.toHaveBeenCalled();
+  });
+
+  it('buys the monthly App Store SKU when Monthly is selected', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'ios' });
+
+    render(<SubscriptionSettingsScreen />);
+    fireEvent.press(screen.getByText('Monthly'));
+    pressUpgrade();
+
+    await waitFor(() => {
+      expect(mockPurchase).toHaveBeenCalledWith(
+        'com.legacysports.app.premium.monthly',
+      );
+    });
+  });
+
+  it('still uses Stripe checkout on Android', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'android' });
+    const mockCreateCheckout = jest
+      .fn()
+      .mockResolvedValue({ data: { createCheckoutSession: { url: null } } });
+    mockUseCheckoutSession.mockReturnValue([
+      mockCreateCheckout,
+      { loading: false },
+    ]);
+
+    render(<SubscriptionSettingsScreen />);
+    pressUpgrade();
+
+    await waitFor(() => {
+      expect(mockCreateCheckout).toHaveBeenCalledTimes(1);
+    });
+    expect(mockPurchase).not.toHaveBeenCalled();
+  });
+
+  it('confirms the upgrade and refreshes the subscription once the purchase succeeds', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'ios' });
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation();
+
+    const { rerender } = render(<SubscriptionSettingsScreen />);
+    pressUpgrade();
+    await waitFor(() => expect(mockPurchase).toHaveBeenCalled());
+
+    mockIapState = { ...mockIapState, isSubscribed: true };
+    rerender(<SubscriptionSettingsScreen />);
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith(
+        'Upgrade Complete',
+        'Welcome to Premium! Your subscription is now active.',
+      );
+    });
+    expect(mockRefetch).toHaveBeenCalled();
+  });
+
+  it('shows an alert when the purchase fails', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'ios' });
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation();
+
+    const { rerender } = render(<SubscriptionSettingsScreen />);
+    pressUpgrade();
+    await waitFor(() => expect(mockPurchase).toHaveBeenCalled());
+
+    mockIapState = {
+      ...mockIapState,
+      error: 'Purchase verification failed. Please try again.',
+    };
+    rerender(<SubscriptionSettingsScreen />);
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith(
+        'Purchase Failed',
+        'Purchase verification failed. Please try again.',
+      );
+    });
+    expect(mockClearError).toHaveBeenCalled();
+  });
+
+  it('shows no alert when the user cancels the purchase', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'ios' });
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation();
+
+    const { rerender } = render(<SubscriptionSettingsScreen />);
+    pressUpgrade();
+    await waitFor(() => expect(mockPurchase).toHaveBeenCalled());
+
+    // useIAP swallows E_USER_CANCELLED: loading clears, error stays null.
+    rerender(<SubscriptionSettingsScreen />);
+
+    expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  it('shows Purchasing… and disables Upgrade while a purchase is in flight', () => {
+    Object.defineProperty(Platform, 'OS', { value: 'ios' });
+    mockIapState = { ...mockIapState, loading: true };
+
+    render(<SubscriptionSettingsScreen />);
+
+    expect(screen.getByText('Purchasing…')).toBeTruthy();
   });
 });
