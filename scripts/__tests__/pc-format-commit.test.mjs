@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -185,6 +185,120 @@ test('a file that never converges fails loudly instead of committing non-canonic
     // silently accepting non-canonical formatting.
     const log = git(dir, ['log', '--format=%s']);
     assert.equal(log.trim(), 'baseline');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// LS-10532: pc-lint's `eslint --fix` leaves rewrites uncommitted; pc-format
+// must format+commit those instead of hard-failing on its dirty-tree guard.
+const LINT_FIXED_MARKER = (dir) => path.join(dir, '.git', 'pc-lint-fixed.json');
+
+function runFormat(dir, stub) {
+  return spawnSync(process.execPath, [SCRIPT], {
+    cwd: dir,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      PC_FORMAT_PRETTIER_ARGV: JSON.stringify([process.execPath, stub]),
+    },
+  });
+}
+
+function recordLintFix(dir, file) {
+  const hash = git(dir, ['hash-object', '--', file]).trim();
+  writeFileSync(
+    LINT_FIXED_MARKER(dir),
+    JSON.stringify({ fixed: { [file]: hash } }),
+  );
+}
+
+test('a file dirtied only by pc-lint eslint --fix is formatted and committed, not refused (LS-10532)', () => {
+  const dir = makeTempRepo();
+  try {
+    writeFileSync(path.join(dir, 'needs-format.js'), 'original\n');
+    git(dir, ['add', '-A']);
+    git(dir, ['commit', '--quiet', '-m', 'baseline']);
+
+    // pc-lint rewrote the (previously clean) file and recorded it.
+    writeFileSync(path.join(dir, 'needs-format.js'), 'eslint-fixed\n');
+    recordLintFix(dir, 'needs-format.js');
+
+    const result = runFormat(dir, STUB_PRETTIER);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /rewritten by pc-lint's eslint --fix/);
+    assert.match(git(dir, ['log', '-1', '--format=%s']), /eslint --fix/);
+    assert.equal(
+      git(dir, ['status', '--porcelain', '--', 'needs-format.js']),
+      '',
+    );
+    assert.equal(existsSync(LINT_FIXED_MARKER(dir)), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('an eslint-fixed file prettier does not flag is still committed (LS-10532)', () => {
+  const dir = makeTempRepo();
+  try {
+    writeFileSync(path.join(dir, 'fixed.js'), 'original\n');
+    git(dir, ['add', '-A']);
+    git(dir, ['commit', '--quiet', '-m', 'baseline']);
+    writeFileSync(path.join(dir, 'fixed.js'), 'eslint-fixed\n');
+    recordLintFix(dir, 'fixed.js');
+
+    const noopStub = path.join(dir, 'noop-prettier.js');
+    writeFileSync(noopStub, 'process.exit(0);\n');
+
+    const result = runFormat(dir, noopStub);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(
+      git(dir, ['status', '--porcelain']).includes('fixed.js'),
+      false,
+    );
+    assert.deepEqual(
+      git(dir, ['show', '--name-only', '--format=', 'HEAD']).trim().split('\n'),
+      ['fixed.js'],
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a hand edit made after pc-lint is still refused, not swept into the commit (LS-10532)', () => {
+  const dir = makeTempRepo();
+  try {
+    writeFileSync(path.join(dir, 'needs-format.js'), 'original\n');
+    git(dir, ['add', '-A']);
+    git(dir, ['commit', '--quiet', '-m', 'baseline']);
+    writeFileSync(path.join(dir, 'needs-format.js'), 'eslint-fixed\n');
+    recordLintFix(dir, 'needs-format.js');
+    // The author edits the file after pc-lint: its hash no longer matches.
+    writeFileSync(
+      path.join(dir, 'needs-format.js'),
+      'eslint-fixed + hand edit\n',
+    );
+
+    const result = runFormat(dir, STUB_PRETTIER);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /already have uncommitted changes/);
+    assert.equal(git(dir, ['log', '--format=%s']).trim(), 'baseline');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('without a pc-lint record a dirty file that needs formatting is still refused (LS-10532)', () => {
+  const dir = makeTempRepo();
+  try {
+    writeFileSync(path.join(dir, 'needs-format.js'), 'original\n');
+    git(dir, ['add', '-A']);
+    git(dir, ['commit', '--quiet', '-m', 'baseline']);
+    writeFileSync(path.join(dir, 'needs-format.js'), 'hand edit\n');
+
+    const result = runFormat(dir, STUB_PRETTIER);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /already have uncommitted changes/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

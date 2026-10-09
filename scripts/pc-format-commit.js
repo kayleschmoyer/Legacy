@@ -28,6 +28,12 @@
 'use strict';
 
 const { spawnSync } = require('node:child_process');
+const {
+  clearMarker,
+  dirtyPaths,
+  hashFile,
+  readMarker,
+} = require('./pc-lint-fixed-marker');
 
 const IS_WINDOWS = process.platform === 'win32';
 
@@ -147,16 +153,35 @@ function main() {
     );
   }
 
-  if (files.length === 0) {
+  // Files pc-lint's `eslint --fix` rewrote (LS-10532): clean before the fix and
+  // byte-identical to what it left, so their dirt is eslint's alone. These are
+  // exempt from the guard below and ship in this commit; a file edited since
+  // no longer matches its recorded hash and is refused like any other.
+  const cwd = process.cwd();
+  const dirty = dirtyPaths(cwd);
+  const lintFixed = Object.entries(readMarker(cwd))
+    .filter(([file, hash]) => dirty.has(file) && hashFile(cwd, file) === hash)
+    .map(([file]) => file);
+  const lintFixedSet = new Set(lintFixed);
+
+  if (files.length === 0 && lintFixed.length === 0) {
     console.log('  No formatting changes needed.');
     return;
+  }
+  if (lintFixed.length > 0) {
+    console.log(
+      `  Including ${lintFixed.length} file(s) rewritten by pc-lint's eslint --fix.`,
+    );
   }
 
   // 2. Refuse only when one of THOSE specific files is already dirty --
   //    we can't tell a pre-existing hand edit apart from a format fix on
   //    the same file. Dirty files elsewhere in the tree are none of this
   //    step's business and are left alone.
-  const preStatus = git(['status', '--porcelain', '--', ...files]);
+  const guarded = files.filter((file) => !lintFixedSet.has(file));
+  const preStatus = guarded.length
+    ? git(['status', '--porcelain', '--', ...guarded])
+    : '';
   if (preStatus.trim()) {
     console.error('');
     console.error(
@@ -191,6 +216,7 @@ function main() {
   const MAX_FORMAT_PASSES = 3;
   let remaining = files;
   for (let pass = 1; pass <= MAX_FORMAT_PASSES; pass++) {
+    if (remaining.length === 0) break;
     const writeResult = runPrettier([
       '--write',
       '--ignore-unknown',
@@ -236,13 +262,20 @@ function main() {
   //    Never `git add -A`: whatever else became dirty while this ran --
   //    including edits made by an agent that kept working while pc-format
   //    was backgrounded -- stays out of this commit.
-  git(['add', '--', ...files]);
+  git(['add', '--', ...new Set([...files, ...lintFixed])]);
   const staged = git(['diff', '--cached', '--name-only']);
   if (!staged.trim()) {
     console.log('  No formatting changes to commit.');
     return;
   }
-  git(['commit', '-m', 'style: apply formatting']);
+  git([
+    'commit',
+    '-m',
+    lintFixed.length > 0
+      ? 'style: apply eslint --fix and formatting'
+      : 'style: apply formatting',
+  ]);
+  clearMarker(cwd);
   console.log('  ✓ Format fixes committed as a new commit.');
 }
 

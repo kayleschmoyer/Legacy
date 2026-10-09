@@ -52,6 +52,12 @@
 const { execFileSync } = require('child_process');
 const { existsSync } = require('fs');
 const { dirname, extname, join, relative, resolve } = require('path');
+const {
+  clearMarker,
+  dirtyPaths,
+  hashFile,
+  writeMarker,
+} = require('./pc-lint-fixed-marker');
 
 // The `.bin/eslint` shim is a `.cmd` file on Windows. Since Node's
 // CVE-2024-27980 fix (backported to 18.19.1/20.11.1/21.6.2+; this repo runs
@@ -183,6 +189,9 @@ function main() {
   const eslintEntry = resolve(root, ESLINT_JS_ENTRY);
   const baseRef = parseBaseRef(process.argv);
 
+  // A record from an earlier run is stale the moment this one starts.
+  clearMarker(root);
+
   const files = getChangedFiles(baseRef, root);
   if (files === null) {
     process.stdout.write(
@@ -202,6 +211,20 @@ function main() {
     );
     return;
   }
+
+  // Snapshot every file the fix pass may touch (root-relative), and which of
+  // them are already dirty, so afterwards we can tell exactly what eslint
+  // rewrote (LS-10532).
+  const targets = [];
+  for (const [configDir, relFiles] of byConfigDir) {
+    for (const relFile of relFiles) {
+      targets.push(
+        relative(root, join(configDir, relFile)).replace(/\\/g, '/'),
+      );
+    }
+  }
+  const dirtyBefore = dirtyPaths(root);
+  const hashesBefore = new Map(targets.map((t) => [t, hashFile(root, t)]));
 
   let hadUnexpectedFailure = false;
 
@@ -235,8 +258,42 @@ function main() {
     }
   }
 
+  reportAndRecordFixes(root, targets, dirtyBefore, hashesBefore);
+
   if (hadUnexpectedFailure) {
     process.exitCode = 1;
+  }
+}
+
+/**
+ * Tell the agent which files `eslint --fix` rewrote, and record the ones that
+ * were clean beforehand so pc-format can format and commit them instead of
+ * refusing on "already have uncommitted changes" (LS-10532). A file that was
+ * already dirty is reported but not recorded: its dirt is not provably
+ * eslint's, so pc-format must keep refusing it.
+ */
+function reportAndRecordFixes(root, targets, dirtyBefore, hashesBefore) {
+  const modified = targets.filter(
+    (t) => hashFile(root, t) !== hashesBefore.get(t),
+  );
+  if (modified.length === 0) return;
+
+  process.stdout.write(
+    `  eslint --fix modified ${modified.length} file(s):\n${modified
+      .map((f) => `    ${f}`)
+      .join('\n')}\n`,
+  );
+
+  const fixed = {};
+  for (const file of modified) {
+    if (!dirtyBefore.has(file)) fixed[file] = hashFile(root, file);
+  }
+  writeMarker(root, fixed);
+  const skipped = modified.length - Object.keys(fixed).length;
+  if (skipped > 0) {
+    process.stdout.write(
+      `  ${skipped} of those already had uncommitted changes; commit them yourself before pc-format.\n`,
+    );
   }
 }
 
@@ -249,4 +306,5 @@ module.exports = {
   groupByConfigDir,
   getChangedFiles,
   buildEslintFixInvocation,
+  reportAndRecordFixes,
 };

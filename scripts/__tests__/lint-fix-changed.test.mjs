@@ -12,7 +12,14 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  rmSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,6 +32,7 @@ const {
   groupByConfigDir,
   getChangedFiles,
   buildEslintFixInvocation,
+  reportAndRecordFixes,
 } = require(resolve(__dirname, '..', 'lint-fix-changed.js'));
 
 function git(root, args) {
@@ -192,6 +200,68 @@ test('getChangedFiles fails safe (returns null) when git errors', () => {
   const root = mkdtempSync(join(tmpdir(), 'lint-fix-changed-notgit-'));
   try {
     assert.equal(getChangedFiles('main', root), null);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('reportAndRecordFixes lists what eslint rewrote and records only previously-clean files (LS-10532)', () => {
+  const root = makeGitFixture();
+  const { dirtyPaths, hashFile } = require(
+    resolve(__dirname, '..', 'pc-lint-fixed-marker.js'),
+  );
+  const out = [];
+  const realWrite = process.stdout.write.bind(process.stdout);
+  try {
+    writeFileSync(join(root, 'clean.ts'), 'a\n');
+    writeFileSync(join(root, 'dirty.ts'), 'a\n');
+    writeFileSync(join(root, 'untouched.ts'), 'a\n');
+    git(root, ['add', '-A']);
+    git(root, ['commit', '-q', '-m', 'add']);
+    // dirty.ts has an author edit before the fix pass runs.
+    writeFileSync(join(root, 'dirty.ts'), 'a edited\n');
+
+    const targets = ['clean.ts', 'dirty.ts', 'untouched.ts'];
+    const dirtyBefore = dirtyPaths(root);
+    const hashesBefore = new Map(targets.map((t) => [t, hashFile(root, t)]));
+
+    // The "eslint --fix" pass.
+    writeFileSync(join(root, 'clean.ts'), 'b\n');
+    writeFileSync(join(root, 'dirty.ts'), 'b\n');
+
+    process.stdout.write = (chunk) => (out.push(String(chunk)), true);
+    try {
+      reportAndRecordFixes(root, targets, dirtyBefore, hashesBefore);
+    } finally {
+      process.stdout.write = realWrite;
+    }
+
+    const text = out.join('');
+    assert.match(text, /eslint --fix modified 2 file\(s\)/);
+    assert.match(text, /clean\.ts/);
+    assert.match(text, /dirty\.ts/);
+    assert.doesNotMatch(text, /untouched\.ts/);
+
+    const markerFile = join(root, '.git', 'pc-lint-fixed.json');
+    assert.ok(existsSync(markerFile));
+    const { fixed } = JSON.parse(readFileSync(markerFile, 'utf8'));
+    assert.deepEqual(Object.keys(fixed), ['clean.ts']);
+    assert.equal(fixed['clean.ts'], hashFile(root, 'clean.ts'));
+  } finally {
+    process.stdout.write = realWrite;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('reportAndRecordFixes is silent and writes no record when eslint changed nothing (LS-10532)', () => {
+  const root = makeGitFixture();
+  const { hashFile } = require(
+    resolve(__dirname, '..', 'pc-lint-fixed-marker.js'),
+  );
+  try {
+    const hashesBefore = new Map([['base.ts', hashFile(root, 'base.ts')]]);
+    reportAndRecordFixes(root, ['base.ts'], new Set(), hashesBefore);
+    assert.equal(existsSync(join(root, '.git', 'pc-lint-fixed.json')), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
