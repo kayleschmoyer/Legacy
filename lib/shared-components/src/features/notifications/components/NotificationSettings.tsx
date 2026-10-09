@@ -1,15 +1,5 @@
 import React from 'react';
-import {
-  Card,
-  H5,
-  Label,
-  Separator,
-  Switch,
-  Text,
-  XStack,
-  YStack,
-} from 'tamagui';
-import { Settings } from '@tamagui/lucide-icons/icons/Settings';
+import { Card, Label, Separator, Switch, Text, XStack, YStack } from 'tamagui';
 import {
   type NotificationPreference,
   type NotificationPreferenceInput,
@@ -52,13 +42,6 @@ export function NotificationSettings({
 
   return (
     <Card elevate size="$4" bordered animation="bouncy">
-      <Card.Header padded>
-        <XStack space="$2" alignItems="center">
-          <Settings size="$1" />
-          <H5>Notification Preferences</H5>
-        </XStack>
-      </Card.Header>
-
       <YStack padding="$3" space="$3">
         {/* Notification Types */}
         <YStack space="$2">

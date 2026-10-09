@@ -155,7 +155,7 @@ export function NotificationsScreen({
       ? `You have ${unreadCount} unread notification${
           unreadCount === 1 ? '' : 's'
         }`
-      : '’You’re all caught up';
+      : 'You’re all caught up';
 
   let body: React.ReactNode;
   if (loading && notifications.length === 0) {
