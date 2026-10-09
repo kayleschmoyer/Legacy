@@ -26,6 +26,7 @@ import {
   useCreateCheckoutSessionMutation,
   useGetMySubscriptionQuery,
 } from '@legacy-sports/graphql';
+import { PaymentRecoveryModal } from './PaymentRecoveryModal';
 import { PageMeta } from '../../components/PageMeta';
 import { PriceSkeleton } from '../../components/PriceSkeleton';
 import { StepUpModal } from '../../components/StepUpModal';
@@ -819,6 +820,9 @@ const SubscriptionPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [activating, isPremium, pollAttempt, refetch]);
 
+  // LS-7398: in-app payment recovery for past-due Stripe subscriptions.
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+
   const [createCheckoutSession, { loading: checkoutLoading }] =
     useCreateCheckoutSessionMutation();
   const [createBillingPortalSession, { loading: portalLoading }] =
@@ -979,11 +983,25 @@ const SubscriptionPage: React.FC = () => {
               onRetry={
                 storeManagement
                   ? openStoreManagement
-                  : () => void handleManageSubscription()
+                  : () => requireStepUp(() => setShowPaymentModal(true))
               }
               loading={storeManagement ? false : portalLoading}
               gracePeriodEndsAt={subscription?.gracePeriodEndsAt}
               actionLabel={storeManagement?.label}
+            />
+          )}
+
+          {showPaymentModal && (
+            <PaymentRecoveryModal
+              onSuccess={() => {
+                setShowPaymentModal(false);
+                refetchSafely('payment recovery');
+              }}
+              onDismiss={() => setShowPaymentModal(false)}
+              onUsePortal={() => {
+                setShowPaymentModal(false);
+                handleManageSubscription();
+              }}
             />
           )}
 

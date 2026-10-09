@@ -3195,6 +3195,11 @@ type Mutation {
     sport: Sport
     statKey: String
   ): Int
+
+  """
+  Create a Stripe SetupIntent for the signed-in user's Stripe customer so the client can collect a replacement payment method with Stripe Elements (past-due recovery).
+  """
+  createSetupIntent: SetupIntentResult
   createTiebreakerRules(
     allowCommissionerOverride: Boolean
     leagueId: Int!
@@ -3546,6 +3551,11 @@ type Mutation {
     purchaseToken: String!
   ): Boolean
   resumeDraft(leagueId: Int!): Draft
+
+  """
+  After a SetupIntent has been confirmed, make the new payment method the default for the subscription and retry payment on its latest open invoice (past-due recovery).
+  """
+  retryLatestInvoice(setupIntentId: String!): RetryInvoiceResult
 
   """
   Revoke a previously granted consent
@@ -5360,6 +5370,15 @@ input RecordConsentInput {
 }
 
 """
+Outcome of retrying payment on the latest open invoice (LS-7398).
+"""
+type RetryInvoiceResult {
+  message: String
+  status: String
+  success: Boolean
+}
+
+"""
 How rosters carry across seasons: redraft (full reset, default), keeper (retain up to keeperCount players), or dynasty (full roster carries over).
 """
 enum RosterContinuity {
@@ -5922,6 +5941,14 @@ input SetTeamLockInput {
   locked: Boolean!
   reason: String
   teamId: Int!
+}
+
+"""
+A Stripe SetupIntent the client confirms with Stripe Elements to attach a new payment method (LS-7398).
+"""
+type SetupIntentResult {
+  clientSecret: String
+  publishableKey: String
 }
 
 """

@@ -23,6 +23,7 @@ import {
 import {
   createBillingPortalSessionResponse,
   createCheckoutSessionResponse,
+  createSetupIntentResponse,
   myCanceledSubscriptionResponse,
   myFreeSubscriptionResponse,
   myPastDueSubscriptionResponse,
@@ -311,6 +312,79 @@ test.describe('SubscriptionPage — past due @regression', () => {
     await expect(
       page.getByText(/past due|payment failed|fix payment/i).first(),
     ).toBeVisible();
+  });
+
+  // LS-7398: "Fix Payment" opens the in-app modal instead of the portal.
+  test('Fix Payment opens the in-app payment modal, not the billing portal', async ({
+    page,
+  }) => {
+    let portalCalled = false;
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const operation = extractOperationName(route).toLowerCase();
+      const respond = async (body: unknown) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(body),
+        });
+      if (operation === 'getmysubscription') {
+        return respond(myPastDueSubscriptionResponse());
+      }
+      if (operation === 'createsetupintent') {
+        return respond(createSetupIntentResponse());
+      }
+      if (operation === 'createbillingportalsession') {
+        portalCalled = true;
+        return respond(createBillingPortalSessionResponse());
+      }
+      return unmockedGraphQLFallback(route);
+    });
+
+    await page.goto('/profile/subscription');
+    await page.waitForLoadState('load');
+    await seedStepUp(page);
+
+    await page.getByRole('button', { name: /fix payment/i }).click();
+
+    await expect(page.getByTestId('payment-recovery-modal')).toBeVisible();
+    await expect(page.getByTestId('payment-recovery-portal')).toBeVisible();
+    expect(portalCalled).toBe(false);
+  });
+
+  test('shows an inline error and portal fallback when the setup intent fails', async ({
+    page,
+  }) => {
+    let portalCalled = false;
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const operation = extractOperationName(route).toLowerCase();
+      const respond = async (body: unknown) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(body),
+        });
+      if (operation === 'getmysubscription') {
+        return respond(myPastDueSubscriptionResponse());
+      }
+      if (operation === 'createsetupintent') {
+        return respond({ errors: [{ message: 'Stripe unavailable' }] });
+      }
+      if (operation === 'createbillingportalsession') {
+        portalCalled = true;
+        return respond(createBillingPortalSessionResponse());
+      }
+      return unmockedGraphQLFallback(route);
+    });
+
+    await page.goto('/profile/subscription');
+    await page.waitForLoadState('load');
+    await seedStepUp(page);
+
+    await page.getByRole('button', { name: /fix payment/i }).click();
+
+    await expect(page.getByTestId('payment-recovery-error')).toBeVisible();
+    await page.getByRole('button', { name: /open billing portal/i }).click();
+    await expect.poll(() => portalCalled).toBe(true);
   });
 });
 

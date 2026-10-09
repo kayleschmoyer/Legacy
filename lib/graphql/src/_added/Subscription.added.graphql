@@ -67,6 +67,21 @@ mutation CreateBillingPortalSession($returnUrl: String!) {
   }
 }
 
+mutation CreateSetupIntent {
+  createSetupIntent {
+    clientSecret
+    publishableKey
+  }
+}
+
+mutation RetryLatestInvoice($setupIntentId: String!) {
+  retryLatestInvoice(setupIntentId: $setupIntentId) {
+    success
+    status
+    message
+  }
+}
+
 query GetDonationPaymentLink {
   donationPaymentLink {
     url

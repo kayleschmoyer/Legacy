@@ -109,6 +109,7 @@ import {
   requireCheckoutEmail,
   shouldRedirectToBillingPortal,
   subscriptionStatusPriority,
+  toRetryInvoiceResult,
 } from './subscriptions';
 import { builder } from './builder';
 
@@ -1178,5 +1179,29 @@ describe('SubscriptionInfo.billingInterval resolver', () => {
     });
 
     await expect(getResolver()('sub_123')).resolves.toBeNull();
+  });
+});
+
+// ─── toRetryInvoiceResult (LS-7398) ──────────────────────────────────────────
+
+describe('toRetryInvoiceResult', () => {
+  it('reports success for a paid invoice', () => {
+    expect(toRetryInvoiceResult({ status: 'paid' })).toEqual({
+      success: true,
+      status: 'paid',
+      message: null,
+    });
+  });
+
+  it('reports failure with a retry message for a still-open invoice', () => {
+    const result = toRetryInvoiceResult({ status: 'open' });
+    expect(result.success).toBe(false);
+    expect(result.status).toBe('open');
+    expect(result.message).toMatch(/try again/i);
+  });
+
+  it('treats a missing status as unknown failure', () => {
+    expect(toRetryInvoiceResult({ status: null }).success).toBe(false);
+    expect(toRetryInvoiceResult({ status: null }).status).toBe('unknown');
   });
 });

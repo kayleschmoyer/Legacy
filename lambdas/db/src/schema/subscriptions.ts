@@ -229,6 +229,37 @@ BillingPortalSessionResultRef.implement({
   }),
 });
 
+const SetupIntentResultRef = builder.objectRef<{
+  clientSecret: string;
+  publishableKey: string;
+}>('SetupIntentResult');
+
+SetupIntentResultRef.implement({
+  description:
+    'A Stripe SetupIntent the client confirms with Stripe Elements to attach a ' +
+    'new payment method (LS-7398).',
+  fields: (t) => ({
+    clientSecret: t.exposeString('clientSecret'),
+    publishableKey: t.exposeString('publishableKey'),
+  }),
+});
+
+const RetryInvoiceResultRef = builder.objectRef<{
+  success: boolean;
+  status: string;
+  message: string | null;
+}>('RetryInvoiceResult');
+
+RetryInvoiceResultRef.implement({
+  description:
+    'Outcome of retrying payment on the latest open invoice (LS-7398).',
+  fields: (t) => ({
+    success: t.exposeBoolean('success'),
+    status: t.exposeString('status'),
+    message: t.exposeString('message', { nullable: true }),
+  }),
+});
+
 const TemporaryPremiumGrantResultRef = builder.objectRef<{
   stripeSubscriptionId: string;
   expiresAt: string;
@@ -1054,6 +1085,216 @@ builder.mutationField('createBillingPortalSession', (t) =>
       });
 
       return { url: portal.url };
+    },
+  }),
+);
+
+const PAYMENT_RECOVERY_RATE_LIMIT_BUCKET = 'payment_recovery';
+const PAYMENT_RECOVERY_RATE_LIMIT_MAX_ATTEMPTS = 10;
+const PAYMENT_RECOVERY_RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const PAYMENT_RECOVERY_UNAVAILABLE_MESSAGE =
+  'Unable to update the payment method for this account.';
+
+/**
+ * LS-7398: the Stripe objects the in-app "Fix Payment" flow touches only make
+ * sense for a Stripe-managed subscription. Shared by both mutations so they
+ * fail identically (and without revealing which condition failed).
+ */
+async function requireStripeManagedSubscription(
+  userId: number,
+  reason: string,
+) {
+  const subscription = await getSubscriptionForUser(userId);
+  if (!subscription || !subscription.stripeCustomerId) {
+    LOGGER.info('Payment recovery unavailable for user', {
+      userId,
+      reason: subscription ? 'not_stripe_managed' : 'no_subscription',
+      operation: reason,
+    });
+    throw UserInputError(PAYMENT_RECOVERY_UNAVAILABLE_MESSAGE);
+  }
+  return { ...subscription, stripeCustomerId: subscription.stripeCustomerId };
+}
+
+builder.mutationField('createSetupIntent', (t) =>
+  t.field({
+    type: SetupIntentResultRef,
+    description:
+      "Create a Stripe SetupIntent for the signed-in user's Stripe customer so " +
+      'the client can collect a replacement payment method with Stripe ' +
+      'Elements (past-due recovery).',
+    resolve: async (_parent, _args, context) => {
+      if (!context.user) throw AuthenticationError();
+      requireNotImpersonating(context);
+
+      const rateLimit = await checkAndIncrementRateLimit(context.db, {
+        bucket: PAYMENT_RECOVERY_RATE_LIMIT_BUCKET,
+        userId: context.user.id,
+        limit: PAYMENT_RECOVERY_RATE_LIMIT_MAX_ATTEMPTS,
+        windowMs: PAYMENT_RECOVERY_RATE_LIMIT_WINDOW_MS,
+      });
+      if (!rateLimit.allowed) {
+        throw RateLimitedError();
+      }
+
+      const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY;
+      if (!publishableKey) {
+        LOGGER.error(
+          'STRIPE_PUBLISHABLE_KEY is not configured',
+          new Error('STRIPE_PUBLISHABLE_KEY missing'),
+        );
+        throw UserInputError(PAYMENT_RECOVERY_UNAVAILABLE_MESSAGE);
+      }
+
+      const subscription = await requireStripeManagedSubscription(
+        context.user.id,
+        'createSetupIntent',
+      );
+
+      const stripe = await getStripeClient();
+      const setupIntent = await stripe.setupIntents.create({
+        customer: subscription.stripeCustomerId,
+        usage: 'off_session',
+        automatic_payment_methods: { enabled: true },
+      });
+      if (!setupIntent.client_secret) {
+        throw UserInputError(PAYMENT_RECOVERY_UNAVAILABLE_MESSAGE);
+      }
+
+      LOGGER.info('Created Stripe setup intent', { userId: context.user.id });
+
+      return { clientSecret: setupIntent.client_secret, publishableKey };
+    },
+  }),
+);
+
+type RetryInvoiceResult = {
+  success: boolean;
+  status: string;
+  message: string | null;
+};
+
+/**
+ * LS-7398: map a Stripe invoice to the client-facing retry result. Pure so the
+ * paid / still-open / card-error branches are unit-testable.
+ */
+export function toRetryInvoiceResult(
+  invoice: Pick<Stripe.Invoice, 'status'>,
+): RetryInvoiceResult {
+  const status = invoice.status ?? 'unknown';
+  return {
+    success: status === 'paid',
+    status,
+    message:
+      status === 'paid' ? null : 'The payment did not go through. Try again.',
+  };
+}
+
+builder.mutationField('retryLatestInvoice', (t) =>
+  t.field({
+    type: RetryInvoiceResultRef,
+    description:
+      'After a SetupIntent has been confirmed, make the new payment method the ' +
+      'default for the subscription and retry payment on its latest open ' +
+      'invoice (past-due recovery).',
+    args: {
+      setupIntentId: t.arg.string({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) throw AuthenticationError();
+      requireNotImpersonating(context);
+
+      const rateLimit = await checkAndIncrementRateLimit(context.db, {
+        bucket: PAYMENT_RECOVERY_RATE_LIMIT_BUCKET,
+        userId: context.user.id,
+        limit: PAYMENT_RECOVERY_RATE_LIMIT_MAX_ATTEMPTS,
+        windowMs: PAYMENT_RECOVERY_RATE_LIMIT_WINDOW_MS,
+      });
+      if (!rateLimit.allowed) {
+        throw RateLimitedError();
+      }
+
+      const subscription = await requireStripeManagedSubscription(
+        context.user.id,
+        'retryLatestInvoice',
+      );
+      if (!subscription.stripeSubscriptionId) {
+        throw UserInputError(PAYMENT_RECOVERY_UNAVAILABLE_MESSAGE);
+      }
+
+      const stripe = await getStripeClient();
+
+      // Never trust the client: re-read the SetupIntent and require that it
+      // belongs to this user's customer and actually succeeded.
+      const setupIntent = await stripe.setupIntents.retrieve(
+        args.setupIntentId,
+      );
+      const customerId =
+        typeof setupIntent.customer === 'string'
+          ? setupIntent.customer
+          : setupIntent.customer?.id;
+      const paymentMethodId =
+        typeof setupIntent.payment_method === 'string'
+          ? setupIntent.payment_method
+          : setupIntent.payment_method?.id;
+      if (
+        customerId !== subscription.stripeCustomerId ||
+        setupIntent.status !== 'succeeded' ||
+        !paymentMethodId
+      ) {
+        LOGGER.warn('Rejected retryLatestInvoice: setup intent not usable', {
+          userId: context.user.id,
+          setupIntentStatus: setupIntent.status,
+          customerMatches: customerId === subscription.stripeCustomerId,
+        });
+        throw UserInputError(PAYMENT_RECOVERY_UNAVAILABLE_MESSAGE);
+      }
+
+      await stripe.customers.update(subscription.stripeCustomerId, {
+        invoice_settings: { default_payment_method: paymentMethodId },
+      });
+      const stripeSubscription = await stripe.subscriptions.update(
+        subscription.stripeSubscriptionId,
+        {
+          default_payment_method: paymentMethodId,
+          expand: ['latest_invoice'],
+        },
+      );
+
+      const latestInvoice = stripeSubscription.latest_invoice;
+      if (!latestInvoice || typeof latestInvoice === 'string') {
+        return { success: false, status: 'no_invoice', message: null };
+      }
+      if (latestInvoice.status === 'paid') {
+        return toRetryInvoiceResult(latestInvoice);
+      }
+      if (latestInvoice.status !== 'open' || !latestInvoice.id) {
+        return toRetryInvoiceResult(latestInvoice);
+      }
+
+      try {
+        const paid = await stripe.invoices.pay(latestInvoice.id, {
+          payment_method: paymentMethodId,
+        });
+        LOGGER.info('Retried latest invoice', {
+          userId: context.user.id,
+          status: paid.status,
+        });
+        return toRetryInvoiceResult(paid);
+      } catch (error) {
+        if (error instanceof Stripe.errors.StripeCardError) {
+          LOGGER.info('Invoice retry declined', {
+            userId: context.user.id,
+            code: error.code,
+          });
+          return {
+            success: false,
+            status: 'declined',
+            message: error.message,
+          };
+        }
+        throw error;
+      }
     },
   }),
 );

@@ -126,3 +126,15 @@ export function createBillingPortalSessionResponse(
 ) {
   return { data: { createBillingPortalSession: { url } } };
 }
+
+/** Response for the `createSetupIntent` mutation (LS-7398). */
+export function createSetupIntentResponse() {
+  return {
+    data: {
+      createSetupIntent: {
+        clientSecret: 'seti_test_secret_123',
+        publishableKey: 'pk_test_e2e_placeholder',
+      },
+    },
+  };
+}

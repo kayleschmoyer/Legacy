@@ -2400,6 +2400,8 @@ export type Mutation = {
   createPlayoffBracket?: Maybe<PlayoffBracket>;
   /** Create a new Season Draft Game. The creator is added automatically; others join via invite link. */
   createSeasonDraftGame?: Maybe<Scalars['Int']['output']>;
+  /** Create a Stripe SetupIntent for the signed-in user's Stripe customer so the client can collect a replacement payment method with Stripe Elements (past-due recovery). */
+  createSetupIntent?: Maybe<SetupIntentResult>;
   createTiebreakerRules?: Maybe<TiebreakerRule>;
   /** Remove an achievement restriction from a league. Commissioner / General Manager access required. */
   deleteAchievementRestriction?: Maybe<Scalars['Boolean']['output']>;
@@ -2517,6 +2519,8 @@ export type Mutation = {
   /** Restore Google Play subscriptions and sync the subscription tier. Pass the purchaseToken for the most recent active purchase returned by react-native-iap getAvailablePurchases on Android. */
   restoreGooglePurchases?: Maybe<Scalars['Boolean']['output']>;
   resumeDraft?: Maybe<Draft>;
+  /** After a SetupIntent has been confirmed, make the new payment method the default for the subscription and retry payment on its latest open invoice (past-due recovery). */
+  retryLatestInvoice?: Maybe<RetryInvoiceResult>;
   /** Revoke a previously granted consent */
   revokeConsent?: Maybe<UserConsent>;
   /** Withdraw a pending invite (the mock draft host or the league commissioner). A mock invite releases its reserved seat (LS-10078). */
@@ -3107,6 +3111,10 @@ export type MutationRestoreGooglePurchasesArgs = {
 
 export type MutationResumeDraftArgs = {
   leagueId: Scalars['Int']['input'];
+};
+
+export type MutationRetryLatestInvoiceArgs = {
+  setupIntentId: Scalars['String']['input'];
 };
 
 export type MutationRevokeConsentArgs = {
@@ -4900,6 +4908,14 @@ export type RecordConsentInput = {
   userAgent?: InputMaybe<Scalars['String']['input']>;
 };
 
+/** Outcome of retrying payment on the latest open invoice (LS-7398). */
+export type RetryInvoiceResult = {
+  __typename?: 'RetryInvoiceResult';
+  message?: Maybe<Scalars['String']['output']>;
+  status?: Maybe<Scalars['String']['output']>;
+  success?: Maybe<Scalars['Boolean']['output']>;
+};
+
 /** How rosters carry across seasons: redraft (full reset, default), keeper (retain up to keeperCount players), or dynasty (full roster carries over). */
 export enum RosterContinuity {
   Dynasty = 'dynasty',
@@ -5374,6 +5390,13 @@ export type SetTeamLockInput = {
   locked: Scalars['Boolean']['input'];
   reason?: InputMaybe<Scalars['String']['input']>;
   teamId: Scalars['Int']['input'];
+};
+
+/** A Stripe SetupIntent the client confirms with Stripe Elements to attach a new payment method (LS-7398). */
+export type SetupIntentResult = {
+  __typename?: 'SetupIntentResult';
+  clientSecret?: Maybe<Scalars['String']['output']>;
+  publishableKey?: Maybe<Scalars['String']['output']>;
 };
 
 /** Strength-of-schedule tier for an NFL team in a given season */
@@ -9839,6 +9862,33 @@ export type CreateBillingPortalSessionMutation = {
   createBillingPortalSession?: {
     __typename?: 'BillingPortalSessionResult';
     url?: string | null;
+  } | null;
+};
+
+export type CreateSetupIntentMutationVariables = Exact<{
+  [key: string]: never;
+}>;
+
+export type CreateSetupIntentMutation = {
+  __typename?: 'Mutation';
+  createSetupIntent?: {
+    __typename?: 'SetupIntentResult';
+    clientSecret?: string | null;
+    publishableKey?: string | null;
+  } | null;
+};
+
+export type RetryLatestInvoiceMutationVariables = Exact<{
+  setupIntentId: Scalars['String']['input'];
+}>;
+
+export type RetryLatestInvoiceMutation = {
+  __typename?: 'Mutation';
+  retryLatestInvoice?: {
+    __typename?: 'RetryInvoiceResult';
+    success?: boolean | null;
+    status?: string | null;
+    message?: string | null;
   } | null;
 };
 
@@ -24737,6 +24787,108 @@ export type CreateBillingPortalSessionMutationResult =
 export type CreateBillingPortalSessionMutationOptions = BaseMutationOptions<
   CreateBillingPortalSessionMutation,
   CreateBillingPortalSessionMutationVariables
+>;
+export const CreateSetupIntent = gql`
+  mutation CreateSetupIntent {
+    createSetupIntent {
+      clientSecret
+      publishableKey
+    }
+  }
+`;
+export type CreateSetupIntentMutationFn = MutationFunction<
+  CreateSetupIntentMutation,
+  CreateSetupIntentMutationVariables
+>;
+
+/**
+ * __useCreateSetupIntentMutation__
+ *
+ * To run a mutation, you first call `useCreateSetupIntentMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCreateSetupIntentMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [createSetupIntentMutation, { data, loading, error }] = useCreateSetupIntentMutation({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useCreateSetupIntentMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    CreateSetupIntentMutation,
+    CreateSetupIntentMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    CreateSetupIntentMutation,
+    CreateSetupIntentMutationVariables
+  >(CreateSetupIntent, options);
+}
+export type CreateSetupIntentMutationHookResult = ReturnType<
+  typeof useCreateSetupIntentMutation
+>;
+export type CreateSetupIntentMutationResult =
+  Apollo.MutationResult<CreateSetupIntentMutation>;
+export type CreateSetupIntentMutationOptions = BaseMutationOptions<
+  CreateSetupIntentMutation,
+  CreateSetupIntentMutationVariables
+>;
+export const RetryLatestInvoice = gql`
+  mutation RetryLatestInvoice($setupIntentId: String!) {
+    retryLatestInvoice(setupIntentId: $setupIntentId) {
+      success
+      status
+      message
+    }
+  }
+`;
+export type RetryLatestInvoiceMutationFn = MutationFunction<
+  RetryLatestInvoiceMutation,
+  RetryLatestInvoiceMutationVariables
+>;
+
+/**
+ * __useRetryLatestInvoiceMutation__
+ *
+ * To run a mutation, you first call `useRetryLatestInvoiceMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRetryLatestInvoiceMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [retryLatestInvoiceMutation, { data, loading, error }] = useRetryLatestInvoiceMutation({
+ *   variables: {
+ *      setupIntentId: // value for 'setupIntentId'
+ *   },
+ * });
+ */
+export function useRetryLatestInvoiceMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    RetryLatestInvoiceMutation,
+    RetryLatestInvoiceMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    RetryLatestInvoiceMutation,
+    RetryLatestInvoiceMutationVariables
+  >(RetryLatestInvoice, options);
+}
+export type RetryLatestInvoiceMutationHookResult = ReturnType<
+  typeof useRetryLatestInvoiceMutation
+>;
+export type RetryLatestInvoiceMutationResult =
+  Apollo.MutationResult<RetryLatestInvoiceMutation>;
+export type RetryLatestInvoiceMutationOptions = BaseMutationOptions<
+  RetryLatestInvoiceMutation,
+  RetryLatestInvoiceMutationVariables
 >;
 export const GetDonationPaymentLink = gql`
   query GetDonationPaymentLink {
