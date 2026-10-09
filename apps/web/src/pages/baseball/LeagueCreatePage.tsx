@@ -742,8 +742,6 @@ const LEAGUE_FORM_MESSAGES = {
     `Custom era's first year must be between ${min} and ${max}.`,
   customEraEndYearOutOfRange: (min: number, max: number) =>
     `Custom era's last year must be between ${min} and ${max}.`,
-  customEraStrayFields:
-    'Custom era years should only be set when Custom Era is selected.',
   draftDateInPast: 'Draft date must be in the future.',
   salaryCapRequired: 'Salary cap amount is required.',
   salaryCapOutOfRange: (min: number, max: number) =>
@@ -847,8 +845,6 @@ export function validateFormFull(
           currentYear,
         );
     }
-  } else if (f.customEraStartYear != null || f.customEraEndYear != null) {
-    errs.customEra = LEAGUE_FORM_MESSAGES.customEraStrayFields;
   }
   if (f.draftDate && f.draftDate < new Date())
     errs.draftDate = LEAGUE_FORM_MESSAGES.draftDateInPast;

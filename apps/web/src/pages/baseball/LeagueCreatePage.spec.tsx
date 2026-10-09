@@ -2067,14 +2067,14 @@ describe('validateFormFull — custom era year bounds (LS-6082, LS-6093)', () =>
     expect(errs.customEra).toBeDefined();
   });
 
-  it('rejects customEraStartYear/customEraEndYear set when eraFilter is not custom', () => {
+  it('ignores leftover customEraStartYear/customEraEndYear when eraFilter is not custom', () => {
     const errs = validateFormFull({
       ...baseFormData,
       baseballEraFilter: 'all',
       customEraStartYear: 1940,
       customEraEndYear: 1960,
     });
-    expect(errs.customEra).toBeDefined();
+    expect(errs.customEra).toBeUndefined();
   });
 
   it('does not flag customEra when eraFilter is not custom and years are unset', () => {

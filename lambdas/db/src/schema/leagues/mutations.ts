@@ -57,6 +57,7 @@ import {
   isPoolValidForSport,
   isRosterSizeValidForSport,
   normalizeSport,
+  resolveCustomEraYears,
   ROSTER_RANGE_BY_SPORT,
 } from './sport-validation';
 import { generateSecureInviteCode } from './helpers';
@@ -1080,8 +1081,11 @@ builder.mutationField('createLeagueAndTeams', (t) =>
               | null
               | undefined) ?? 'all',
           baseballHofOnly: inputHofOnly ?? false,
-          customEraStartYear: inputCustomEraStartYear ?? null,
-          customEraEndYear: inputCustomEraEndYear ?? null,
+          ...resolveCustomEraYears(
+            inputEraFilter,
+            inputCustomEraStartYear,
+            inputCustomEraEndYear,
+          ),
           isPublic: inputIsPublic ?? false,
           // Salary cap settings
           salaryCapEnabled: inputSalaryCapEnabled ?? false,

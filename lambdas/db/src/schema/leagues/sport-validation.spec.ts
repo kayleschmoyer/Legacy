@@ -21,6 +21,7 @@ import {
   isPoolValidForSport,
   isRosterSizeValidForSport,
   normalizeSport,
+  resolveCustomEraYears,
   ROSTER_RANGE_BY_SPORT,
   VALID_ERAS_BY_SPORT,
   VALID_POOLS_BY_SPORT,
@@ -228,6 +229,24 @@ describe('sport-validation', () => {
     it('matches CUSTOM_ERA_MIN_YEAR_BY_SPORT for both sports', () => {
       expect(CUSTOM_ERA_MIN_YEAR_BY_SPORT.baseball).toBe(1871);
       expect(CUSTOM_ERA_MIN_YEAR_BY_SPORT.football).toBe(1920);
+    });
+  });
+
+  describe('resolveCustomEraYears (LS-10500)', () => {
+    it('keeps the years for the custom era', () => {
+      expect(resolveCustomEraYears('custom', 2000, 2020)).toEqual({
+        customEraStartYear: 2000,
+        customEraEndYear: 2020,
+      });
+    });
+
+    it('drops stray years for any non-custom era', () => {
+      for (const era of ['all', 'modern', null, undefined]) {
+        expect(resolveCustomEraYears(era, 2000, 2020)).toEqual({
+          customEraStartYear: null,
+          customEraEndYear: null,
+        });
+      }
     });
   });
 });

@@ -128,6 +128,25 @@ export function isCustomEraYearValidForSport(
 }
 
 /**
+ * Custom era bounds to persist (LS-10500). The years only mean something for
+ * the `custom` era; stray values left over from a switch back to another era
+ * are ignored rather than stored.
+ */
+export function resolveCustomEraYears(
+  eraFilter: string | null | undefined,
+  startYear: number | null | undefined,
+  endYear: number | null | undefined,
+): { customEraStartYear: number | null; customEraEndYear: number | null } {
+  if (eraFilter !== 'custom') {
+    return { customEraStartYear: null, customEraEndYear: null };
+  }
+  return {
+    customEraStartYear: startYear ?? null,
+    customEraEndYear: endYear ?? null,
+  };
+}
+
+/**
  * False when a new league asks for a defensive format whose players don't
  * exist yet (LS-10727). A D/ST football league has a required DST roster
  * slot, and no team-defense players exist until the ingest ships, so the
