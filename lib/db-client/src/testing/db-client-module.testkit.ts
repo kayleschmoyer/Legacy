@@ -96,8 +96,40 @@ export function mockDbClientModule(
     ...exportOverrides
   } = overrides;
 
+  // `applyTierChangeSideEffects` (LS-7397) closes over the real downgrade /
+  // unfreeze functions, so a spec that stubs those two would otherwise hit the
+  // real DB path. Unless the spec overrides the helper itself, rebuild it on top
+  // of whichever downgrade / unfreeze functions the spec supplied.
+  const tierSideEffects =
+    'applyTierChangeSideEffects' in exportOverrides
+      ? {}
+      : {
+          applyTierChangeSideEffects: async (
+            userId: number,
+            previousTier: 'free' | 'premium' | null,
+            newTier: 'free' | 'premium',
+            dbOptions: unknown,
+          ): Promise<void> => {
+            const downgrade = (exportOverrides.handleSubscriptionDowngrade ??
+              actual.handleSubscriptionDowngrade) as (
+              ...args: unknown[]
+            ) => Promise<void>;
+            const unfreeze = (exportOverrides.clearLeagueTierFreezes ??
+              actual.clearLeagueTierFreezes) as (
+              ...args: unknown[]
+            ) => Promise<void>;
+            if (previousTier === newTier) return;
+            if (newTier === 'free') {
+              await downgrade(userId, dbOptions);
+            } else if (previousTier === 'free') {
+              await unfreeze(userId, dbOptions);
+            }
+          },
+        };
+
   return {
     ...actual,
+    ...tierSideEffects,
     ...exportOverrides,
     PublicSchema: { ...actual.PublicSchema, ...publicOverrides },
     InternalSchema: { ...actual.InternalSchema, ...internalOverrides },

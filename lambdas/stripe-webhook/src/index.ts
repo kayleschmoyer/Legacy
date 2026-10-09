@@ -8,8 +8,7 @@ import {
   retrieveSecretParameterValue,
 } from '@legacy-sports/aws-utils';
 import {
-  clearLeagueTierFreezes,
-  handleSubscriptionDowngrade,
+  applyTierChangeSideEffects,
   InternalSchema,
   runWithInternalClient,
 } from '@legacy-sports/db-client';
@@ -252,7 +251,12 @@ async function upsertSubscription(
   });
 
   // Apply tier-change side effects (league freezes / feature conversions)
-  await applyTierChangeSideEffects(userId, previousTier, newTier);
+  await applyTierChangeSideEffects(
+    userId,
+    previousTier,
+    newTier,
+    getDbOptions(),
+  );
   return true;
 }
 
@@ -346,42 +350,13 @@ async function updateSubscriptionStatus(
   if (result === null) return null;
 
   const { userId, previousTier } = result;
-  await applyTierChangeSideEffects(userId, previousTier, newTier);
+  await applyTierChangeSideEffects(
+    userId,
+    previousTier,
+    newTier,
+    getDbOptions(),
+  );
   return userId;
-}
-
-// ── Tier-change side effects ──────────────────────────────────────────────────
-
-/**
- * Apply league-level side effects when a user's subscription tier changes.
- *
- * - premium → free: run the downgrade handler (freeze excess leagues, convert
- *   salary-cap / FAAB-waiver settings)
- * - free → premium: clear any tier-based league freezes
- * - No change: no-op
- */
-async function applyTierChangeSideEffects(
-  userId: number,
-  previousTier: 'free' | 'premium' | null,
-  newTier: 'free' | 'premium',
-): Promise<void> {
-  if (previousTier === newTier) return;
-
-  if (newTier === 'free') {
-    LOGGER.info('Tier downgrade detected — applying downgrade restrictions', {
-      userId,
-      previousTier,
-      newTier,
-    });
-    await handleSubscriptionDowngrade(userId, getDbOptions());
-  } else if (newTier === 'premium' && previousTier === 'free') {
-    LOGGER.info('Tier upgrade detected — clearing tier freezes', {
-      userId,
-      previousTier,
-      newTier,
-    });
-    await clearLeagueTierFreezes(userId, getDbOptions());
-  }
 }
 
 // ── Event handlers ────────────────────────────────────────────────────────────
@@ -825,7 +800,12 @@ async function handlePaymentFailed(
   if (result === null) return null;
 
   if (!result.withinGracePeriod) {
-    await applyTierChangeSideEffects(result.userId, 'premium', 'free');
+    await applyTierChangeSideEffects(
+      result.userId,
+      'premium',
+      'free',
+      getDbOptions(),
+    );
   }
 
   return result.userId;
@@ -1142,7 +1122,12 @@ async function handleChargeRefunded(
       chargeId: charge.id,
       amountRefunded,
     });
-    await applyTierChangeSideEffects(userId, previousTier, 'free');
+    await applyTierChangeSideEffects(
+      userId,
+      previousTier,
+      'free',
+      getDbOptions(),
+    );
     if (stripeSubscriptionId) {
       await cancelStripeSubscriptionSafely(stripeSubscriptionId, 'refund');
     }
@@ -1261,7 +1246,12 @@ async function handleChargeDisputeCreated(
     disputeStatus: dispute.status,
   });
 
-  await applyTierChangeSideEffects(userId, previousTier, 'free');
+  await applyTierChangeSideEffects(
+    userId,
+    previousTier,
+    'free',
+    getDbOptions(),
+  );
   if (stripeSubscriptionId) {
     await cancelStripeSubscriptionSafely(stripeSubscriptionId, 'dispute');
   }

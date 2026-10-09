@@ -38,6 +38,7 @@ export {
   clearLeagueTierFreezes,
   FREE_TIER_LEAGUE_LIMIT,
 } from './SubscriptionDowngradeService';
+export { applyTierChangeSideEffects } from './TierChangeSideEffectsService';
 export {
   SeasonDraftGameService,
   SeasonDraftJoinError,

@@ -15,8 +15,7 @@ import {
   retrieveSecretParameterValue,
 } from '@legacy-sports/aws-utils';
 import {
-  clearLeagueTierFreezes,
-  handleSubscriptionDowngrade,
+  applyTierChangeSideEffects,
   InternalSchema,
   runWithInternalClient,
 } from '@legacy-sports/db-client';
@@ -251,7 +250,7 @@ async function upsertAppleSubscription(
       .where(eq(InternalSchema.usersInAppInternal.id, userId));
   });
 
-  await applyTierChangeSideEffects(userId, previousTier, tier);
+  await applyTierChangeSideEffects(userId, previousTier, tier, getDbOptions());
 }
 
 async function findUserIdByOriginalTransactionId(
@@ -270,32 +269,6 @@ async function findUserIdByOriginalTransactionId(
       .limit(1);
     return rows[0]?.userId ?? null;
   });
-}
-
-// ── Tier-change side effects ──────────────────────────────────────────────────
-
-async function applyTierChangeSideEffects(
-  userId: number,
-  previousTier: 'free' | 'premium' | null,
-  newTier: 'free' | 'premium',
-): Promise<void> {
-  if (previousTier === newTier) return;
-
-  if (newTier === 'free') {
-    LOGGER.info('Apple IAP — tier downgrade detected', {
-      userId,
-      previousTier,
-      newTier,
-    });
-    await handleSubscriptionDowngrade(userId, getDbOptions());
-  } else if (newTier === 'premium' && previousTier === 'free') {
-    LOGGER.info('Apple IAP — tier upgrade detected', {
-      userId,
-      previousTier,
-      newTier,
-    });
-    await clearLeagueTierFreezes(userId, getDbOptions());
-  }
 }
 
 // ── Notification handler ──────────────────────────────────────────────────────

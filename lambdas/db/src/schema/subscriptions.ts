@@ -1,6 +1,5 @@
 import {
-  clearLeagueTierFreezes,
-  handleSubscriptionDowngrade,
+  applyTierChangeSideEffects,
   InternalSchema,
   PublicSchema,
   reapplyLeagueRestrictions,
@@ -1450,7 +1449,14 @@ export async function expireSubscriptionGracePeriods(
       }
       const row = claimed;
 
-      await handleSubscriptionDowngrade(row.userId, getDbOptions());
+      // The claim above only matches premium rows and the UPDATE just wrote
+      // tier='free', so this is always a premium → free transition.
+      await applyTierChangeSideEffects(
+        row.userId,
+        'premium',
+        'free',
+        getDbOptions(),
+      );
 
       if (notificationService) {
         try {
@@ -1634,13 +1640,12 @@ builder.mutationField('verifyApplePurchase', (t) =>
       });
 
       // Apply tier-change side effects
-      if (previousTier !== tier) {
-        if (tier === 'free') {
-          await handleSubscriptionDowngrade(userId, getDbOptions());
-        } else if (tier === 'premium' && previousTier === 'free') {
-          await clearLeagueTierFreezes(userId, getDbOptions());
-        }
-      }
+      await applyTierChangeSideEffects(
+        userId,
+        previousTier,
+        tier,
+        getDbOptions(),
+      );
 
       LOGGER.info('verifyApplePurchase — subscription recorded', {
         userId,
@@ -2032,13 +2037,12 @@ builder.mutationField('verifyGooglePurchase', (t) =>
       });
 
       // Apply tier-change side effects
-      if (previousTier !== tier) {
-        if (tier === 'free') {
-          await handleSubscriptionDowngrade(userId, getDbOptions());
-        } else if (tier === 'premium' && previousTier === 'free') {
-          await clearLeagueTierFreezes(userId, getDbOptions());
-        }
-      }
+      await applyTierChangeSideEffects(
+        userId,
+        previousTier,
+        tier,
+        getDbOptions(),
+      );
 
       LOGGER.info('verifyGooglePurchase — subscription recorded', {
         userId,
@@ -2167,13 +2171,12 @@ builder.mutationField('restoreGooglePurchases', (t) =>
       });
 
       // Apply tier-change side effects
-      if (previousTier !== tier) {
-        if (tier === 'free') {
-          await handleSubscriptionDowngrade(userId, getDbOptions());
-        } else if (tier === 'premium' && previousTier === 'free') {
-          await clearLeagueTierFreezes(userId, getDbOptions());
-        }
-      }
+      await applyTierChangeSideEffects(
+        userId,
+        previousTier,
+        tier,
+        getDbOptions(),
+      );
 
       LOGGER.info('restoreGooglePurchases — subscription restored', {
         userId,
