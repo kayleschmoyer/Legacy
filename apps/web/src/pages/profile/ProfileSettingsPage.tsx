@@ -41,6 +41,9 @@ import { useUsernameAvailability } from '../../hooks/useUsernameAvailability';
 import { trackSignOut } from '../../utils/analytics';
 import { showToast } from '../../components/layout/SuccessToast';
 
+/** LS-7238: how long the premium "Undo" action stays available. */
+const AVATAR_UNDO_MS = 10_000;
+
 /** Preset avatars are stored as relative paths; the API requires absolute HTTPS URLs. */
 const resolvePresetUrl = (url: string): string =>
   `${window.location.origin}${url}`;
@@ -354,13 +357,34 @@ const ProfileSettingsPage: React.FC = () => {
   }, [searchParams, navigate, refetchUser, refetchIdentities]);
 
   const handleAvatarSelect = (url: string | null) => {
+    const previousUrl = currentAvatarUrl;
     // Resolve from the promise, not onCompleted: Apollo skips per-call
     // callbacks once the component unmounts, and the user may have navigated
     // away. Failures already surface via the global apollo:error toast.
     updateUserAvatar({ variables: { avatarUrl: url } })
       .then((result) => {
         if (result.error) return;
-        showToast(url ? 'Avatar updated' : 'Avatar removed');
+        const message = url ? 'Avatar updated' : 'Avatar removed';
+        if (isPremium) {
+          // LS-7238: premium accounts get a 10s undo back to the prior avatar.
+          showToast(message, {
+            durationMs: AVATAR_UNDO_MS,
+            action: {
+              label: 'Undo',
+              onClick: () => {
+                updateUserAvatar({ variables: { avatarUrl: previousUrl } })
+                  .then((undoResult) => {
+                    if (undoResult.error) return;
+                    showToast('Avatar restored');
+                    void refetchUser();
+                  })
+                  .catch(() => undefined);
+              },
+            },
+          });
+        } else {
+          showToast(message);
+        }
         void refetchUser();
       })
       .catch(() => undefined);

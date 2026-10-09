@@ -14,6 +14,7 @@ const mockShowToast = jest.fn();
 const mockUpdateUserAvatar = jest.fn();
 const mockRefetchUser = jest.fn();
 let mockAvatarLoading = false;
+let mockIsPremium = false;
 let mockPickerProps: PickerProps | undefined;
 
 jest.mock('react-router-dom', () => ({
@@ -22,7 +23,7 @@ jest.mock('react-router-dom', () => ({
 }));
 
 jest.mock('../../hooks/useIsPremium', () => ({
-  useIsPremiumStatus: () => ({ isPremium: false, isLoading: false }),
+  useIsPremiumStatus: () => ({ isPremium: mockIsPremium, isLoading: false }),
 }));
 
 jest.mock('@legacy-sports/shared-components/ui', () => {
@@ -100,8 +101,9 @@ jest.mock('../../components/PageMeta', () => ({
 }));
 
 jest.mock('../../components/layout/SuccessToast', () => ({
-  showToast: (message: string) => {
-    mockShowToast(message);
+  showToast: (message: string, options?: unknown) => {
+    if (options === undefined) mockShowToast(message);
+    else mockShowToast(message, options);
   },
 }));
 
@@ -109,6 +111,7 @@ describe('ProfileSettingsPage avatar save (LS-7236)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockAvatarLoading = false;
+    mockIsPremium = false;
     mockPickerProps = undefined;
   });
 
@@ -174,5 +177,52 @@ describe('ProfileSettingsPage avatar save (LS-7236)', () => {
 
     expect(confirmSpy).not.toHaveBeenCalled();
     confirmSpy.mockRestore();
+  });
+
+  it('offers a 10s Undo to premium users that restores the previous avatar (LS-7238)', async () => {
+    mockIsPremium = true;
+    mockUpdateUserAvatar.mockResolvedValue({});
+    render(<ProfileSettingsPage />);
+
+    await act(async () => {
+      mockPickerProps?.onSelect('/avatars/fox.png');
+      await Promise.resolve();
+    });
+
+    expect(mockShowToast).toHaveBeenCalledWith(
+      'Avatar updated',
+      expect.objectContaining({
+        durationMs: 10_000,
+        action: expect.objectContaining({ label: 'Undo' }),
+      }),
+    );
+
+    const { action } = mockShowToast.mock.calls[0][1] as {
+      action: { onClick: () => void };
+    };
+    mockUpdateUserAvatar.mockClear();
+    await act(async () => {
+      action.onClick();
+      await Promise.resolve();
+    });
+
+    expect(mockUpdateUserAvatar).toHaveBeenCalledWith({
+      variables: { avatarUrl: null },
+    });
+    expect(mockShowToast).toHaveBeenCalledWith('Avatar restored');
+  });
+
+  it('does not offer Undo to non-premium users (LS-7238)', async () => {
+    mockUpdateUserAvatar.mockResolvedValue({});
+    render(<ProfileSettingsPage />);
+    await act(async () => {
+      mockPickerProps?.onSelect('/avatars/fox.png');
+      await Promise.resolve();
+    });
+    expect(mockShowToast).toHaveBeenCalledWith('Avatar updated');
+    expect(mockShowToast).not.toHaveBeenCalledWith(
+      'Avatar updated',
+      expect.anything(),
+    );
   });
 });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { showToast, SuccessToast } from './SuccessToast';
 
 jest.mock('../../context/ThemeContext', () => ({
@@ -22,6 +22,24 @@ describe('SuccessToast', () => {
     act(() => {
       jest.advanceTimersByTime(4000);
     });
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('renders an action button that dismisses and fires its handler (LS-7238)', () => {
+    const onClick = jest.fn();
+    render(<SuccessToast />);
+    act(() =>
+      showToast('Avatar updated', {
+        durationMs: 10_000,
+        action: { label: 'Undo', onClick },
+      }),
+    );
+    act(() => {
+      jest.advanceTimersByTime(4000);
+    });
+    expect(screen.getByRole('status')).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(onClick).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('status')).toBeNull();
   });
 });

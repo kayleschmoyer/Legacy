@@ -15,14 +15,29 @@ const DISMISS_MS = 4000;
  * has unmounted (e.g. an in-flight mutation that resolves post-navigation,
  * LS-7236). Rendered by {@link SuccessToast}, which lives at the app root.
  */
-export function showToast(message: string): void {
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
+export interface ToastOptions {
+  /** Optional button rendered beside the message (e.g. "Undo"). */
+  action?: ToastAction;
+  /** Overrides the default auto-dismiss delay. */
+  durationMs?: number;
+}
+
+export function showToast(message: string, options?: ToastOptions): void {
   if (typeof window === 'undefined') return;
-  window.dispatchEvent(new CustomEvent(TOAST_EVENT, { detail: { message } }));
+  window.dispatchEvent(
+    new CustomEvent(TOAST_EVENT, { detail: { message, ...options } }),
+  );
 }
 
 /** Global, route-independent success toast driven by {@link showToast}. */
 export function SuccessToast(): React.JSX.Element | null {
   const [message, setMessage] = useState<string | null>(null);
+  const [action, setAction] = useState<ToastAction | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const { resolvedTheme } = useThemeContext();
   const isLight = resolvedTheme === 'light';
@@ -30,15 +45,18 @@ export function SuccessToast(): React.JSX.Element | null {
   const dismiss = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     setMessage(null);
+    setAction(null);
   }, []);
 
   useEffect(() => {
     const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ message?: string }>).detail;
+      const detail = (e as CustomEvent<{ message?: string } & ToastOptions>)
+        .detail;
       if (!detail?.message) return;
       if (timerRef.current) clearTimeout(timerRef.current);
       setMessage(detail.message);
-      timerRef.current = setTimeout(dismiss, DISMISS_MS);
+      setAction(detail.action ?? null);
+      timerRef.current = setTimeout(dismiss, detail.durationMs ?? DISMISS_MS);
     };
     window.addEventListener(TOAST_EVENT, handler);
     return () => {
@@ -72,6 +90,28 @@ export function SuccessToast(): React.JSX.Element | null {
       }}
     >
       {message}
+      {action && (
+        <button
+          type="button"
+          onClick={() => {
+            dismiss();
+            action.onClick();
+          }}
+          style={{
+            marginLeft: 12,
+            padding: 0,
+            background: 'none',
+            border: 'none',
+            color: WHITE,
+            font: 'inherit',
+            fontWeight: 700,
+            textDecoration: 'underline',
+            cursor: 'pointer',
+          }}
+        >
+          {action.label}
+        </button>
+      )}
     </div>
   );
 }
