@@ -29,6 +29,7 @@ import {
   validateUsername,
 } from '@legacy-sports/utils';
 import { getSessionStatus } from './sessionStatus';
+import { hasPendingBillingAction } from './pendingBillingAction';
 import { signOut } from './signOut';
 import TwoFactorSection from '../../components/profile/TwoFactorSection';
 import { PageMeta } from '../../components/PageMeta';
@@ -226,6 +227,11 @@ const ProfileSettingsPage: React.FC = () => {
   const auth = useAuth();
   const user = auth?.user;
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
+  const [pendingBilling, setPendingBilling] = useState(false);
+  const openSignOutConfirm = () => {
+    setPendingBilling(hasPendingBillingAction());
+    setConfirmingSignOut(true);
+  };
   const handleSignOut = () => {
     setConfirmingSignOut(false);
     trackSignOut('profile_settings');
@@ -1292,7 +1298,7 @@ const ProfileSettingsPage: React.FC = () => {
                 <SignOutButton
                   role="button"
                   tabIndex={0}
-                  onPress={() => setConfirmingSignOut(true)}
+                  onPress={openSignOutConfirm}
                   onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => {
                     if (e.repeat) {
                       return;
@@ -1301,7 +1307,7 @@ const ProfileSettingsPage: React.FC = () => {
                       if (e.key === ' ') {
                         e.preventDefault();
                       }
-                      setConfirmingSignOut(true);
+                      openSignOutConfirm();
                     }
                   }}
                 >
@@ -1318,7 +1324,11 @@ const ProfileSettingsPage: React.FC = () => {
                   onOpenChange={setConfirmingSignOut}
                   eyebrow="Account"
                   title="Sign out?"
-                  description="You will be signed out of this device and redirected to the login page."
+                  description={
+                    pendingBilling
+                      ? 'You have a pending billing action. Signing out now may leave it incomplete — finish it in your billing tab first, or sign out anyway. You will be redirected to the login page.'
+                      : 'You will be signed out of this device and redirected to the login page.'
+                  }
                   confirmLabel="Sign out"
                   cancelLabel="Stay signed in"
                   destructive

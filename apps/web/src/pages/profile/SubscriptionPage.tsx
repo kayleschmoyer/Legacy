@@ -26,6 +26,10 @@ import {
   useCreateCheckoutSessionMutation,
   useGetMySubscriptionQuery,
 } from '@legacy-sports/graphql';
+import {
+  clearPendingBillingAction,
+  markPendingBillingAction,
+} from './pendingBillingAction';
 import { PaymentRecoveryModal } from './PaymentRecoveryModal';
 import { PageMeta } from '../../components/PageMeta';
 import { PriceSkeleton } from '../../components/PriceSkeleton';
@@ -671,6 +675,10 @@ const SubscriptionPage: React.FC = () => {
     searchParams.get('interval') === 'monthly' ? 'monthly' : 'annual',
   );
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  // Landing back here means the Stripe hand-off finished (or was abandoned).
+  useEffect(() => {
+    clearPendingBillingAction();
+  }, []);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [portalError, setPortalError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -868,6 +876,7 @@ const SubscriptionPage: React.FC = () => {
 
       const url = result.data?.createCheckoutSession?.url;
       if (url) {
+        markPendingBillingAction();
         window.location.href = url;
         return;
       }
@@ -904,6 +913,7 @@ const SubscriptionPage: React.FC = () => {
 
       const url = result.data?.createBillingPortalSession?.url;
       if (url) {
+        markPendingBillingAction();
         window.location.href = url;
         return;
       }

@@ -49,6 +49,7 @@ jest.mock('@legacy-sports/shared-components/ui', () => {
     Dialog: ({
       open,
       title,
+      description,
       confirmLabel,
       cancelLabel,
       onConfirm,
@@ -56,6 +57,7 @@ jest.mock('@legacy-sports/shared-components/ui', () => {
     }: {
       open?: boolean;
       title: string;
+      description?: string;
       confirmLabel?: string;
       cancelLabel?: string;
       onConfirm?: () => void;
@@ -63,6 +65,7 @@ jest.mock('@legacy-sports/shared-components/ui', () => {
     }) =>
       open ? (
         <div role="dialog" aria-label={title}>
+          <p>{description}</p>
           <button onClick={onCancel}>{cancelLabel}</button>
           <button onClick={onConfirm}>{confirmLabel}</button>
         </div>
@@ -288,6 +291,16 @@ describe('ProfileSettingsPage sign-out confirmation (LS-7221)', () => {
 
     expect(mockSignOut).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('warns about a pending billing action started in another tab (LS-7225)', () => {
+    window.localStorage.setItem('ls:pendingBillingAction', String(Date.now()));
+    renderPage(null);
+
+    fireEvent.click(screen.getByText('Sign Out'));
+
+    expect(screen.getByText(/You have a pending billing action/)).toBeVisible();
+    window.localStorage.clear();
   });
 
   it('stays signed in when the user cancels', () => {
