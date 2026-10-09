@@ -1142,6 +1142,76 @@ test(
   },
 );
 
+test(
+  'a pruned slot leaves dangling nested symlinks: --check reports them and the install sweeps them (LS-10367)',
+  { skip: SYMLINK_OK ? false : 'no symlink capability' },
+  () => {
+    const root = freshMainRepo();
+    try {
+      const wt = makeWorktree(root, 'pruned-nested-wt', LOCK_WORKSPACE);
+      const hash = runLink([
+        `--worktree=${wt}`,
+        `--main-repo=${root}`,
+        '--print-hash',
+      ]).trim();
+      const pool = join(root, '.modules-pool');
+      const slotDir = join(pool, hash);
+      makeHealthyNodeModules(join(slotDir, 'node_modules'));
+      const slotBin = join(
+        slotDir,
+        'nested',
+        'apps',
+        'app',
+        'node_modules',
+        '.bin',
+      );
+      mkdirSync(slotBin, { recursive: true });
+      writeFileSync(join(slotBin, 'tool'), 'x');
+
+      runLink([`--worktree=${wt}`, `--main-repo=${root}`]);
+      const binLink = join(wt, 'apps', 'app', 'node_modules', '.bin');
+      assert.ok(
+        lstatSync(binLink).isSymbolicLink(),
+        'precondition: .bin must be linked into the worktree',
+      );
+
+      // gc.mjs prunes the slot outright — nothing is quarantined, so the
+      // quarantine path never runs and .bin is left dangling.
+      rmSync(slotDir, { recursive: true, force: true });
+      assert.ok(!existsSync(binLink), 'precondition: .bin must now dangle');
+
+      const check = spawnSync(
+        'node',
+        [LINK, `--worktree=${wt}`, `--main-repo=${root}`, '--check'],
+        { encoding: 'utf-8' },
+      );
+      assert.equal(check.status, 1);
+      assert.match(check.stdout, /dangling nested node_modules symlinks/);
+      assert.ok(check.stdout.includes(binLink), '--check must name the link');
+
+      const shim = join(root, 'fake-bin');
+      makeFakePnpm(shim);
+      const out = runLink(
+        [`--worktree=${wt}`, `--main-repo=${root}`],
+        fakePnpmEnv(shim),
+      );
+      assert.doesNotMatch(
+        out,
+        /\[quarantine\]/,
+        'no slot existed to quarantine',
+      );
+      assert.match(out, /\[sweep\] removed 1 dangling nested/);
+      assert.match(out, /slot materialised and linked/);
+      assert.ok(
+        !lstatExistsHelper(binLink),
+        'the dangling .bin link must be swept before the install',
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
 function lstatExistsHelper(p) {
   try {
     lstatSync(p);

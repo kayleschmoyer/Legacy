@@ -252,7 +252,22 @@ if (args['check']) {
     console.log('[check] worktree node_modules link is UNHEALTHY:');
     for (const f of linkFindings) console.log(`  - ${f}`);
   }
-  if (slotState.healthy && linkFindings.length === 0) process.exit(0);
+  const danglingNested = findDanglingNestedSymlinks();
+  if (danglingNested.length === 0) {
+    console.log('[check] no dangling nested node_modules symlinks.');
+  } else {
+    console.log('[check] dangling nested node_modules symlinks are UNHEALTHY:');
+    for (const d of danglingNested) {
+      console.log(`  - ${d.path} -> ${safeReadlink(d.path) ?? '?'}`);
+    }
+  }
+  if (
+    slotState.healthy &&
+    linkFindings.length === 0 &&
+    danglingNested.length === 0
+  ) {
+    process.exit(0);
+  }
   console.log('');
   console.log(
     'Re-run without --check to quarantine/rebuild the slot and (re)link node_modules automatically.',
@@ -312,6 +327,7 @@ function materialiseSlot(noFrozen = false) {
   // pnpm needs to write a real node_modules in the worktree, so clear any
   // existing symlink/dir first.
   removeNodeModulesEntry(nmPath);
+  sweepDanglingNestedSymlinks();
 
   const installFlag = noFrozen ? '--no-frozen-lockfile' : '--frozen-lockfile';
   console.log(`[install] pnpm install ${installFlag} (in worktree)…`);
@@ -1009,48 +1025,38 @@ function quarantineSlot(findings) {
         'Stop those processes (e.g. `make kill-stale`) and re-run this script.',
     );
   }
-  sweepDanglingNestedSymlinks();
 }
 
 /**
- * After quarantining a slot, the worktree's nested per-package node_modules
- * entries from a PREVIOUS linkNestedWorkspaceModules() run may still point
- * (directly, or via an entry inside them) at the slot that was just renamed
- * away — leaving them dangling. materialiseSlot() only clears the root
- * node_modules before running `pnpm install`, so a dangling nested link is
- * left in place and pnpm's mkdir through it fails with ENOENT (LS-9745).
- * Sweep and remove any dangling node_modules symlink — the outer per-package
- * dir itself (older whole-dir-symlink layout, pre-LS-9563) or an individual
- * entry inside a real, per-worktree directory (current layout) — so the
- * install proceeds against a clean tree. linkNestedWorkspaceModules() rebuilds
- * whatever it removes once materialisation completes.
+ * The worktree's nested per-package node_modules entries from a PREVIOUS
+ * linkNestedWorkspaceModules() run may point (directly, or via an entry inside
+ * them) at a pool slot that has since been renamed away or pruned by gc.mjs —
+ * leaving them dangling. materialiseSlot() only clears the root node_modules
+ * before running `pnpm install`, so a dangling nested link is left in place
+ * and pnpm's mkdir through it fails with ENOENT (LS-9745, LS-10367).
+ * Read-only: returns every dangling node_modules symlink — the outer
+ * per-package dir itself (older whole-dir-symlink layout, pre-LS-9563) or an
+ * individual entry inside a real, per-worktree directory (current layout,
+ * including `.bin` and one level into @scopes). Shared by --check and the
+ * pre-install sweep.
  */
-function sweepDanglingNestedSymlinks() {
-  let removed = 0;
+function findDanglingNestedSymlinks() {
+  const found = [];
   for (const rel of nestedNodeModulesRelPaths(lockfilePath)) {
     const dest = join(worktree, rel, 'node_modules');
     const st = safeLstat(dest);
     if (!st) continue;
     if (st.isSymbolicLink()) {
-      // Outer whole-dir symlink (pre-LS-9563 layout) — remove if dangling.
-      if (!existsSync(dest)) {
-        removeNodeModulesEntry(dest);
-        removed++;
-      }
+      if (!existsSync(dest)) found.push({ path: dest, outer: true });
       continue;
     }
     if (!st.isDirectory()) continue;
-    // Current layout: dest is a real, per-worktree directory; sweep its
-    // entries (including one level into @scopes) for dangling symlinks.
     for (const entry of safeReaddirNames(dest)) {
       const entryPath = join(dest, entry);
       const entrySt = safeLstat(entryPath);
       if (!entrySt) continue;
       if (entrySt.isSymbolicLink()) {
-        if (!existsSync(entryPath)) {
-          rmSync(entryPath, { force: true });
-          removed++;
-        }
+        if (!existsSync(entryPath)) found.push({ path: entryPath });
         continue;
       }
       if (entry.startsWith('@') && entrySt.isDirectory()) {
@@ -1058,16 +1064,32 @@ function sweepDanglingNestedSymlinks() {
           const subPath = join(entryPath, sub);
           const subSt = safeLstat(subPath);
           if (subSt && subSt.isSymbolicLink() && !existsSync(subPath)) {
-            rmSync(subPath, { force: true });
-            removed++;
+            found.push({ path: subPath });
           }
         }
       }
     }
   }
-  if (removed > 0) {
+  return found;
+}
+
+/**
+ * Remove every dangling nested node_modules symlink so `pnpm install`
+ * proceeds against a clean tree. Runs on every materialise, not only after a
+ * quarantine: a slot pruned by gc.mjs no longer exists, so nothing is
+ * quarantined, yet the worktree's nested links into it still dangle
+ * (LS-10367). linkNestedWorkspaceModules() rebuilds whatever is removed once
+ * materialisation completes.
+ */
+function sweepDanglingNestedSymlinks() {
+  const dangling = findDanglingNestedSymlinks();
+  for (const { path, outer } of dangling) {
+    if (outer) removeNodeModulesEntry(path);
+    else rmSync(path, { force: true });
+  }
+  if (dangling.length > 0) {
     console.log(
-      `[quarantine] removed ${removed} dangling nested node_modules symlink(s) left pointing at the quarantined slot.`,
+      `[sweep] removed ${dangling.length} dangling nested node_modules symlink(s) left pointing at a quarantined or pruned slot.`,
     );
   }
 }
