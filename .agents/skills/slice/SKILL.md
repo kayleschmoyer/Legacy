@@ -90,7 +90,13 @@ Ask for confirmation or changes:
 
 ### Step 4: Create child tickets
 
-After user confirmation, create each child ticket in dependency order. **Confirm `parent` is one level above the child** — see [plan-ticket archetype catalog → Hierarchy](../plan-ticket/references/create.md#hierarchy). If the parent ticket is a Story (not an Epic), children cannot use `parent: "<story-key>"`; parent them to the Story's own parent Epic instead and link to the Story with `Relates` (the [umbrella grouping pattern](../plan-ticket/references/create.md#umbrella-grouping-pattern)).
+After user confirmation, make sure the sliced ticket can actually parent its children, then create each child in dependency order. **Slicing must yield a real parent/child hierarchy** — children are true Jira children of the sliced ticket, never merely `Relates`-linked (LS-11007). A Relates-only slice leaves `jira_get_all_descendants(parent)` empty, so `/work-ticket <parent>` falls into Leaf Mode and would implement the whole oversized ticket, and nothing rolls child progress up to it.
+
+**Convert a Story/Task/Bug parent to an Epic first** (`jira_edit_ticket({ key, type: "Epic" })`), verify type and original parent with `jira_view`, restore the parent via `jira_set_parent` if dropped. Full procedure, the labelled `Relates` fallback, and the repair recipe: [references/hierarchy.md](references/hierarchy.md#4a-make-the-parent-a-container).
+
+#### 4b. Create the children
+
+Create each child **with `parent` = the (now-Epic) sliced ticket**:
 
 ```
 jira_create_ticket({
@@ -98,7 +104,7 @@ jira_create_ticket({
   description: "<structured spec for this child>",
   type: "Task",
   sprint: "current",
-  parent: "LS-####"   // the parent ticket key
+  parent: "LS-####"   // the sliced ticket (an Epic after 4a)
 })
 ```
 
@@ -114,6 +120,8 @@ And create a Jira issue link if the tool is available (`inwardKey` is the blocke
 jira_link_issues({ inwardKey: "LS-B", outwardKey: "LS-A", linkType: "Blocks" })
 ```
 
+**Children shared with a sibling story** (one parent per child; e.g. LS-7220 shares LS-7218's children): pick one owner Epic, leave the sibling a thin `sliced`-labelled tracking ticket — see [references/hierarchy.md](references/hierarchy.md#4c-children-shared-with-a-sibling-story).
+
 ### Step 5: Handoff
 
 After creating all children, print a summary table:
@@ -127,7 +135,8 @@ Then suggest:
 
 - **If children are independent**: `/work-ticket LS-#### LS-#### …` to work them in parallel (batch mode)
 - **If children are sequential**: `/work-ticket LS-####` starting with the first (unblocked) child
-- **For the parent**: if the parent is an **Epic**, `/work-ticket LS-####` on it will manage its Jira transitions based on true Jira children (In Progress while children are being worked, In Review when all are at least In Review, Done when all are Done) — jira-branch-sync's epic-aggregate sync (`.github/workflows/jira-branch-sync.yml`) does this automatically as children's PRs merge. If the parent is a **Story/Task** (the common case per Step 4 — children are `Relates`-linked, not true Jira children, because a Story/Task cannot parent other tickets), there is no automatic child-aggregate mirroring for it: `jira_get_all_descendants` on a Story/Task parent returns its true descendants, which is empty, so `/work-ticket LS-####` on it enters **Leaf Mode** rather than tracking the slice. Update the parent's status manually as the slice's PRs merge, and only transition it to Done once every child in the breakdown (not just the ones visible in a single PR) is actually Done — see the "Concurrent resolution paths" gotcha below.
+- **For the parent**: after Step 4a it is an **Epic** with true Jira children, so `/work-ticket LS-####` on it auto-dispatches chips for the unblocked To Do children, and jira-branch-sync's epic-aggregate sync (`.github/workflows/jira-branch-sync.yml`) moves it In Progress / In Review / Done as the children's PRs merge. Verify with `jira_get_all_descendants(parent)` that `total` equals the number of children created. Only in the 4a fallback (ticket had to stay a Story/Task, or a shared sibling per 4c) are children `Relates`-linked; those tickets carry the `sliced` label and a `Sliced into:` comment, `/work-ticket` routes them to its [sliced-tracking branch](../work-ticket/references/orient.md) (never Leaf Mode), and you update their status manually — transition to Done only once every child is actually Done (see "Concurrent resolution paths" below).
+- **Repairing an already-sliced Story** (as LS-7218 was): [references/hierarchy.md](references/hierarchy.md#repairing-an-already-sliced-story).
 
 ## Child Spec Template
 
@@ -156,6 +165,7 @@ Dependencies:
 ## Gotchas
 
 - **Never slice without a Technical Approach** — if the parent has no Technical Approach section, the breakdown will be guesswork. Send to `/define` first.
+- **Never create Relates-only children when the parent can be converted (LS-11007)** — creating siblings under the grandparent Epic because `parent: "<story>"` 400'd is the failure this skill used to prescribe. Convert (Step 4a) or the slice has no hierarchy, no roll-up, and `/work-ticket` treats the parent as a leaf.
 - **Never create children without confirmation** — a hallucinated task structure that doesn't match the user's intent wastes implementation effort.
 - **Dependency links matter** — if child B branches from child A's branch, agents must know this before starting. Missing dependency notes cause rebasing pain later.
 - **Declare all dependencies** — sequential dependencies between children are fine; undeclared ones are not. A child that silently assumes another has merged defeats the purpose of slicing. Always note blockers in both the child description and as a Jira issue link.

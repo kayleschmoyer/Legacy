@@ -13,11 +13,14 @@ You are the **chief operator** for this ticket. The operator loop:
 
 This file owns orientation and routing. Each mode's execution playbook lives in a reference — read the matching reference **end to end** before executing that mode:
 
-| Mode                                               | When                                                                            | Playbook                                                     |
-| -------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| **Leaf** — implement solo                          | task/story/bug with no To Do leaf descendants                                   | [references/leaf-mode.md](references/leaf-mode.md)           |
-| **Parent Dispatch** — enumerate, then ask the user | Story/Task with To Do children, no `--batch`                                    | [references/dispatch-modes.md](references/dispatch-modes.md) |
-| **Batch dispatch** — one chip per child, no prompt | any Epic (always); `--batch`; or phrasing like "work all tickets under LS-####" | [references/dispatch-modes.md](references/dispatch-modes.md) |
+| Mode                                                    | When                                                                                  | Playbook                                                                               |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| **Leaf** — implement solo                               | task/story/bug with no To Do leaf descendants                                         | [references/leaf-mode.md](references/leaf-mode.md)                                     |
+| **Parent Dispatch** — enumerate, then ask the user      | Story/Task with To Do children, no `--batch`                                          | [references/dispatch-modes.md](references/dispatch-modes.md)                           |
+| **Sliced-tracking** — repair or report, never implement | Story/Task with no descendants but `sliced` label / `Sliced into:` comment (LS-11007) | [references/orient.md](references/orient.md#sliced-story-with-relates-linked-children) |
+| **Batch dispatch** — one chip per child, no prompt      | any Epic (always); `--batch`; or phrasing like "work all tickets under LS-####"       | [references/dispatch-modes.md](references/dispatch-modes.md)                           |
+
+**Never implement a sliced ticket itself** (an Epic, or a Story/Task marked `sliced`) — it routes to dispatch or sliced-tracking.
 
 **Never implement an Epic itself.** Epic input always routes to dispatch — the user's intent when targeting an epic key is "work down this backlog", never "implement the first child in my session".
 

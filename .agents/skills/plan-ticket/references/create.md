@@ -54,12 +54,14 @@ The actual question to ask **before** filing is: **will this ticket need first-c
 
 **If you're mid-ticket and discover it needs children after all** (the common trap: filed as `Task`, now the work has split into independent phases), you have two ways out — pick based on whether the children need to be first-class tickets:
 
-1. **Convert the grouping to an Epic.** Either edit the existing ticket's `type` to `Epic` via `jira_edit_ticket` (if it has no meaningful content of its own yet — it's purely becoming a container) and re-file the actual work as new Task/Bug/Story children parented to it, or create a fresh Epic and `jira_set_parent` the original ticket under it as the first child.
+1. **Convert the grouping to an Epic (the default, and what [slice](../../slice/SKILL.md) Step 4a does).** Either edit the existing ticket's `type` to `Epic` via `jira_edit_ticket` (if it has no meaningful content of its own yet — it's purely becoming a container) and re-file the actual work as new Task/Bug/Story children parented to it, or create a fresh Epic and `jira_set_parent` the original ticket under it as the first child.
 2. **Use the [umbrella grouping pattern](#umbrella-grouping-pattern) below** if the ticket must stay a Task/Story/Bug (e.g. it's already got history, comments, or is itself the natural "sub-theme" entry point) — keep it as-is, parent every child to the _bucket Epic above it_ instead, and `Relates`-link each child back to it.
 
 **Never fall back to creating a sibling under the parent Epic just because parenting to the Task/Story 400'd.** A sibling with no recorded relationship to the ticket it was meant to be a child of loses the dependency/grouping information entirely — use one of the two options above instead.
 
 ### Umbrella grouping pattern
+
+> Fallback only: [`/slice`](../../slice/SKILL.md) prefers converting the sliced ticket to an Epic so `jira_get_all_descendants` and `/work-ticket` see real children. Use this pattern when the umbrella must stay a Story/Task, and label it `sliced` (LS-11007).
 
 When a body of work needs an organizing entry but the children must be first-class engineering tickets (Task / Bug / Story) that already live under an existing bucket Epic — for example, sub-themes of `LS-2981` (mcp-gaps) — use this pattern:
 
