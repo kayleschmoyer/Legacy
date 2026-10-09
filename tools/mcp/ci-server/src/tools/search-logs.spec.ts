@@ -337,6 +337,42 @@ describe('searchLogs partial job coverage (LS-9389)', () => {
   });
 });
 
+describe('searchLogs log-download failures (LS-10250)', () => {
+  beforeEach(() => {
+    mockFetchRunLogs.mockReset();
+  });
+
+  it('returns an error, not totalMatches: 0, when every searched job failed to download', async () => {
+    mockFetchRunLogs.mockResolvedValue(
+      fetchResult('job-a\n(Log fetch failed for this job: boom)', {
+        jobsSearched: 1,
+        jobsTotal: 1,
+        fetchFailedJobs: ['job-a'],
+      }),
+    );
+    const result = await searchLogs({ runId: 1, pattern: 'ReferenceError' });
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toMatch(/could not download logs for 1 job/);
+    expect(textOf(result)).toMatch(/NOT evidence the pattern is absent/);
+  });
+
+  it('flags failed-download jobs in scopeNote when other jobs were searched', async () => {
+    mockFetchRunLogs.mockResolvedValue(
+      fetchResult('job-a\n(Log fetch failed for this job: boom)\njob-b\nok', {
+        jobsSearched: 2,
+        jobsTotal: 2,
+        fetchFailedJobs: ['job-a'],
+      }),
+    );
+    const result = await searchLogs({ runId: 1, pattern: 'ReferenceError' });
+    expect(result.isError).toBeUndefined();
+    const parsed = parseSearchResult(textOf(result));
+    expect(parsed.truncated).toBe(true);
+    expect(parsed.scopeNote).toMatch(/Log download failed for 1 searched job/);
+    expect(parsed.scopeNote).toContain('"job-a"');
+  });
+});
+
 describe('searchLogs ANSI stripping (LS-9557)', () => {
   // Built from String.fromCharCode rather than a \x1b literal — same
   // no-control-regex rationale as get-logs.ts.

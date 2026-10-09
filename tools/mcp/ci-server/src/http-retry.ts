@@ -123,6 +123,44 @@ export function formatGithubApiError(
 }
 
 /**
+ * Thrown by {@link fetchWithRetry} when `fetch()` rejects before any HTTP
+ * response arrives (DNS, TCP/TLS, or proxy CONNECT denial). Node's undici
+ * reports all of these as a bare `TypeError: fetch failed` and puts the real
+ * reason on `err.cause`; surfacing it (LS-10250) is what lets a caller tell
+ * "egress proxy denied the log blob host" apart from a transient network
+ * blip instead of staring at an undiagnosable "fetch failed".
+ */
+export class NetworkFetchError extends Error {
+  constructor(label: string, cause: unknown) {
+    super(`Network error during ${label}: ${describeFetchFailure(cause)}`, {
+      cause,
+    });
+    this.name = 'NetworkFetchError';
+  }
+}
+
+/** Render `fetch failed` plus its nested `cause` chain (code + message). */
+export function describeFetchFailure(err: unknown): string {
+  const parts: string[] = [];
+  let current: unknown = err;
+  for (let depth = 0; current && depth < 4; depth++) {
+    if (current instanceof Error) {
+      const code = (current as { code?: unknown }).code;
+      parts.push(
+        typeof code === 'string'
+          ? `${current.message} [${code}]`
+          : current.message,
+      );
+      current = current.cause;
+    } else {
+      parts.push(typeof current === 'string' ? current : 'unknown error');
+      break;
+    }
+  }
+  return sanitizeErrorBody(parts.join(' <- '));
+}
+
+/**
  * Fetch a URL with retry-with-backoff on transient gateway errors (502, 503,
  * 504) and on 410 (see RETRIABLE_STATUSES). Up to 3 attempts; honors
  * `retry-after` header; falls back to 2^attempt seconds of exponential
@@ -139,7 +177,16 @@ export async function fetchWithRetry(
 ): Promise<ArrayBuffer> {
   let lastStatus = 0;
   for (let attempt = 1; attempt <= LOG_BLOB_MAX_ATTEMPTS; attempt++) {
-    const res = await fetch(url, options);
+    let res: Response;
+    try {
+      res = await fetch(url, options);
+    } catch (err) {
+      // Abort/timeout errors keep their identity so callers can report them
+      // as timeouts; everything else is a network-layer failure whose cause
+      // would otherwise be lost behind "fetch failed" (LS-10250).
+      if (isTimeoutError(err)) throw err;
+      throw new NetworkFetchError(logLabel, err);
+    }
 
     if (res.ok) {
       logRateLimit(res, logLabel);

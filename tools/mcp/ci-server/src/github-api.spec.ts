@@ -17,6 +17,7 @@ import {
   isAlreadyRunningError,
   isTimeoutError,
   isTransientServerError,
+  NetworkFetchError,
   withRetryOnAlreadyRunning,
 } from './http-retry.js';
 
@@ -58,6 +59,40 @@ describe('fetchWithRetry (githubGetArrayBuffer retry logic)', () => {
 
   afterEach(() => {
     jest.useRealTimers();
+  });
+
+  it('surfaces the undici cause instead of a bare "fetch failed" (LS-10250)', async () => {
+    const cause = Object.assign(
+      new Error('Proxy response (403) !== 200 when HTTP Tunneling'),
+      { code: 'UND_ERR_PRX_TLS' },
+    );
+    mockFetch.mockRejectedValue(new TypeError('fetch failed', { cause }));
+
+    const err = await fetchWithRetry(
+      FAKE_URL,
+      FAKE_OPTS,
+      noopLog,
+      'GET /actions/jobs/1/logs (arraybuffer)',
+    ).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(NetworkFetchError);
+    const message = (err as Error).message;
+    expect(message).toContain('GET /actions/jobs/1/logs (arraybuffer)');
+    expect(message).toContain('fetch failed');
+    expect(message).toContain('Proxy response (403)');
+    expect(message).toContain('UND_ERR_PRX_TLS');
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('rethrows abort/timeout errors unchanged', async () => {
+    const abort = Object.assign(new Error('timed out'), {
+      name: 'TimeoutError',
+    });
+    mockFetch.mockRejectedValue(abort);
+
+    await expect(
+      fetchWithRetry(FAKE_URL, FAKE_OPTS, noopLog, 'test'),
+    ).rejects.toBe(abort);
   });
 
   it('returns arrayBuffer on first-attempt success', async () => {

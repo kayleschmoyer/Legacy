@@ -548,6 +548,35 @@ describe('errorSummary step-scoping (LS-9556)', () => {
   });
 });
 
+describe('fetchRunLogs log-download failure reporting (LS-10250)', () => {
+  beforeEach(() => {
+    mockGithubGet.mockReset();
+    mockGithubGetArrayBuffer.mockReset();
+  });
+
+  it('puts the underlying cause in the placeholder and lists the failed job', async () => {
+    mockGithubGet.mockResolvedValue({
+      total_count: 1,
+      jobs: [
+        { id: 7, name: 'e2e', status: 'completed', conclusion: 'failure' },
+      ],
+    });
+    mockGithubGetArrayBuffer.mockRejectedValue(
+      new Error(
+        'Network error during GET /actions/jobs/7/logs: fetch failed <- Proxy response (403) [UND_ERR_PRX_TLS]',
+      ),
+    );
+
+    const result = await fetchRunLogs({ runId: 1, failedOnly: true });
+
+    expect(result.text).toContain(
+      'Log fetch failed for this job: Network error',
+    );
+    expect(result.text).toContain('Proxy response (403)');
+    expect(result.fetchFailedJobs).toEqual(['e2e']);
+  });
+});
+
 describe('fetchRunLogs scope metadata (LS-8301)', () => {
   beforeEach(() => {
     mockGithubGet.mockReset();

@@ -553,8 +553,9 @@ async function fetchJobLogsBatched(
   jobs: GitHubJob[],
   concurrency: number,
   signal?: AbortSignal,
-): Promise<string[]> {
+): Promise<{ entries: string[]; fetchFailedJobs: string[] }> {
   const results: string[] = [];
+  const fetchFailedJobs: string[] = [];
 
   for (let i = 0; i < jobs.length; i += concurrency) {
     const batch = jobs.slice(i, i + concurrency);
@@ -573,15 +574,25 @@ async function fetchJobLogsBatched(
           if (err instanceof LogTooLargeError) {
             return `${job.name}\n${err.message}`;
           }
-          const reason = isAbortError(err) ? 'timed out' : 'failed';
-          return `${job.name}\n(Log fetch ${reason} for this job)`;
+          fetchFailedJobs.push(job.name);
+          return `${job.name}\n${logFetchFailureLine(err)}`;
         }
       }),
     );
     results.push(...batchResults);
   }
 
-  return results;
+  return { entries: results, fetchFailedJobs };
+}
+
+/**
+ * Placeholder line for a job whose log could not be fetched. Carries the
+ * underlying cause (LS-10250) so a bare "fetch failed" never reaches the caller.
+ */
+function logFetchFailureLine(err: unknown): string {
+  if (isAbortError(err)) return '(Log fetch timed out for this job)';
+  const detail = err instanceof Error ? err.message : String(err);
+  return `(Log fetch failed for this job: ${detail})`;
 }
 
 /** Returns true for AbortError / TimeoutError (DOMException name variants). */
@@ -676,6 +687,12 @@ export interface FetchRunLogsResult {
    */
   skippedJobs?: Array<{ name: string; reason: string }>;
   /**
+   * Names of searched jobs whose log download itself failed (LS-10250). Their
+   * text is a placeholder line, so a zero-match result over them is not a
+   * clean negative — callers must surface this rather than report "0 matches".
+   */
+  fetchFailedJobs?: string[];
+  /**
    * The single job `jobName` resolved to, echoed back so a caller can see
    * exactly which job answered the query (LS-9578) — present only when
    * `jobName` was given and resolved to exactly one job.
@@ -763,7 +780,7 @@ export async function fetchRunLogs(
   if (skipped > 0) jobs = jobs.slice(0, MAX_LOG_JOBS);
 
   // Fetch logs with concurrency limiting to avoid OOM and rate limiting
-  const logEntries = await fetchJobLogsBatched(
+  const { entries: logEntries, fetchFailedJobs } = await fetchJobLogsBatched(
     jobs,
     LOG_FETCH_CONCURRENCY,
     params.signal,
@@ -789,6 +806,7 @@ export async function fetchRunLogs(
     jobsTotal,
     skippedByFailedOnly: false,
     skippedJobs: skippedJobs.length > 0 ? skippedJobs : undefined,
+    fetchFailedJobs: fetchFailedJobs.length > 0 ? fetchFailedJobs : undefined,
     resolvedJobName,
     resolvedJobId,
   };
@@ -975,11 +993,7 @@ export async function fetchRunLogsRing(
           if (err instanceof LogTooLargeError) {
             return { name: job.name, lines: [err.message] };
           }
-          const reason = isAbortError(err) ? 'timed out' : 'failed';
-          return {
-            name: job.name,
-            lines: [`(Log fetch ${reason} for this job)`],
-          };
+          return { name: job.name, lines: [logFetchFailureLine(err)] };
         }
       }),
     );

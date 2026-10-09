@@ -133,6 +133,34 @@ export async function searchLogs(
         ? `${rawLogs.jobsSearched} of ${rawLogs.jobsTotal} job(s) were searched — ${jobsUnsearched} job(s) were not searched${skippedJobsList ? `: ${skippedJobsList}` : ' (excluded by failedOnly=true and/or the per-call job cap)'}. A 0-match result does NOT mean the pattern is absent from the run. Retry with failedOnly=false and/or jobName/jobId to cover the remaining job(s).`
         : undefined;
 
+    // LS-10250: a job whose log download failed contributes only a placeholder
+    // line, so "0 matches" over it is not a clean negative. If nothing matched
+    // and every searched job failed to download, that is an error, not a result;
+    // otherwise flag the failed jobs so partial coverage is never silent.
+    const fetchFailedJobs = rawLogs.fetchFailedJobs ?? [];
+    if (
+      fetchFailedJobs.length > 0 &&
+      totalMatches === 0 &&
+      fetchFailedJobs.length >= rawLogs.jobsSearched
+    ) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: `Failed to search logs for workflow run ${params.runId}: could not download logs for ${fetchFailedJobs.length} job(s) (${fetchFailedJobs.map((n) => `"${n}"`).join(', ')}), so 0 matches is NOT evidence the pattern is absent. Cause: see the "(Log fetch failed ...)" detail via ci_get_logs, or read the job with the hosted github get_job_logs.`,
+          },
+        ],
+      };
+    }
+    const failedFetchNote =
+      fetchFailedJobs.length > 0
+        ? `Log download failed for ${fetchFailedJobs.length} searched job(s): ${fetchFailedJobs.map((n) => `"${n}"`).join(', ')} — they were NOT searched. A 0-match result does NOT mean the pattern is absent from them.`
+        : undefined;
+    const combinedScopeNote = [scopeNote, failedFetchNote]
+      .filter(Boolean)
+      .join(' ');
+
     return {
       content: [
         {
@@ -144,10 +172,13 @@ export async function searchLogs(
               pattern: params.pattern,
               totalMatches,
               returnedMatches: matches.length,
-              truncated: totalMatches > matches.length || partialCoverage,
+              truncated:
+                totalMatches > matches.length ||
+                partialCoverage ||
+                fetchFailedJobs.length > 0,
               jobsSearched: rawLogs.jobsSearched,
               jobsTotal: rawLogs.jobsTotal,
-              ...(scopeNote ? { scopeNote } : {}),
+              ...(combinedScopeNote ? { scopeNote: combinedScopeNote } : {}),
             },
             matches,
             {
