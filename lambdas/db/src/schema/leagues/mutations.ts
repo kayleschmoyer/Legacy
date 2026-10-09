@@ -1116,6 +1116,9 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         if (error instanceof GraphQLError) {
           throw error;
         }
+        // Drizzle hides the real Postgres error in `error.cause`; surface it so
+        // failures are diagnosable instead of an opaque "Failed query" (LS-4867).
+        const detail = describeDbError(error);
         LOGGER.error(
           'Error creating league and teams',
           error instanceof Error ? error : new Error(String(error)),
@@ -1127,12 +1130,16 @@ builder.mutationField('createLeagueAndTeams', (t) =>
             draftMode,
             selectionMethod,
             draftOrder,
+            pgCode: detail.code,
+            constraint: detail.constraint,
+            table: detail.table,
+            detail: detail.detail,
           },
         );
 
         if (error instanceof Error) {
           throw new Error(
-            `Failed to create league and teams: ${error.message}`,
+            `Failed to create league and teams: ${formatDbError(detail)}`,
           );
         }
         throw new Error(
