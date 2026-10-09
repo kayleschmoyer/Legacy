@@ -215,13 +215,6 @@ test.describe('League Creation @critical', () => {
     await leaguePage.fillLeagueName('Valid League Name');
     await leaguePage.createButton.expectEnabled();
 
-    // League name input must hard-cap at 50 chars — no overshoot buffer
-    // that lets users type past the validated limit before seeing the
-    // error (LS-6055). The "over 50 characters" validation-message branch
-    // is covered at the unit level (LeagueCreatePage.spec.tsx) since this
-    // cap makes an over-limit value unconstructable through the UI.
-    await leaguePage.leagueNameInput.expectAttribute('maxlength', '50');
-
     // Test team count options (6, 8, 10, 12, 14, 16)
     for (const count of ['6', '8', '10', '12', '14', '16']) {
       await leaguePage.button(count, { exact: true }).expectVisible();

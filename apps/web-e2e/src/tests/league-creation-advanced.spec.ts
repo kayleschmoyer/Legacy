@@ -800,12 +800,8 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await leaguePage.expectNoAppError();
   });
 
-  // "Name too long" inline error card: the League Name input now hard-caps
-  // at maxLength={MAX_LEAGUE_NAME_LENGTH} (LS-6055), so a fill()/typed value
-  // over the limit is no longer constructable through the UI — the
-  // validation-message branch is covered at the unit level instead
-  // (LeagueCreatePage.spec.tsx › validateFormFull — league name length).
-  // The maxlength=50 cap itself is asserted in league-creation.spec.ts.
+  // "Name too long" is covered in create-league-form-validation.spec.ts
+  // (LS-10446) and at the unit level (LeagueCreatePage.spec.tsx).
 
   test('submit button is always enabled regardless of league name length', async ({
     leaguePage,

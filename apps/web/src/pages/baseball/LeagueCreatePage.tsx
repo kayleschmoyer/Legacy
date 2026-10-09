@@ -722,7 +722,7 @@ function generateCorrelationId(): string {
 const LEAGUE_FORM_MESSAGES = {
   leagueNameTooShort: 'League name must be 3–50 characters.',
   leagueNameTooLong: (maxLength: number) =>
-    `League name must be less than ${maxLength} characters`,
+    `League name must be ${maxLength} characters or fewer.`,
   teamsOutOfRange: 'Teams must be 4–16.',
   moreDivisionsThanTeams: 'More divisions than teams.',
   divisionParityMismatch: 'Division parity must match team parity.',
@@ -2331,9 +2331,16 @@ export function LeagueCreatePage(): React.JSX.Element {
     [formData],
   );
   const errorCount = Object.keys(validationErrors).length;
-  const leagueNameError = leagueNameTouched
-    ? validationErrors.leagueName
-    : undefined;
+  // An over-limit name is surfaced immediately rather than waiting for blur:
+  // the input no longer hard-caps at MAX_LEAGUE_NAME_LENGTH (LS-10446), so a
+  // pasted over-long value must never sit there silently (LS-10714 keeps the
+  // pristine/too-short case quiet until blur).
+  const leagueNameTooLong =
+    formData.leagueName.trim().length > MAX_LEAGUE_NAME_LENGTH;
+  const leagueNameError =
+    leagueNameTouched || leagueNameTooLong
+      ? validationErrors.leagueName
+      : undefined;
 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitErrorMeta, setSubmitErrorMeta] = useState<{
@@ -3300,7 +3307,6 @@ export function LeagueCreatePage(): React.JSX.Element {
                         backgroundColor="$color1"
                         disabled={isFormDisabled}
                         aria-required="true"
-                        maxLength={MAX_LEAGUE_NAME_LENGTH}
                       />
                       {leagueNameTagsRemoved && (
                         <XStack

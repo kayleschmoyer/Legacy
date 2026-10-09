@@ -1817,18 +1817,13 @@ describe('validateFormFull — league name length (LS-6055)', () => {
     rosterSlots: {},
   };
 
-  // The rendered Input hard-caps at maxLength={MAX_LEAGUE_NAME_LENGTH}, so a
-  // name longer than the limit can no longer be produced through the UI —
-  // covering the "too long" branch here, against the pure validator, rather
-  // than through an E2E fill() that the native maxlength attribute now
-  // truncates before submission ever sees an over-limit value.
   it('rejects a league name over the max length', () => {
     const errs = validateFormFull({
       ...baseFormData,
       leagueName: 'A'.repeat(MAX_LEAGUE_NAME_LENGTH + 1),
     });
     expect(errs.leagueName).toBe(
-      `League name must be less than ${MAX_LEAGUE_NAME_LENGTH} characters`,
+      `League name must be ${MAX_LEAGUE_NAME_LENGTH} characters or fewer.`,
     );
   });
 
