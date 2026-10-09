@@ -323,7 +323,8 @@ export async function selectAndAssignFootballGameIdentifiers(
       `No valid football game identifiers for player ${playerId} season ${season}, marking unassigned slots as noGameDataFound`,
     );
     // See selectAndAssignGameIdentifiers: this is a data-availability gap,
-    // not a real off day, so it gets its own flag (LS-9122).
+    // not a real off day, so it gets its own flag (LS-9122). SP-skipped rows
+    // are excluded: the two flags are mutually exclusive by design (LS-10234).
     await db
       .update(PublicSchema.matchupPlayerGames)
       .set({ noGameDataFound: true, statsLoadingStatus: 'completed' })
@@ -331,6 +332,7 @@ export async function selectAndAssignFootballGameIdentifiers(
         and(
           eq(PublicSchema.matchupPlayerGames.matchupPlayerId, matchupPlayerId),
           isNull(PublicSchema.matchupPlayerGames.gameIdentifier),
+          eq(PublicSchema.matchupPlayerGames.pitcherStartSkipped, false),
         ),
       );
     return;
@@ -339,6 +341,19 @@ export async function selectAndAssignFootballGameIdentifiers(
   LOGGER.info(
     `Found ${validGames.length} unique football games for player ${playerId} season ${season}`,
   );
+
+  // Heal a stale noGameDataFound left on SP-skipped rows by an earlier no-data
+  // run. Must run before the "nothing to assign" early return below (LS-10234).
+  await db
+    .update(PublicSchema.matchupPlayerGames)
+    .set({ noGameDataFound: false })
+    .where(
+      and(
+        eq(PublicSchema.matchupPlayerGames.matchupPlayerId, matchupPlayerId),
+        eq(PublicSchema.matchupPlayerGames.pitcherStartSkipped, true),
+        eq(PublicSchema.matchupPlayerGames.noGameDataFound, true),
+      ),
+    );
 
   const unassignedGames = await db
     .select()

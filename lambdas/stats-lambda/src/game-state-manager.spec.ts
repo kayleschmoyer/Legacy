@@ -291,6 +291,77 @@ describe('selectAndAssignFootballGameIdentifiers', () => {
     });
     expect(updateSetCalls[0]).not.toHaveProperty('pitcherStartSkipped');
   });
+
+  // LS-10238: football sibling of the LS-10234 fix.
+  it('excludes pitcherStartSkipped rows from the no-data bulk flag', async () => {
+    const { db, updateWhereCalls } = createMockDb(
+      new Map([
+        [gameFootballPassing, []],
+        [gameFootballRushing, []],
+        [gameFootballReceiving, []],
+        [gameFootballKicking, []],
+      ]),
+    );
+
+    await selectAndAssignFootballGameIdentifiers(
+      db as never,
+      42,
+      991,
+      2025,
+      false,
+      'WR',
+    );
+
+    // Negative control: on the unfixed code this WHERE has no
+    // pitcherStartSkipped term, so the assertion below fails.
+    expect(updateWhereCalls).toHaveLength(1);
+    expect(renderSql(updateWhereCalls[0])).toBe(
+      '(mpg.matchupPlayerId = 42 and mpg.gameIdentifier is null and mpg.pitcherStartSkipped = false)',
+    );
+  });
+
+  it('clears stale noGameDataFound on SP-skipped rows once real game data exists, even when there is nothing left to assign', async () => {
+    const { db, updateSetCalls, updateWhereCalls } = createMockDb(
+      new Map([[gameFootballPassing, [{ gameIdentifier: 'NFL2025W01' }]]]),
+      [[]],
+    );
+
+    await selectAndAssignFootballGameIdentifiers(
+      db as never,
+      42,
+      991,
+      2025,
+      false,
+      'QB',
+    );
+
+    // Negative control: the unfixed code issues no UPDATE at all here.
+    expect(updateSetCalls).toEqual([{ noGameDataFound: false }]);
+    expect(renderSql(updateWhereCalls[0])).toBe(
+      '(mpg.matchupPlayerId = 42 and mpg.pitcherStartSkipped = true and mpg.noGameDataFound = true)',
+    );
+  });
+
+  it('heals stale SP-skipped rows before assigning the remaining slots', async () => {
+    const { db, updateSetCalls } = createMockDb(
+      new Map([[gameFootballPassing, [{ gameIdentifier: 'NFL2025W02' }]]]),
+      [[{ id: 7 }], []],
+    );
+
+    await selectAndAssignFootballGameIdentifiers(
+      db as never,
+      42,
+      991,
+      2025,
+      false,
+      'QB',
+    );
+
+    expect(updateSetCalls).toEqual([
+      { noGameDataFound: false },
+      { gameIdentifier: 'NFL2025W02', noGameDataFound: false },
+    ]);
+  });
 });
 
 describe('checkMatchupCompletion', () => {
