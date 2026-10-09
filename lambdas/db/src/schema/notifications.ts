@@ -1,7 +1,7 @@
 import { createDatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { builder } from './builder';
-import { AuthenticationError } from './graphql-errors';
+import { AuthenticationError, UserInputError } from './graphql-errors';
 
 // Create a single database service instance to reuse across all resolvers
 const dbService = createDatabaseService(getDbOptions());
@@ -23,6 +23,10 @@ const NotificationPreferenceInput = builder.inputType(
     }),
   },
 );
+
+// Platforms the push-delivery pipeline can route. `platform` stays a plain
+// String in the schema, so the allowlist is enforced in the resolver (LS-7652).
+const DEVICE_TOKEN_PLATFORMS = ['ios', 'android', 'web'];
 
 const DeviceTokenInput = builder.inputType('DeviceTokenInput', {
   fields: (t) => ({
@@ -337,6 +341,11 @@ builder.mutationField('registerDeviceToken', (t) =>
       }
       const userId = context.user.id;
       const { deviceToken, platform } = input;
+      if (!DEVICE_TOKEN_PLATFORMS.includes(platform)) {
+        throw UserInputError(
+          `Invalid platform "${platform}". Expected one of: ${DEVICE_TOKEN_PLATFORMS.join(', ')}`,
+        );
+      }
       // Reuse the request's existing connection rather than opening a second
       // client (and re-resolving Secrets Manager credentials) — LS-9541.
       const token = await dbService.notifications.registerDeviceToken(

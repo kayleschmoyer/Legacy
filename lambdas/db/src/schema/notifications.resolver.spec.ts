@@ -438,23 +438,43 @@ describe('notifications resolver', () => {
     ).rejects.toThrow('Authentication required');
   });
 
-  it('registerDeviceToken: registers token and returns DeviceToken', async () => {
-    const result = await getMutationResolver('registerDeviceToken')(
-      {},
-      { input: { deviceToken: 'abc123', platform: 'ios' } },
-      mockContext,
-      undefined as never,
-    );
-    expect(result).toMatchObject({ id: 5, deviceToken: 'abc123' });
-    // The request's own connection is threaded through instead of the service
-    // opening a second client (LS-9541).
-    expect(mockNotificationsService.registerDeviceToken).toHaveBeenCalledWith(
-      10,
-      'abc123',
-      'ios',
-      mockContext.db,
-    );
-  });
+  it.each(['ios', 'android', 'web'])(
+    'registerDeviceToken: registers token with platform %s and returns DeviceToken',
+    async (platform) => {
+      const result = await getMutationResolver('registerDeviceToken')(
+        {},
+        { input: { deviceToken: 'abc123', platform } },
+        mockContext,
+        undefined as never,
+      );
+      expect(result).toMatchObject({ id: 5, deviceToken: 'abc123' });
+      // The request's own connection is threaded through instead of the service
+      // opening a second client (LS-9541).
+      expect(mockNotificationsService.registerDeviceToken).toHaveBeenCalledWith(
+        10,
+        'abc123',
+        platform,
+        mockContext.db,
+      );
+    },
+  );
+
+  it.each(['windows', '', 'IOS'])(
+    'registerDeviceToken: rejects invalid platform %j without calling the service',
+    async (platform) => {
+      await expect(
+        getMutationResolver('registerDeviceToken')(
+          {},
+          { input: { deviceToken: 'abc123', platform } },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Invalid platform');
+      expect(
+        mockNotificationsService.registerDeviceToken,
+      ).not.toHaveBeenCalled();
+    },
+  );
 
   // ── disableDeviceToken ────────────────────────────────────────────────────
 

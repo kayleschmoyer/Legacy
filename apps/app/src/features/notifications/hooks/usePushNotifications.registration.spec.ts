@@ -20,6 +20,11 @@ const mockLoggerError = jest.fn();
 
 // Mutable so each test can configure whether a projectId is present.
 let mockExtra: Record<string, unknown> = {};
+// Mutable so each test can run as iOS or Android (LS-7652).
+let mockPlatformOS = 'ios';
+const mockSetNotificationChannelAsync = jest
+  .fn<Promise<null>, unknown[]>()
+  .mockResolvedValue(null);
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ navigate: jest.fn() }),
@@ -42,7 +47,8 @@ jest.mock('expo-notifications', () => ({
   getLastNotificationResponseAsync: jest.fn().mockResolvedValue(null),
   getPermissionsAsync: () => mockGetPermissionsAsync(),
   requestPermissionsAsync: () => mockRequestPermissionsAsync(),
-  setNotificationChannelAsync: jest.fn().mockResolvedValue(null),
+  setNotificationChannelAsync: (...args: unknown[]) =>
+    mockSetNotificationChannelAsync(...args),
   getExpoPushTokenAsync: (options?: unknown) =>
     mockGetExpoPushTokenAsync(options),
   AndroidImportance: { MAX: 5 },
@@ -79,7 +85,11 @@ const mockAppStateAddEventListener = jest.fn(
 );
 
 jest.mock('react-native', () => ({
-  Platform: { OS: 'ios' },
+  Platform: {
+    get OS() {
+      return mockPlatformOS;
+    },
+  },
   AppState: {
     addEventListener: (...args: [string, AppStateChangeHandler]) =>
       mockAppStateAddEventListener(...args),
@@ -115,6 +125,7 @@ beforeEach(async () => {
 
   jest.clearAllMocks();
   mockExtra = {};
+  mockPlatformOS = 'ios';
   appStateListeners = [];
 });
 
@@ -135,6 +146,68 @@ describe('usePushNotifications — token registration', () => {
       }),
     );
     expect(mockLoggerError).not.toHaveBeenCalled();
+  });
+
+  it('registers the token with platform android on Android', async () => {
+    mockPlatformOS = 'android';
+    mockExtra = { eas: { projectId: 'proj-9999' } };
+
+    renderHook(() => usePushNotifications(1));
+
+    await waitFor(() =>
+      expect(mockRegisterDeviceToken).toHaveBeenCalledWith({
+        variables: {
+          input: { deviceToken: 'expo-token', platform: 'android' },
+        },
+      }),
+    );
+    expect(mockLoggerError).not.toHaveBeenCalled();
+  });
+
+  it('sets up the default notification channel on Android only', async () => {
+    mockPlatformOS = 'android';
+    mockExtra = { eas: { projectId: 'proj-9999' } };
+
+    const android = renderHook(() => usePushNotifications(1));
+    await waitFor(() => expect(mockRegisterDeviceToken).toHaveBeenCalled());
+    expect(mockSetNotificationChannelAsync).toHaveBeenCalledTimes(1);
+    expect(mockSetNotificationChannelAsync).toHaveBeenCalledWith(
+      'default',
+      expect.anything(),
+    );
+    android.unmount();
+
+    jest.clearAllMocks();
+    await AsyncStorage.clear();
+    mockPlatformOS = 'ios';
+
+    renderHook(() => usePushNotifications(1));
+    await waitFor(() => expect(mockRegisterDeviceToken).toHaveBeenCalled());
+    expect(mockSetNotificationChannelAsync).not.toHaveBeenCalled();
+  });
+
+  it('registers separate tokens for ios then android with their own platform', async () => {
+    mockExtra = { eas: { projectId: 'proj-9999' } };
+
+    mockGetExpoPushTokenAsync.mockResolvedValueOnce({ data: 'token-A' });
+    const ios = renderHook(() => usePushNotifications(1));
+    await waitFor(() =>
+      expect(mockRegisterDeviceToken).toHaveBeenCalledWith({
+        variables: { input: { deviceToken: 'token-A', platform: 'ios' } },
+      }),
+    );
+    ios.unmount();
+
+    await AsyncStorage.clear();
+    mockPlatformOS = 'android';
+    mockGetExpoPushTokenAsync.mockResolvedValueOnce({ data: 'token-B' });
+    renderHook(() => usePushNotifications(1));
+    await waitFor(() =>
+      expect(mockRegisterDeviceToken).toHaveBeenCalledWith({
+        variables: { input: { deviceToken: 'token-B', platform: 'android' } },
+      }),
+    );
+    expect(mockRegisterDeviceToken).toHaveBeenCalledTimes(2);
   });
 
   it('skips registration without error when no EAS projectId is configured', async () => {
