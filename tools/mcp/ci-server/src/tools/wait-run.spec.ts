@@ -190,4 +190,81 @@ describe('waitRunHint', () => {
     expect(hint).toContain('ci_wait_run({ runId: 42 })');
     expect(hint).toContain('Do NOT re-dispatch');
   });
+
+  describe('jobName (LS-10264)', () => {
+    const jobs = (rows: Array<[number, string, string, string | null]>) => ({
+      jobs: rows.map(([id, name, status, conclusion]) => ({
+        id,
+        name,
+        status,
+        conclusion,
+      })),
+    });
+
+    function route(jobsBody: unknown, run = makeRun()) {
+      mockGithubGet.mockImplementation((path: string) =>
+        Promise.resolve(path.endsWith('/jobs') ? jobsBody : run),
+      );
+    }
+
+    it('returns as soon as the named job completes while the run is still in_progress', async () => {
+      route(
+        jobs([
+          [1, 'Playwright shared-live (1/1)', 'completed', 'success'],
+          [2, 'Deploy Playwright Report', 'in_progress', null],
+        ]),
+      );
+
+      const result = await waitRun({ runId: 123, jobName: 'shared-live' });
+
+      expect(result.isError).toBeUndefined();
+      expect(parseBody(result.content[0].text)).toMatchObject({
+        status: 'completed',
+        conclusion: 'success',
+        jobId: 1,
+        jobName: 'Playwright shared-live (1/1)',
+        runStatus: 'in_progress',
+      });
+    });
+
+    it('returns an in_progress snapshot with a job-scoped hint while the job is running', async () => {
+      route(jobs([[1, 'Playwright shared-live (1/1)', 'in_progress', null]]));
+      jest.useFakeTimers();
+
+      try {
+        const p = waitRun({ runId: 123, jobName: 'shared-live' });
+        await jest.runAllTimersAsync();
+        const body = parseBody((await p).content[0].text);
+        expect(body.status).toBe('in_progress');
+        expect(body.hint).toContain('jobName');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('errors listing candidate job names when nothing matches', async () => {
+      route(jobs([[1, 'Lint', 'completed', 'success']]));
+
+      const result = await waitRun({ runId: 123, jobName: 'shared-live' });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('matches no job');
+      expect(result.content[0].text).toContain('"Lint"');
+    });
+
+    it('errors listing every candidate when the name is ambiguous', async () => {
+      route(
+        jobs([
+          [1, 'Playwright shared-live (1/2)', 'completed', 'success'],
+          [2, 'Playwright shared-live (2/2)', 'completed', 'success'],
+        ]),
+      );
+
+      const result = await waitRun({ runId: 123, jobName: 'shared-live' });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('(1/2)');
+      expect(result.content[0].text).toContain('(2/2)');
+    });
+  });
 });

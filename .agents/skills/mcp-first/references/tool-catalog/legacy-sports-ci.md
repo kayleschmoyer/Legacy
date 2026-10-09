@@ -275,11 +275,12 @@ Prefer this over `gh run view --json jobs` via shell. List per-job name, status,
 
 ### `ci_wait_run`
 
-Wait for a workflow run to complete, bounded at 20s per call (stays under this Lambda-hosted server's own 30s execution timeout). Returns { status: "completed", conclusion } when the run finishes, or a { status: "in_progress", hint } snapshot (never an error) if it has not — re-invoke to continue waiting. Use after ci_dispatch_workflow returns in_progress, or after a session resume to re-attach to a run without re-dispatching.
+Wait ≤20s per call (Lambda 30s timeout) for a workflow run to complete. Returns { status: "completed", conclusion } when done, else an { status: "in_progress", hint } snapshot (never an error) — re-invoke to continue. Use after ci_dispatch_workflow returns in_progress, or to re-attach after a session resume. Pass jobName to wait for just one job (returns jobId while other jobs still run); 0/many matches error with candidates.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
 | `runId` | number | **required** | coerced, integer, > 0 | Run ID |
+| `jobName` | string |  | min 1 | Wait for this job only (like ci_get_logs.jobName) |
 | `maxWaitSeconds` | number |  | coerced, integer, > 0, max 20 | Max wait per call in seconds (default and cap: 20) |
 
 ### `ci_workflow_info`
