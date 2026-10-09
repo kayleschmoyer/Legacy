@@ -23,6 +23,7 @@
 import { type Page } from '@playwright/test';
 import { expect } from '../fixtures/auth-enhanced';
 import { test, unauthTest } from '../fixtures/auth-enhanced';
+import { createGraphQLRouter, fulfillJson } from '../mocks/graphql/router';
 import { E2EJwtUtil } from '../utils/jwt';
 
 const HELP_URL = '/help';
@@ -491,6 +492,47 @@ unauthTest.describe(
         ).toBeVisible({ timeout: 10000 });
 
         // Tutorial must stay hidden — the completion flag was already set.
+        await expect(page.getByRole('dialog')).not.toBeVisible({
+          timeout: 5000,
+        });
+      },
+    );
+
+    unauthTest(
+      'user whose server flag says onboarding is complete does not see the tutorial, even with no local flag (LS-10382)',
+      async ({ page }) => {
+        await mockGoogleLogin(page, 505);
+        await createGraphQLRouter(page, {
+          getuserpreferences: (route) =>
+            fulfillJson(route, {
+              data: {
+                getUserPreferences: {
+                  __typename: 'UserPreference',
+                  id: 1,
+                  userId: 505,
+                  statsFormat: 'standard',
+                  audioEnabled: true,
+                  onboardingCompletedAt: '2026-01-01T00:00:00.000Z',
+                  createdAt: '2026-01-01T00:00:00.000Z',
+                  updatedAt: '2026-01-01T00:00:00.000Z',
+                },
+              },
+            }),
+        });
+
+        await page.goto('/');
+        await page.waitForLoadState('load');
+
+        const loginButton = page.getByRole('button', {
+          name: /continue with google/i,
+        });
+        await expect(loginButton).toBeVisible({ timeout: 15000 });
+        await loginButton.click();
+
+        await expect(page).toHaveURL('/');
+        await expect(
+          page.getByRole('heading', { name: 'Start your dynasty.' }),
+        ).toBeVisible({ timeout: 10000 });
         await expect(page.getByRole('dialog')).not.toBeVisible({
           timeout: 5000,
         });

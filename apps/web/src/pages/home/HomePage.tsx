@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   hasStoredSession,
@@ -24,17 +30,10 @@ import {
   useGetMyMockDraftUsageQuery,
   useGetUserLeagueStandingsQuery,
   useGetUserLeagueSummariesQuery,
-  useGetUserPreferencesQuery,
   type UserLeagueSummaryFragment,
-  useUpdateUserPreferencesMutation,
 } from '@legacy-sports/graphql';
 import { LOGGER } from '@legacy-sports/logging';
-import {
-  getOnboardingKey,
-  migrateLegacyOnboardingFlag,
-  parseOnboardingComplete,
-  serializeOnboardingComplete,
-} from '@legacy-sports/shared-components/utils';
+import { useOnboardingCompletion } from '@legacy-sports/shared-components/utils';
 import { getOnboardingStepKey, readOnboardingStep } from './onboardingStorage';
 import { leagueDetailRoute, leagueRosterRoute } from './homeRoutes';
 import { formatDisplayName } from '../../lib/formatDisplayName';
@@ -212,102 +211,46 @@ export function HomePage(): React.JSX.Element {
   // failed query (offline, flaky network) also leaves the summaries empty, and
   // must not be read as "no leagues" — that opened the tutorial over the
   // dashboard error state for existing users (LS-10716).
-  // The server flag is the source of truth so completion follows the user
-  // across browsers/devices; localStorage stays as a same-device cache and the
-  // fallback when the preferences query fails (LS-6890).
-  const {
-    data: prefsData,
-    loading: prefsLoading,
-    error: prefsError,
-  } = useGetUserPreferencesQuery({
-    skip: !sessionPresent,
-    fetchPolicy: 'cache-and-network',
-  });
-  const [updatePreferences] = useUpdateUserPreferencesMutation();
-  const prefsSettled = !prefsLoading && (prefsData != null || !!prefsError);
-  const serverOnboardingCompleted =
-    prefsData?.getUserPreferences?.onboardingCompletedAt != null;
-
-  const persistOnboardingCompleteToServer = useCallback(() => {
-    updatePreferences({
-      variables: { input: { markOnboardingComplete: true } },
-    }).catch((caught: unknown) => {
-      LOGGER.error(
-        'HomePage: failed to persist onboarding completion to server',
-        caught instanceof Error ? caught : new Error(String(caught)),
-      );
-    });
-  }, [updatePreferences]);
-
   const confirmedNoLeagues =
     !summariesLoading &&
     !summariesError &&
     summaryData?.getUserLeagueSummaries != null &&
     summaryData.getUserLeagueSummaries.length === 0;
 
+  // The server flag is the source of truth so completion follows the user
+  // across devices; localStorage is the same-device cache and fallback (LS-10382).
+  const { shouldAutoShow, markComplete } = useOnboardingCompletion({
+    userId,
+    storage: window.localStorage,
+    skip: !sessionPresent,
+    clearKeys: userId ? [getOnboardingStepKey(userId)] : [],
+  });
+  // Completion is recorded only when the tutorial was auto-shown; a manual
+  // "How it works" relaunch never alters it.
+  const autoShownRef = useRef(false);
+
   useEffect(() => {
-    if (!userId || !confirmedNoLeagues || !prefsSettled) return;
-    const key = getOnboardingKey(userId);
+    if (!userId || !confirmedNoLeagues || !shouldAutoShow) return;
+    if (autoShownRef.current) return;
+    autoShownRef.current = true;
     try {
-      if (serverOnboardingCompleted) {
-        // Seed this browser so the flag survives a later server outage.
-        window.localStorage.setItem(key, serializeOnboardingComplete(true));
-        window.localStorage.removeItem(getOnboardingStepKey(userId));
-        return;
-      }
-      const legacyComplete = migrateLegacyOnboardingFlag(
-        window.localStorage,
-        key,
-      );
-      const completed =
-        legacyComplete ||
-        parseOnboardingComplete(window.localStorage.getItem(key));
-      if (completed) {
-        // Completed before the server flag existed: backfill it.
-        if (!prefsError) persistOnboardingCompleteToServer();
-        return;
-      }
       setTutorialInitialStep(
         readOnboardingStep(window.localStorage, getOnboardingStepKey(userId)),
       );
-      setTutorialOpen(true);
     } catch (caught) {
-      // Without storage we cannot tell whether the tutorial was already
-      // completed, so leave it closed rather than re-showing it on every
-      // visit; "How it works" still opens it on demand.
       LOGGER.error(
-        'HomePage: onboarding localStorage access failed',
+        'HomePage: onboarding step read failed',
         caught instanceof Error ? caught : new Error(String(caught)),
       );
     }
-  }, [
-    userId,
-    confirmedNoLeagues,
-    prefsSettled,
-    prefsError,
-    serverOnboardingCompleted,
-    persistOnboardingCompleteToServer,
-  ]);
+    setTutorialOpen(true);
+  }, [userId, confirmedNoLeagues, shouldAutoShow]);
 
   const handleTutorialClose = () => {
     setTutorialOpen(false);
     // Hand keyboard focus to the empty-state CTA once the modal is gone (LS-6918).
     setCtaFocusRequest((n) => n + 1);
-    if (userId) {
-      persistOnboardingCompleteToServer();
-      try {
-        window.localStorage.setItem(
-          getOnboardingKey(userId),
-          serializeOnboardingComplete(true),
-        );
-        window.localStorage.removeItem(getOnboardingStepKey(userId));
-      } catch (caught) {
-        LOGGER.error(
-          'HomePage: failed to persist onboarding completion',
-          caught instanceof Error ? caught : new Error(String(caught)),
-        );
-      }
-    }
+    if (autoShownRef.current) markComplete();
   };
 
   // Escape hides the tutorial for this visit only (LS-6909): it is not a
