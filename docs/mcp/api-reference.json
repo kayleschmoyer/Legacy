@@ -2916,10 +2916,11 @@
               "optional": true,
               "enum": [
                 "check",
-                "write"
+                "write",
+                "fix"
               ],
               "default": "check",
-              "description": "\"check\" reports formatting issues without modifying files (default); \"write\" reformats in place."
+              "description": "\"check\" (default) only reports; \"write\"/\"fix\" reformats in place."
             },
             "worktreePath": {
               "type": "string",

@@ -49,6 +49,23 @@ describe('runPrettier', () => {
     });
   });
 
+  it('treats mode "fix" as an alias for "write"', async () => {
+    mockRunPnpm.mockResolvedValue('apps/web/Foo.tsx 12ms');
+
+    const result = await runPrettier({
+      files: ['apps/web/Foo.tsx'],
+      mode: 'fix',
+    });
+
+    expect(mockRunPnpm.mock.calls[0][0]).toEqual([
+      'exec',
+      'prettier',
+      '--write',
+      'apps/web/Foo.tsx',
+    ]);
+    expect(result.content[0].text).toContain('"mode":"write"');
+  });
+
   it('passes --write when mode is "write"', async () => {
     mockRunPnpm.mockResolvedValue('apps/web/Foo.tsx 12ms');
 

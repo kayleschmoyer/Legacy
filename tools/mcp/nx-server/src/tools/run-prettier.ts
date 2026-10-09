@@ -19,7 +19,8 @@ const SHELL_METACHAR_REGEX = /[;&`${}]/;
 
 export interface RunPrettierParams {
   files: string[];
-  mode?: 'check' | 'write';
+  // "fix" is an alias for "write" so callers can reuse nx_run_eslint's vocabulary (LS-10203).
+  mode?: 'check' | 'write' | 'fix';
   worktreePath?: string;
 }
 
@@ -31,7 +32,7 @@ export async function runPrettier(
   params: RunPrettierParams,
 ): Promise<ToolResult> {
   const cwd = params.worktreePath || getRepoRoot();
-  const mode = params.mode ?? 'check';
+  const mode = params.mode === 'fix' ? 'write' : (params.mode ?? 'check');
 
   if (params.files.length > MAX_FILES) {
     return errorResult(

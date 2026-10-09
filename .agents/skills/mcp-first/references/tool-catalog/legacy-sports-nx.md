@@ -147,7 +147,7 @@ Prefer this over raw `pnpm exec prettier --check/--write <files>` via shell, and
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
 | `files` | string[] | **required** | min 1 | File paths (relative to worktreePath/repo root, or absolute) to check or format. |
-| `mode` | enum |  | — | "check" reports formatting issues without modifying files (default); "write" reformats in place. |
+| `mode` | enum |  | — | "check" (default) only reports; "write"/"fix" reformats in place. |
 | `worktreePath` | string |  | — | Worktree path (default: repo root) |
 
 ### `nx_run_test`

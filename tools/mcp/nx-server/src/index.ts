@@ -430,10 +430,10 @@ server.tool(
         'File paths (relative to worktreePath/repo root, or absolute) to check or format.',
       ),
     mode: z
-      .enum(['check', 'write'])
+      .enum(['check', 'write', 'fix'])
       .default('check')
       .describe(
-        '"check" reports formatting issues without modifying files (default); "write" reformats in place.',
+        '"check" (default) only reports; "write"/"fix" reformats in place.',
       ),
     worktreePath: z
       .string()
