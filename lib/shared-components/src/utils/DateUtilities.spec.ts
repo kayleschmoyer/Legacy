@@ -2,7 +2,9 @@ import {
   formatLocalDateTime,
   getLocalTimeZoneLabel,
   localDateTimeInputToIso,
+  parseLocalDateInput,
   parseLocalDateTimeInput,
+  toLocalDateInput,
   toLocalDateTimeInput,
 } from './DateUtilities';
 
@@ -107,5 +109,63 @@ describe('local-time instant helpers (LS-10471)', () => {
     it('returns an empty string for an invalid value', () => {
       expect(formatLocalDateTime('nope')).toBe('');
     });
+  });
+});
+
+// LS-10486: date-only helpers must give the same calendar day in every zone.
+// process.env.TZ is switched per case (Node re-reads it on each Date call) so
+// the suite exercises zones both east and west of UTC regardless of the runner.
+describe.each(['Asia/Kolkata', 'America/Los_Angeles', 'Pacific/Auckland'])(
+  'local date-only helpers under TZ=%s (LS-10486)',
+  (zone) => {
+    const originalTz = process.env.TZ;
+    beforeAll(() => {
+      process.env.TZ = zone;
+    });
+    afterAll(() => {
+      if (originalTz === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTz;
+    });
+
+    it('formats local midnight as the same calendar day', () => {
+      expect(toLocalDateInput(new Date(2026, 9, 8))).toBe('2026-10-08');
+      expect(toLocalDateInput(new Date(2026, 0, 1))).toBe('2026-01-01');
+    });
+
+    it('formats a late-evening local time as that local day', () => {
+      expect(toLocalDateInput(new Date(2026, 9, 8, 23, 30))).toBe('2026-10-08');
+    });
+
+    it('parses YYYY-MM-DD to local midnight of the same day', () => {
+      const parsed = parseLocalDateInput('2026-10-08');
+      expect(parsed?.getFullYear()).toBe(2026);
+      expect(parsed?.getMonth()).toBe(9);
+      expect(parsed?.getDate()).toBe(8);
+      expect(parsed?.getHours()).toBe(0);
+    });
+
+    it('round-trips format → parse → format', () => {
+      for (const key of [
+        '2026-01-01',
+        '2026-03-08',
+        '2026-11-01',
+        '2026-12-31',
+      ]) {
+        expect(toLocalDateInput(parseLocalDateInput(key) as Date)).toBe(key);
+      }
+    });
+  },
+);
+
+describe('local date-only helpers: invalid input (LS-10486)', () => {
+  it('rejects malformed and non-existent dates', () => {
+    expect(parseLocalDateInput('')).toBeUndefined();
+    expect(parseLocalDateInput(null)).toBeUndefined();
+    expect(parseLocalDateInput('10/08/2026')).toBeUndefined();
+    expect(parseLocalDateInput('2026-02-31')).toBeUndefined();
+  });
+
+  it('formats an invalid Date as an empty string', () => {
+    expect(toLocalDateInput(new Date(NaN))).toBe('');
   });
 });

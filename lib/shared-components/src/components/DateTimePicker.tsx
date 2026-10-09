@@ -15,6 +15,7 @@ import { Clock } from '@tamagui/lucide-icons/icons/Clock';
 import { X } from '@tamagui/lucide-icons/icons/X';
 import { Platform } from 'react-native';
 import { to12Hour, to24Hour } from './dateTimePickerUtils';
+import { toLocalDateInput } from '../utils/DateUtilities';
 
 export interface DateTimePickerProps {
   value?: Date;
@@ -524,7 +525,7 @@ export function DateTimePicker({
                           return (
                             <Button
                               key={`${weekIndex}-${dayIndex}`}
-                              testID={`date-time-picker-day-${date.toISOString().slice(0, 10)}`}
+                              testID={`date-time-picker-day-${toLocalDateInput(date)}`}
                               size="$2"
                               flex={1}
                               chromeless={!selected}

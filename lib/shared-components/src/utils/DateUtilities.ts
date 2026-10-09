@@ -49,6 +49,37 @@ export function parseLocalDateTimeInput(
   return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
+/**
+ * Format a Date as its local calendar day, `YYYY-MM-DD` (the `<input
+ * type="date">` convention and the DateTimePicker day-cell key). Uses local
+ * getters so it never shifts a day the way `toISOString()` does east/west of
+ * UTC. Returns '' for an invalid Date.
+ */
+export function toLocalDateInput(date: Date): string {
+  if (Number.isNaN(date.getTime())) return '';
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+/**
+ * Parse a `YYYY-MM-DD` string into a Date at local midnight. Unlike
+ * `new Date('YYYY-MM-DD')` (UTC midnight) this lands on the same local day in
+ * every zone. Returns undefined for malformed or non-existent dates.
+ */
+export function parseLocalDateInput(
+  value: string | null | undefined,
+): Date | undefined {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value ?? '');
+  if (!match) return undefined;
+  const [y, mo, d] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const date = new Date(y, mo - 1, d);
+  // Reject overflow such as 2026-02-31 (Date rolls it into March).
+  return date.getFullYear() === y &&
+    date.getMonth() === mo - 1 &&
+    date.getDate() === d
+    ? date
+    : undefined;
+}
+
 /** Convert a local wall-clock `YYYY-MM-DDTHH:MM` string to a UTC ISO-8601 instant. */
 export function localDateTimeInputToIso(
   value: string | null | undefined,

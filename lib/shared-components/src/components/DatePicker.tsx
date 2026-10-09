@@ -4,6 +4,7 @@ import { Calendar } from '@tamagui/lucide-icons/icons/Calendar';
 import { ChevronLeft } from '@tamagui/lucide-icons/icons/ChevronLeft';
 import { ChevronRight } from '@tamagui/lucide-icons/icons/ChevronRight';
 import { Platform } from '../platform-components';
+import { parseLocalDateInput, toLocalDateInput } from '../utils/DateUtilities';
 
 export interface DatePickerProps {
   value?: Date;
@@ -46,18 +47,10 @@ export function DatePicker({
     });
   };
 
-  const formatInputDate = (date: Date): string => {
-    return date.toISOString().split('T')[0];
-  };
+  const formatInputDate = toLocalDateInput;
 
-  const parseInputDate = (dateString: string): Date | null => {
-    try {
-      const date = new Date(dateString);
-      return isNaN(date.getTime()) ? null : date;
-    } catch {
-      return null;
-    }
-  };
+  const parseInputDate = (dateString: string): Date | null =>
+    parseLocalDateInput(dateString) ?? null;
 
   const isDateDisabled = (date: Date): boolean => {
     if (minDate && date < minDate) return true;

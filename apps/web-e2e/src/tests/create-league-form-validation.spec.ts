@@ -17,6 +17,7 @@
 
 import { customAuthTest, leagueTest as test } from '../fixtures/pages';
 import { useTier } from '../fixtures/shared-mocks';
+import { localDayKey } from '../pages/league.page';
 
 /** Free-tier identity, with page objects injected. */
 const freeUserTest = customAuthTest('freeuser@test.com', 'none');
@@ -118,13 +119,11 @@ test.describe('Create League (Baseball) — Form Validation @regression', () => 
     await leaguePage.gotoCreate();
     await leaguePage.expandSection('draft');
 
-    // Matches the picker's own per-cell key: `new Date(y, m, d)` (local
-    // midnight) rendered via `.toISOString()`. Using `new Date()` (the
-    // current instant, not midnight) here would drift a UTC day near
-    // midnight depending on the runner's timezone.
+    // Matches the picker's own per-cell key: the local calendar date of
+    // `new Date(y, m, d)` (LS-10486).
     const now = new Date(2026, 4, 31, 12, 0, 0);
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const todayKey = today.toISOString().slice(0, 10);
+    const todayKey = localDayKey(today);
 
     // Open the picker — today's cell (current month view, no navigation) is
     // selectable.
@@ -136,7 +135,7 @@ test.describe('Create League (Baseball) — Form Validation @regression', () => 
     // past regardless of which day "today" is.
     await leaguePage.testId('date-time-picker-prev-month').tap();
     const prevMonth = new Date(today.getFullYear(), today.getMonth() - 1, 15);
-    const prevMonthKey = prevMonth.toISOString().slice(0, 10);
+    const prevMonthKey = localDayKey(prevMonth);
     await leaguePage
       .testId(`date-time-picker-day-${prevMonthKey}`)
       .expectDisabled();

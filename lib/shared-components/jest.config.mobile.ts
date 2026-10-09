@@ -75,6 +75,10 @@ module.exports = {
     // resolvable under the RN mobile jest environment. Belongs to
     // shared-components:web only.
     '/src/components/DateTimePicker\\.navigateMonth\\.spec\\.tsx$',
+    // Web-only (LS-10486): asserts the native <input type="date"> DOM value;
+    // DatePicker's web branch needs Popover compound components that the RN
+    // mobile jest environment can't resolve. Belongs to shared-components:web.
+    '/src/components/DatePicker\\.timezone\\.spec\\.tsx$',
     // Web-only (LS-6918): asserts DOM focus on the empty-state CTA.
     '/src/features/home/HomeScreen\\.focus\\.web\\.spec\\.tsx$',
     // Web-only specs for components that still have a dedicated `.native.tsx`

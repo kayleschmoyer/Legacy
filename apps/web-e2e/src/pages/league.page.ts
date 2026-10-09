@@ -4,6 +4,16 @@ import type { AppDriver, UIElement } from '../driver';
 import { BaseScreen } from '../base/base.screen';
 import { LeagueCard } from '../components/league-card.component';
 
+/**
+ * Local calendar-day key (`YYYY-MM-DD`) matching the DateTimePicker's
+ * `date-time-picker-day-*` testIDs. Local getters, not `toISOString()`, so it
+ * never shifts a day in non-UTC runners (LS-10486).
+ */
+export function localDayKey(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 /** The two sports the league surfaces are mounted under. */
 export type Sport = 'baseball' | 'football';
 
@@ -829,7 +839,7 @@ export class LeaguePage extends BaseScreen {
    */
   async selectDraftDate(date: Date): Promise<void> {
     await this.draftDatePickerTrigger.tap();
-    const dayId = `date-time-picker-day-${date.toISOString().slice(0, 10)}`;
+    const dayId = `date-time-picker-day-${localDayKey(date)}`;
     await this.testId(dayId).tap();
     await this.draftDatePickerApply.tap();
   }

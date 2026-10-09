@@ -52,3 +52,31 @@ describe('DateTimePicker', () => {
     expect(screen.getByText('February 2026')).toBeTruthy();
   });
 });
+
+describe('DateTimePicker day testIDs (LS-10486)', () => {
+  const originalTz = process.env.TZ;
+  afterEach(() => {
+    jest.useRealTimers();
+    if (originalTz === undefined) delete process.env.TZ;
+    else process.env.TZ = originalTz;
+  });
+
+  it.each(['Asia/Kolkata', 'America/Los_Angeles'])(
+    'keys each day cell by its local calendar date under TZ=%s',
+    (zone) => {
+      process.env.TZ = zone;
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date(2026, 9, 8, 12));
+
+      render(<DateTimePicker onChange={jest.fn()} useNativeInput={false} />);
+      fireEvent.click(screen.getByTestId('date-time-picker-trigger'));
+
+      expect(
+        screen.getByTestId('date-time-picker-day-2026-10-08'),
+      ).toBeTruthy();
+      expect(
+        screen.getByTestId('date-time-picker-day-2026-10-01'),
+      ).toBeTruthy();
+    },
+  );
+});

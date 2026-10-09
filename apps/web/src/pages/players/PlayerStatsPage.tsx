@@ -38,6 +38,7 @@ import {
   DEFAULT_SPORT_FALLBACK,
   type DefaultSport,
   parseDefaultSport,
+  toLocalDateInput,
   USER_PREFERENCES_STORAGE_KEY,
 } from '@legacy-sports/shared-components/utils';
 import {
@@ -1493,7 +1494,7 @@ export function PlayerStatsRoute() {
 
       let dataBlob: Blob;
       let filename: string;
-      const dateSuffix = new Date().toISOString().split('T')[0];
+      const dateSuffix = toLocalDateInput(new Date());
       const viewSegment = sanitizeFilenameSegment(viewMode);
 
       if (format === 'csv') {
