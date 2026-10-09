@@ -35,6 +35,7 @@ import { PageMeta } from '../../components/PageMeta';
 import { AuthPendingFallback } from '../../components/auth/AuthPendingFallback';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import { useImageLoadError } from '../../hooks/useImageLoadError';
+import { isTrustedAvatarUrl } from '../../lib/trusted-avatar-url';
 import { useIsPremiumStatus } from '../../hooks/useIsPremium';
 import { trackSignOut } from '../../utils/analytics';
 import { showToast } from '../../components/layout/SuccessToast';
@@ -233,7 +234,8 @@ const ProfileSettingsPage: React.FC = () => {
     [auth.config],
   );
   const userName = user?.username ?? '';
-  const userImage = user?.picture ?? null;
+  const rawPicture = user?.picture ?? null;
+  const userImage = isTrustedAvatarUrl(rawPicture) ? rawPicture : null;
   const { hasError: imageError, onError: onImageError } =
     useImageLoadError(userImage);
   const accessLevel = user?.accessLevel ?? 'none';

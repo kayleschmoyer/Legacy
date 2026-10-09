@@ -189,6 +189,13 @@ describe('ProfileSettingsPage avatar (LS-7232)', () => {
     );
   });
 
+  it('does not render a photo from an untrusted host (LS-7209)', () => {
+    const { container } = renderPage('https://attacker.example.com/p.gif');
+
+    expect(container.querySelector('img')).toBeNull();
+    expect(screen.getAllByText('C').length).toBeGreaterThan(0);
+  });
+
   it('still falls back to the initial letter when the image errors', () => {
     renderPage(GOOGLE_PHOTO);
 
