@@ -157,7 +157,8 @@ Prefer this over raw `npx jest --config <path> --testPathPatterns <pattern> -t <
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
 | `project` | string | **required** | — | Project name |
-| `testPathPatterns` | string |  | — | Jest --testPathPatterns value: a spec filename or regex pattern (e.g. "LeagueListRow"). For multiple patterns, pipe-separate: "FileA\|FileB". Capped at 300 characters and rejects nested-quantifier shapes like "(a+)+" (ReDoS) — use a simple spec name/pattern. Required unless the target runs `node --test`, where `files` is used instead. |
+| `testPathPatterns` | string |  | — | Jest --testPathPatterns: spec filename or regex ("LeagueListRow"); pipe-separate multiple ("A\|B"). Max 300 chars, no nested quantifiers like "(a+)+". Omit to run the whole suite. Use `files` for `node --test` targets. |
+| `testPathPattern` | string |  | — | Alias for testPathPatterns. |
 | `files` | string[] |  | — | Project-relative file paths, for a "test" target running `node --test` instead of Jest (e.g. ["lib/__tests__/retry.test.mjs"]). Unused for Jest targets. |
 | `testNamePattern` | string |  | — | Jest -t value: filters to matching test names, e.g. "DraftSquadStrip". Same length cap and ReDoS guard as testPathPatterns. |
 | `config` | string |  | — | Jest config variant, mapped to the "test:<config>" target (e.g. "mobile", "web", "stories"). Omit for projects with a single "test" target. |

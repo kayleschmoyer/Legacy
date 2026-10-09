@@ -14,8 +14,17 @@ import type { ToolResult } from '../types.js';
 
 export interface RunTestParams {
   project: string;
-  /** Jest --testPathPatterns value. Required unless `files` is used instead. */
+  /**
+   * Jest --testPathPatterns value. Optional: omitted, the project's whole
+   * suite runs (LS-10201). Unused for `node --test` targets (`files` instead).
+   */
   testPathPatterns?: string;
+  /**
+   * Singular alias for `testPathPatterns` (Jest's pre-rename flag name). Now
+   * that omitting the pattern runs the whole suite, silently dropping it would
+   * turn "run one spec" into "run everything", so it is honored (LS-10201).
+   */
+  testPathPattern?: string;
   testNamePattern?: string;
   config?: string;
   updateSnapshot?: boolean;
@@ -61,10 +70,7 @@ function validatePattern(paramName: string, value: string): string | null {
   return null;
 }
 
-/**
- * Whether either pattern value could be split by a shell word-split. Only
- * called once `testPathPatterns` has already been validated as present.
- */
+/** Whether either pattern value could be split by a shell word-split. */
 function hasWhitespaceValue(params: RunTestParams): boolean {
   return (
     /\s/.test(params.testPathPatterns ?? '') ||
@@ -91,9 +97,11 @@ function runJestTarget(
   const quote = (value: string) =>
     shellJoinsArgs ? quoteForShellJoin(value) : value;
 
-  // Callers only reach here once testPathPatterns has been validated as
-  // present (the Jest-target branches of runTest all check it first).
-  const args = ['--testPathPatterns', quote(params.testPathPatterns as string)];
+  // No testPathPatterns means "run the whole suite" (LS-10201).
+  const args: string[] = [];
+  if (params.testPathPatterns) {
+    args.push('--testPathPatterns', quote(params.testPathPatterns));
+  }
   if (params.testNamePattern) {
     args.push('--testNamePattern', quote(params.testNamePattern));
   }
@@ -102,7 +110,7 @@ function runJestTarget(
     target,
     noCache: params.noCache,
     updateSnapshot: params.updateSnapshot,
-    args,
+    ...(args.length > 0 ? { args } : {}),
     worktreePath: params.worktreePath,
     syncBudgetMs,
     // One report file per target: a fanned-out run executes several Jest
@@ -266,10 +274,15 @@ function mergeFanoutResults(
  * instead, appended as positional args, with an explicit error rather than
  * a silent full-suite run when `files` is missing.
  */
-export async function runTest(params: RunTestParams): Promise<ToolResult> {
+export async function runTest(input: RunTestParams): Promise<ToolResult> {
   // The ~60s MCP transport timeout covers the whole call, so pre-flight
   // introspection and the job's sync wait share one allowance (LS-10174).
   const callStartedAt = Date.now();
+  const { testPathPattern, ...rest } = input;
+  const params: RunTestParams = {
+    ...rest,
+    testPathPatterns: rest.testPathPatterns ?? testPathPattern,
+  };
   const validationError =
     (params.testPathPatterns != null
       ? validatePattern('testPathPatterns', params.testPathPatterns)
@@ -287,17 +300,6 @@ export async function runTest(params: RunTestParams): Promise<ToolResult> {
   const cwd = params.worktreePath || getRepoRoot();
 
   if (params.config) {
-    if (!params.testPathPatterns) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: 'testPathPatterns is required when config is set (config targets a Jest variant).',
-          },
-        ],
-        isError: true,
-      };
-    }
     const target = `test:${params.config}`;
     // The executor lookup costs an `nx show project --json` spawn, which on a
     // cold project graph is seconds the caller's sync budget has to absorb.
@@ -341,35 +343,12 @@ export async function runTest(params: RunTestParams): Promise<ToolResult> {
   }
 
   if (plan.kind === 'single') {
-    if (!params.testPathPatterns) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: 'testPathPatterns is required for a Jest target.',
-          },
-        ],
-        isError: true,
-      };
-    }
     return runJestTarget(
       params,
       plan.target,
       plan.shellJoinsArgs,
       syncBudgetMs,
     );
-  }
-
-  if (!params.testPathPatterns) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: 'testPathPatterns is required for a Jest target.',
-        },
-      ],
-      isError: true,
-    };
   }
 
   const perTarget = await Promise.all(

@@ -179,11 +179,13 @@ server.tool(
       .string()
       .optional()
       .describe(
-        'Jest --testPathPatterns value: a spec filename or regex pattern (e.g. "LeagueListRow"). ' +
-          'For multiple patterns, pipe-separate: "FileA|FileB". Capped at 300 characters and rejects ' +
-          'nested-quantifier shapes like "(a+)+" (ReDoS) — use a simple spec name/pattern. Required ' +
-          'unless the target runs `node --test`, where `files` is used instead.',
+        'Jest --testPathPatterns: spec filename or regex ("LeagueListRow"); pipe-separate multiple ("A|B"). ' +
+          'Max 300 chars, no nested quantifiers like "(a+)+". Omit to run the whole suite. Use `files` for `node --test` targets.',
       ),
+    testPathPattern: z
+      .string()
+      .optional()
+      .describe('Alias for testPathPatterns.'),
     files: z
       .array(z.string())
       .optional()

@@ -138,38 +138,52 @@ describe('runTest', () => {
     expect(result).toBe(expected);
   });
 
-  it('errors without calling runTarget when testPathPatterns is missing for a "single" Jest plan', async () => {
-    const result = await runTest({ project: 'db' });
+  it('runs the whole suite when testPathPatterns is omitted for a "single" Jest plan (LS-10201)', async () => {
+    await runTest({ project: 'db', report: 'summary' });
 
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toMatch(/testPathPatterns is required/);
-    expect(mockRunTarget).not.toHaveBeenCalled();
+    expect(mockRunTarget).toHaveBeenCalledTimes(1);
+    const call = mockRunTarget.mock.calls[0][0];
+    expect(call.project).toBe('db');
+    expect(call.target).toBe('test');
+    expect(call.args).toBeUndefined();
+    expect(call.jestReport?.mode).toBe('summary');
   });
 
-  it('errors without calling runTarget when testPathPatterns is missing for a "fanout" plan', async () => {
+  it('runs every fanned-out target unfiltered when testPathPatterns is omitted', async () => {
     mockResolveTestTargetPlan.mockResolvedValue({
       kind: 'fanout',
       targets: ['test:web', 'test:mobile'],
       skipped: [],
     });
 
-    const result = await runTest({ project: 'shared-components' });
+    await runTest({ project: 'shared-components' });
 
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toMatch(/testPathPatterns is required/);
-    expect(mockRunTarget).not.toHaveBeenCalled();
+    expect(mockRunTarget).toHaveBeenCalledTimes(2);
+    for (const [call] of mockRunTarget.mock.calls) {
+      expect(call.args).toBeUndefined();
+    }
   });
 
-  it('errors without calling runTarget when testPathPatterns is missing for config', async () => {
-    const result = await runTest({
-      project: 'shared-components',
-      config: 'mobile',
-    });
+  it('runs the whole config variant when testPathPatterns is omitted for config', async () => {
+    await runTest({ project: 'shared-components', config: 'mobile' });
 
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toMatch(/testPathPatterns is required/);
-    expect(mockRunTarget).not.toHaveBeenCalled();
-    expect(mockResolveTestTargetPlan).not.toHaveBeenCalled();
+    expect(mockRunTarget).toHaveBeenCalledWith(
+      expect.objectContaining({
+        project: 'shared-components',
+        target: 'test:mobile',
+      }),
+    );
+    expect(mockRunTarget.mock.calls[0][0].args).toBeUndefined();
+  });
+
+  it('honors the singular testPathPattern alias instead of dropping it', async () => {
+    await runTest({ project: 'cli', testPathPattern: 'ingestNflverse' });
+
+    expect(mockRunTarget).toHaveBeenCalledWith(
+      expect.objectContaining({
+        args: ['--testPathPatterns', 'ingestNflverse'],
+      }),
+    );
   });
 
   it('returns the error message and never calls runTarget when the plan is "error"', async () => {
