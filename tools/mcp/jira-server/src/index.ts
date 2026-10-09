@@ -831,7 +831,7 @@ server.tool(
 // --- jira_get_bucket_epic ---
 server.tool(
   'jira_get_bucket_epic',
-  'Get the current bucket epic for "client-bugs", "mcp-gaps", or "design-sync" from Jira project property. Returns a JSON object with success, bucket, key, cached (boolean), and updatedAt (ISO string or null). Cached 5 minutes.',
+  'Get the current bucket epic for "client-bugs", "mcp-gaps", or "design-sync" from Jira project property. Returns {success, bucket, key, cached, updatedAt, warning?}; warning = property lags newest open bucket epic. Cached 5m.',
   {
     bucket: z
       .enum(['client-bugs', 'mcp-gaps', 'design-sync'])

@@ -1,8 +1,12 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { jiraRequest } from '../jira-api.js';
+import { searchJql } from '../jql-search.js';
 
 // 5-minute module-scope cache per bucket
-const cache = new Map<string, { key: string; expiresAt: number }>();
+const cache = new Map<
+  string,
+  { key: string; warning: string | null; expiresAt: number }
+>();
 const TTL_MS = 5 * 60 * 1000;
 
 interface BucketEpicValue {
@@ -56,6 +60,37 @@ export async function writeBucketEpicKey(
   cache.delete(bucket);
 }
 
+/**
+ * Compare the stored property against the open epics carrying the bucket's
+ * `bucket:<name>` label (newest first). Returns a warning when the property
+ * points at anything but the newest labelled epic, or when several open epics
+ * share the label, so a stale pointer cannot silently misroute tickets
+ * (LS-10240). Best-effort: a failed lookup never breaks the read.
+ */
+async function detectBucketDrift(
+  bucket: string,
+  key: string,
+): Promise<string | null> {
+  try {
+    const { issues } = await searchJql<Record<string, never>>({
+      jql: `project = LS AND issuetype = Epic AND labels = "bucket:${bucket}" AND statusCategory != Done ORDER BY created DESC`,
+      fields: ['summary'],
+      maxResults: 10,
+    });
+    const newest = issues?.[0];
+    if (!newest) return null;
+    if (newest.key !== key) {
+      return `Property bucket.${bucket} points to ${key} but the newest open epic labelled bucket:${bucket} is ${newest.key}. Run jira_rollover_sync (mode "sync") to repair.`;
+    }
+    if (issues.length > 1) {
+      return `${issues.length} open epics carry the bucket:${bucket} label (${issues.map((i) => i.key).join(', ')}); only ${key} is current. Run jira_rollover_sync (mode "sync") to close the older ones.`;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getBucketEpic(params: {
   bucket: string;
 }): Promise<CallToolResult> {
@@ -73,6 +108,7 @@ export async function getBucketEpic(params: {
             key: cached.key,
             cached: true,
             updatedAt: null,
+            ...(cached.warning ? { warning: cached.warning } : {}),
           }),
         },
       ],
@@ -85,7 +121,8 @@ export async function getBucketEpic(params: {
     });
     const key = result?.value?.key?.trim();
     if (!key) throw new Error('Property exists but has no key value');
-    cache.set(bucket, { key, expiresAt: now + TTL_MS });
+    const warning = await detectBucketDrift(bucket, key);
+    cache.set(bucket, { key, warning, expiresAt: now + TTL_MS });
     return {
       content: [
         {
@@ -96,6 +133,7 @@ export async function getBucketEpic(params: {
             key,
             cached: false,
             updatedAt: result.value.updatedAt ?? null,
+            ...(warning ? { warning } : {}),
           }),
         },
       ],
