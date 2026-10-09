@@ -14,7 +14,8 @@
  * What counts as validation evidence (must not have failed):
  *   - nx_run_pc_chunk / nx_run_affected / nx_run / nx_run_e2e_specs MCP calls
  *   - make_run with a pc-*, test, lint, typecheck, or build target
- *   - Bash: make pc-* / make test / make build, pnpm test|lint|typecheck|build,
+ *   - Bash: make [flags] pc-* / test / build (incl. `make -C <dir> pc-*`),
+ *     pnpm test|lint|typecheck|build,
  *     pnpm exec nx|vitest|jest|playwright|tsc|eslint, npx equivalents,
  *     make sync-agent-prompts / lint-agent-prompts
  *   - ci_wait_run (waited on a real CI result)
@@ -72,8 +73,44 @@ const sourceEdits = [
 
 if (sourceEdits.length === 0) process.exit(0);
 
+// make flags (`-C <dir>`, `-C<dir>`, `--directory=<dir>`, `-j4`, `-k`) and
+// `VAR=value` assignments may precede the target — AGENTS.md "Command
+// Patterns" mandates `make -C $wt pc-<chunk>` over `cd $wt && make …`
+// (LS-11022). The target itself must still be the first non-flag word, so
+// `make worktree DESC=test` is not mistaken for `make test`.
+//
+// A backgrounded launch (`run_in_background: true`, which the block message
+// below recommends) is recorded with the launch call's `ok`, not the chunk's
+// eventual exit code — no hook event fires when a background task finishes,
+// so the ledger cannot see it. It still counts as evidence: refusing it would
+// block every session following the documented chunked path.
+//
+// Tokenised rather than one regex: a `(flag|value|assignment)*` regex has
+// overlapping alternatives and backtracks exponentially on long non-matching
+// commands, which would hang the Stop hook.
+const MAKE_TARGET = /^(pc-\w+|test\b|build\b|(sync|lint)-agent-prompts)/;
+const MAKE_VALUE_FLAG = /^-[CfIoW]$/; // value always follows as the next word
+const MAKE_JOBS_FLAG = /^-[jl]$/; // value optional — only a number is consumed
+
+function isMakeValidation(cmd) {
+  const words = cmd.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) ?? [];
+  for (let i = 0; i < words.length; i++) {
+    if (!/(^|[/(;&|])make$/.test(words[i])) continue;
+    let j = i + 1;
+    while (j < words.length) {
+      const w = words[j];
+      if (MAKE_VALUE_FLAG.test(w)) j += 2;
+      else if (MAKE_JOBS_FLAG.test(w)) j += /^\d+$/.test(words[j + 1]) ? 2 : 1;
+      else if (w.startsWith('-') || /^\w+=/.test(w)) j += 1;
+      else break;
+    }
+    if (MAKE_TARGET.test(words[j] ?? '')) return true;
+  }
+  return false;
+}
+
 const BASH_VALIDATION =
-  /\bmake\s+(pc-\w+|test\b|build\b|(sync|lint)-agent-prompts)|\bpnpm\s+(run\s+)?(test|lint|typecheck|build)\b|\bpnpm\s+exec\s+(nx|vitest|jest|playwright|tsc|eslint)\b|\bnpx\s+(vitest|jest|playwright|tsc|eslint)\b/;
+  /\bpnpm\s+(run\s+)?(test|lint|typecheck|build)\b|\bpnpm\s+exec\s+(nx|vitest|jest|playwright|tsc|eslint)\b|\bnpx\s+(vitest|jest|playwright|tsc|eslint)\b/;
 
 const hasValidation = evidence.some((e) => {
   if (e.ok === false) return false;
@@ -87,7 +124,11 @@ const hasValidation = evidence.some((e) => {
   )
     return true;
   if (/__ci_wait_run$/.test(e.tool)) return true;
-  if (e.tool === 'Bash' && BASH_VALIDATION.test(e.arg ?? '')) return true;
+  if (
+    e.tool === 'Bash' &&
+    (isMakeValidation(e.arg ?? '') || BASH_VALIDATION.test(e.arg ?? ''))
+  )
+    return true;
   return false;
 });
 
