@@ -12,8 +12,9 @@ import PricingPage, {
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
+const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
-  useNavigate: () => jest.fn(),
+  useNavigate: () => mockNavigate,
   Link: ({
     to,
     children,
@@ -849,6 +850,31 @@ describe('PricingPage — Premium card CTA by viewer state (LS-7193)', () => {
     ).toHaveLength(2);
     expect(screen.queryByText('Manage subscription')).not.toBeInTheDocument();
   });
+
+  // LS-7170: the chosen billing interval must survive the navigation.
+  it.each([0, 1])(
+    'passes the selected interval to /profile/subscription from Upgrade CTA %i',
+    async (index) => {
+      const user = userEvent.setup();
+      render(<PricingPage />);
+
+      await user.click(
+        screen.getAllByRole('button', { name: 'Upgrade to Premium' })[index],
+      );
+      expect(mockNavigate).toHaveBeenLastCalledWith(
+        '/profile/subscription?interval=annual',
+      );
+
+      screen.getByRole('radio', { name: /Monthly/ }).focus();
+      await user.keyboard('{Enter}');
+      await user.click(
+        screen.getAllByRole('button', { name: 'Upgrade to Premium' })[index],
+      );
+      expect(mockNavigate).toHaveBeenLastCalledWith(
+        '/profile/subscription?interval=monthly',
+      );
+    },
+  );
 
   it('shows "Upgrade to Premium" to authenticated free users', () => {
     mockUseAuth.mockReturnValue({ isAuthenticated: true });

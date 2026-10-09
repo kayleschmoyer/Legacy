@@ -661,6 +661,48 @@ describe('SubscriptionPage — price loading state (LS-8813)', () => {
   });
 });
 
+// LS-7170: the pricing page hands its selected billing interval over via
+// `?interval=`; the billing toggle must open on it.
+describe('SubscriptionPage — ?interval preselect (LS-7170)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseGetMySubscriptionQuery.mockReturnValue({
+      data: { mySubscription: null },
+      loading: false,
+      refetch: jest.fn(),
+    });
+    mockUseLeagueWebSocket.mockReturnValue({ connected: false });
+    mockUseLeagueWebSocketClient.mockReturnValue({
+      client: null,
+      connected: false,
+    });
+    mockUseStripePrices.mockReturnValue(LOADED_STRIPE_PRICES);
+  });
+
+  function renderAt(url: string) {
+    return render(
+      <MemoryRouter initialEntries={[url]}>
+        <SubscriptionPage />
+      </MemoryRouter>,
+    );
+  }
+
+  it('preselects monthly for ?interval=monthly', () => {
+    renderAt('/profile/subscription?interval=monthly');
+    expect(screen.getByText(/Upgrade to Premium — .*\/mo/)).toBeInTheDocument();
+  });
+
+  it.each(['?interval=annual', '?interval=bogus', ''])(
+    'defaults to annual for %p',
+    (query) => {
+      renderAt(`/profile/subscription${query}`);
+      expect(
+        screen.getByText(/Upgrade to Premium — .*\/yr/),
+      ).toBeInTheDocument();
+    },
+  );
+});
+
 // LS-7406: two overlapping handleUpgradeAction calls (fresh step-up runs the
 // action synchronously with no de-duplication) must only surface the latest
 // call's outcome in checkoutError — a slower, earlier call settling late is a

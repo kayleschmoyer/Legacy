@@ -663,13 +663,15 @@ function CancelConfirmDialog({
 /* ─── Main Component ─── */
 
 const SubscriptionPage: React.FC = () => {
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>(
-    'annual',
+  const [searchParams] = useSearchParams();
+  // LS-7170: the pricing page passes the visitor's chosen interval so the
+  // billing toggle opens on it; anything else keeps the annual default.
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>(() =>
+    searchParams.get('interval') === 'monthly' ? 'monthly' : 'annual',
   );
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [portalError, setPortalError] = useState<string | null>(null);
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   const {

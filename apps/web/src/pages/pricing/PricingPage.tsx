@@ -892,7 +892,13 @@ export default function PricingPage() {
               </PlanHeader>
 
               {showUpgradeCta && (
-                <ActionButton onPress={() => navigate('/profile/subscription')}>
+                <ActionButton
+                  onPress={() =>
+                    navigate(
+                      `/profile/subscription?interval=${isAnnual ? 'annual' : 'monthly'}`,
+                    )
+                  }
+                >
                   {premiumCtaLabel(prices.trialPeriodDays)}
                 </ActionButton>
               )}
@@ -1232,7 +1238,11 @@ export default function PricingPage() {
             <XStack gap="$4" flexWrap="wrap" justifyContent="center">
               {showUpgradeCta && (
                 <ActionButton
-                  onPress={() => navigate('/profile/subscription')}
+                  onPress={() =>
+                    navigate(
+                      `/profile/subscription?interval=${isAnnual ? 'annual' : 'monthly'}`,
+                    )
+                  }
                   minWidth={200}
                 >
                   Upgrade to Premium
