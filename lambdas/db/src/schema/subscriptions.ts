@@ -1980,6 +1980,10 @@ builder.mutationField('restoreApplePurchases', (t) =>
       const tier: 'free' | 'premium' = isExpired ? 'free' : 'premium';
       const status = isExpired ? 'canceled' : 'active';
 
+      const previousTier = await getPreviousTierForAppleSubscription(
+        originalTransactionId,
+      );
+
       await runWithInternalClient(getDbOptions(), async (db) => {
         await db
           .insert(InternalSchema.subscriptions)
@@ -2011,6 +2015,14 @@ builder.mutationField('restoreApplePurchases', (t) =>
           .set({ subscriptionTier: tier, updatedAt: new Date() })
           .where(eq(InternalSchema.usersInAppInternal.id, userId));
       });
+
+      // Apply tier-change side effects
+      await applyTierChangeSideEffects(
+        userId,
+        previousTier,
+        tier,
+        getDbOptions(),
+      );
 
       LOGGER.info('restoreApplePurchases — subscription restored', {
         userId,

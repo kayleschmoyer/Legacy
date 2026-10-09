@@ -694,6 +694,13 @@ describe('Google Play mutation validation (LS-5121)', () => {
       const inserts: Record<string, unknown>[] = [];
       const updateSets: Record<string, unknown>[] = [];
       const mockDb = {
+        // getPreviousTierForAppleSubscription reads the existing row first
+        // (LS-7412); no previous subscription here.
+        select: () => ({
+          from: () => ({
+            where: () => ({ limit: async () => [] }),
+          }),
+        }),
         insert: () => ({
           values: (v: Record<string, unknown>) => {
             inserts.push(v);
@@ -786,6 +793,117 @@ describe('Google Play mutation validation (LS-5121)', () => {
         tier: 'premium',
         status: 'active',
       });
+    });
+  });
+
+  // LS-7412: restoreApplePurchases must apply the same tier-change side effects
+  // as verifyApplePurchase / restoreGooglePurchases.
+  describe('restoreApplePurchases tier-change side effects (LS-7412)', () => {
+    const DAY_MS = 24 * 60 * 60 * 1000;
+
+    async function runRestore(
+      previousTier: 'free' | 'premium' | null,
+      expiresDate: number,
+    ) {
+      const dbClientModule = jest.requireMock('@legacy-sports/db-client');
+      const appleJws = jest.requireMock('../apple-jws');
+      appleJws.decodeAndVerifyJwsTransaction.mockResolvedValue({
+        originalTransactionId: 'orig-tx-1',
+        productId: 'com.legacysports.app.premium.monthly',
+        expiresDate,
+      });
+
+      // First runWithInternalClient call: getPreviousTierForAppleSubscription SELECT
+      dbClientModule.runWithInternalClient.mockImplementationOnce(
+        async (
+          _opts: unknown,
+          cb: (db: { select: jest.Mock }) => Promise<unknown>,
+        ) =>
+          cb({
+            select: jest.fn().mockReturnValue({
+              from: jest.fn().mockReturnValue({
+                where: jest.fn().mockReturnValue({
+                  limit: jest
+                    .fn()
+                    .mockResolvedValue(
+                      previousTier ? [{ tier: previousTier }] : [],
+                    ),
+                }),
+              }),
+            }),
+          }),
+      );
+
+      // Second runWithInternalClient call: INSERT + UPDATE subscription
+      dbClientModule.runWithInternalClient.mockImplementationOnce(
+        async (
+          _opts: unknown,
+          cb: (db: {
+            insert: jest.Mock;
+            update: jest.Mock;
+          }) => Promise<unknown>,
+        ) =>
+          cb({
+            insert: jest.fn().mockReturnValue({
+              values: jest.fn().mockReturnValue({
+                onConflictDoUpdate: jest.fn().mockResolvedValue(undefined),
+              }),
+            }),
+            update: jest.fn().mockReturnValue({
+              set: jest.fn().mockReturnValue({
+                where: jest.fn().mockResolvedValue(undefined),
+              }),
+            }),
+          }),
+      );
+
+      const resolve = getResolver('restoreApplePurchases');
+      const result = await resolve(
+        {},
+        { jwsTransaction: 'fake-jws' },
+        mockContext,
+        undefined as never,
+      );
+      return { result, dbClientModule };
+    }
+
+    it('calls handleSubscriptionDowngrade when a premium user restores an expired subscription', async () => {
+      const { result, dbClientModule } = await runRestore(
+        'premium',
+        Date.now() - 365 * DAY_MS,
+      );
+
+      expect(result).toBe(true);
+      expect(dbClientModule.handleSubscriptionDowngrade).toHaveBeenCalledWith(
+        1,
+        expect.anything(),
+      );
+      expect(dbClientModule.clearLeagueTierFreezes).not.toHaveBeenCalled();
+    });
+
+    it('calls clearLeagueTierFreezes when a free user restores an active subscription', async () => {
+      const { result, dbClientModule } = await runRestore(
+        'free',
+        Date.now() + 30 * DAY_MS,
+      );
+
+      expect(result).toBe(true);
+      expect(dbClientModule.clearLeagueTierFreezes).toHaveBeenCalledWith(
+        1,
+        expect.anything(),
+      );
+      expect(dbClientModule.handleSubscriptionDowngrade).not.toHaveBeenCalled();
+    });
+
+    it('fires no side effects when the restored tier equals the previous tier', async () => {
+      const { result, dbClientModule } = await runRestore(
+        'premium',
+        Date.now() + 30 * DAY_MS,
+      );
+
+      expect(result).toBe(true);
+      expect(dbClientModule.handleSubscriptionDowngrade).not.toHaveBeenCalled();
+      expect(dbClientModule.clearLeagueTierFreezes).not.toHaveBeenCalled();
     });
   });
 
