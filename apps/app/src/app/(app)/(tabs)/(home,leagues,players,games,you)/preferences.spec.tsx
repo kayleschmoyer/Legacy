@@ -522,5 +522,28 @@ describe('PreferencesScreen', () => {
         expect(mockShareCurrentLogFile).toHaveBeenCalled();
       });
     });
+
+    it('renders the error message when sharing the log file fails', async () => {
+      mockSecureHasItem.mockResolvedValue(true);
+      mockSecureGetItem.mockImplementation((key: string) =>
+        Promise.resolve(key === 'enable_device_logs' ? 'true' : null),
+      );
+      mockShareCurrentLogFile.mockRejectedValue(
+        new Error('No log file exists yet for today.'),
+      );
+
+      renderWithUser(true);
+
+      await waitFor(() => {
+        expect(mockEnableDeviceLogging).toHaveBeenCalled();
+      });
+
+      fireEvent.press(screen.getByText('Share log file'));
+      await waitFor(() => {
+        expect(
+          screen.getByText('No log file exists yet for today.'),
+        ).toBeTruthy();
+      });
+    });
   });
 });

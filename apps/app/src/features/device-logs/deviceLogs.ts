@@ -18,7 +18,7 @@ const SHARE_MAX_CHARS = 200_000;
  * generic `Error` so callers can differentiate user-actionable failures from
  * unexpected ones in catch blocks and analytics.
  */
-class DeviceLogShareError extends Error {
+export class DeviceLogShareError extends Error {
   constructor(
     message: string,
     public readonly reason: 'disabled' | 'missing-file',

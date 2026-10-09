@@ -335,13 +335,15 @@ function SectionCard({
 /* ─── Main Component ─── */
 
 function AdminToolsSection({
+  isAdmin,
   isCollapsed,
   onToggle,
 }: {
+  isAdmin: boolean;
   isCollapsed: boolean;
   onToggle: () => void;
 }): React.JSX.Element {
-  const { enabled, setEnabled } = useDeviceLoggingPreference(true);
+  const { enabled, setEnabled } = useDeviceLoggingPreference(isAdmin);
   const [shareError, setShareError] = useState<string | null>(null);
 
   const onShare = useCallback(() => {
@@ -645,6 +647,7 @@ export default function PreferencesScreen(): React.JSX.Element {
 
         {currentUser?.isAdmin ? (
           <AdminToolsSection
+            isAdmin={currentUser?.isAdmin ?? false}
             isCollapsed={collapsed.admin}
             onToggle={() => toggle('admin')}
           />
