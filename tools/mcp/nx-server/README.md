@@ -62,7 +62,7 @@ It exists because the raw log cannot carry this reliably: a 16-failure run overf
 
 An Nx cache replay never re-runs Jest and so writes no report: the response then carries `reportUnavailable` plus the raw output rather than a fabricated zero-failure result. Pair `report` with `noCache: true` when that's a risk.
 
-Two related truncation rules apply everywhere in this server: command output is ANSI-stripped before it is matched or truncated (escape codes inflate the budget by 40-80% and break the daemon/plugin-worker/project-not-found pattern matching), and a **failed** `nx_run_pc_chunk` truncates from the top rather than the bottom — eslint and jest print per-project progress first and the real error list last, so head-truncation drops precisely the lines the caller needs.
+Two related truncation rules apply everywhere in this server: command output is ANSI-stripped before it is matched or truncated (escape codes inflate the budget by 40-80% and break the daemon/plugin-worker/project-not-found pattern matching), and a **failed** `nx_run_pc_chunk` truncates from the top rather than the bottom — eslint and jest print per-project progress first and the real error list last, so head-truncation drops precisely the lines the caller needs. A failed chunk also returns a `failures` array (plus `omittedFailures` past 100) extracted from the **full** log before truncation — TAP `not ok` lines with their error context, jest `FAIL`/`●` headers, `error TS` diagnostics, eslint errors, prettier `[warn]` files and nx `Failed tasks:` entries — so the failing test names survive even when `output` is cut to its tail (LS-10354).
 
 ## Response format
 

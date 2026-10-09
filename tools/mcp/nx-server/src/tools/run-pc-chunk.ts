@@ -1,5 +1,6 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { stripAnsiCodes } from '../ansi.js';
+import { extractFailures } from '../extract-failures.js';
 import { registerJobFormatter } from '../job-formatters.js';
 import type { FormattedJobResult } from '../job-formatters.js';
 import type { JobSnapshot } from '../jobs.js';
@@ -122,6 +123,16 @@ function buildPcChunkResult(snapshot: JobSnapshot): FormattedJobResult {
   // caller is reading the result for. A passing chunk keeps the existing
   // balanced shape — there is no failure tail to protect.
   const preferTail = !passed;
+  const extracted = passed ? null : extractFailures(log);
+  const failureFields =
+    extracted && extracted.failures.length > 0
+      ? {
+          failures: extracted.failures,
+          ...(extracted.omittedFailures
+            ? { omittedFailures: extracted.omittedFailures }
+            : {}),
+        }
+      : null;
 
   return {
     body: {
@@ -129,6 +140,8 @@ function buildPcChunkResult(snapshot: JobSnapshot): FormattedJobResult {
       passed,
       ...(snapshot.recoveredFromTimeout ? { recoveredFromTimeout: true } : {}),
       ...(snapshot.error ? { error: snapshot.error } : {}),
+      // Extracted from the FULL log, ahead of any truncation (LS-10354).
+      ...(failureFields ?? {}),
       output: verbose
         ? preferTail
           ? truncateOutputPreferTail(log, MAX_OUTPUT_CHARS)
