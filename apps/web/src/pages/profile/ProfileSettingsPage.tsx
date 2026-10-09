@@ -37,6 +37,7 @@ import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import { useImageLoadError } from '../../hooks/useImageLoadError';
 import { isTrustedAvatarUrl } from '../../lib/trusted-avatar-url';
 import { useIsPremiumStatus } from '../../hooks/useIsPremium';
+import { useUsernameAvailability } from '../../hooks/useUsernameAvailability';
 import { trackSignOut } from '../../utils/analytics';
 import { showToast } from '../../components/layout/SuccessToast';
 
@@ -310,6 +311,12 @@ const ProfileSettingsPage: React.FC = () => {
       setEditedUsername(dbUsername);
     }
   }, [dbUsername, isEditingUsername]);
+
+  const usernameAvailability = useUsernameAvailability(
+    editedUsername,
+    dbUsername,
+    isEditingUsername,
+  );
 
   const isUsernameDirty = isEditingUsername && editedUsername !== dbUsername;
   // LS-7236: a preset pick saves immediately, so the "unsaved" window is the
@@ -652,6 +659,38 @@ const ProfileSettingsPage: React.FC = () => {
                           ? ` · Maximum ${USERNAME_MAX_LENGTH} characters reached`
                           : null}
                       </Paragraph>
+                      {!usernameError &&
+                        usernameAvailability === 'checking' && (
+                          <Paragraph
+                            id="profile-username-availability"
+                            size="$2"
+                            color="$colorPress"
+                            role="status"
+                          >
+                            Checking availability…
+                          </Paragraph>
+                        )}
+                      {!usernameError &&
+                        usernameAvailability === 'available' && (
+                          <Paragraph
+                            id="profile-username-availability"
+                            size="$2"
+                            color="$colorPress"
+                            role="status"
+                          >
+                            Username is available
+                          </Paragraph>
+                        )}
+                      {!usernameError && usernameAvailability === 'taken' && (
+                        <Paragraph
+                          id="profile-username-availability"
+                          size="$2"
+                          style={{ color: 'var(--brandSeamRed)' }}
+                          role="alert"
+                        >
+                          Username is already taken
+                        </Paragraph>
+                      )}
                       {usernameError && (
                         <Paragraph
                           size="$2"

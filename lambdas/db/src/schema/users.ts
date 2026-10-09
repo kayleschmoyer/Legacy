@@ -23,6 +23,11 @@ const UPDATE_USERNAME_RATE_LIMIT_BUCKET = 'update_username';
 const UPDATE_USERNAME_RATE_LIMIT_MAX_ATTEMPTS = 5;
 const UPDATE_USERNAME_RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 
+// Keystroke-driven (debounced client-side), so allow far more than a save.
+const USERNAME_AVAILABLE_RATE_LIMIT_BUCKET = 'username_available';
+const USERNAME_AVAILABLE_RATE_LIMIT_MAX_ATTEMPTS = 60;
+const USERNAME_AVAILABLE_RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+
 // User type
 export const UserRef = builder.objectRef<{
   id: number;
@@ -490,6 +495,49 @@ builder.mutationField('updateUsername', (t) =>
         }
         throw error;
       }
+    },
+  }),
+);
+
+// Live availability pre-check for the username editor (LS-7241 / PRS-040).
+// Authenticated + rate-limited so it cannot be used to enumerate usernames in
+// bulk; the unique constraint in `updateUsername` remains the source of truth.
+builder.queryField('usernameAvailable', (t) =>
+  t.boolean({
+    description:
+      "Whether the given username can be claimed by the current user. True when it is unused or already the caller's own; false when taken or invalid.",
+    args: {
+      username: t.arg.string({ required: true }),
+    },
+    resolve: async (parent, { username }, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+
+      const rateLimit = await checkAndIncrementRateLimit(context.db, {
+        bucket: USERNAME_AVAILABLE_RATE_LIMIT_BUCKET,
+        userId: context.user.id,
+        limit: USERNAME_AVAILABLE_RATE_LIMIT_MAX_ATTEMPTS,
+        windowMs: USERNAME_AVAILABLE_RATE_LIMIT_WINDOW_MS,
+      });
+      if (!rateLimit.allowed) {
+        throw RateLimitedError();
+      }
+
+      const trimmed = username.trim();
+      if (
+        trimmed.length < 3 ||
+        trimmed.length > 50 ||
+        !/^[a-zA-Z0-9_.-]+$/.test(trimmed)
+      ) {
+        return false;
+      }
+
+      const [existing] = await dbService.users.getUsers({
+        filters: { username: trimmed },
+        limit: 1,
+      });
+      return !existing || Number(existing.id) === context.user.id;
     },
   }),
 );

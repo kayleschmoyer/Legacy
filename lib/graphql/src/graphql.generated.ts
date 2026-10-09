@@ -4133,6 +4133,8 @@ export type Query = {
   userLeagueCount: Scalars['Int']['output'];
   userLeagues: Array<League>;
   userTeamId?: Maybe<Scalars['Int']['output']>;
+  /** Whether the given username can be claimed by the current user. True when it is unused or already the caller's own; false when taken or invalid. */
+  usernameAvailable?: Maybe<Scalars['Boolean']['output']>;
   users?: Maybe<Array<User>>;
   usersCount?: Maybe<Scalars['Int']['output']>;
   validateInviteCode?: Maybe<InviteCodeInfo>;
@@ -4862,6 +4864,10 @@ export type QueryUserLeaguesArgs = {
 
 export type QueryUserTeamIdArgs = {
   leagueId: Scalars['Int']['input'];
+};
+
+export type QueryUsernameAvailableArgs = {
+  username: Scalars['String']['input'];
 };
 
 export type QueryUsersArgs = {
@@ -10382,6 +10388,15 @@ export type UpdateUsernameMutation = {
     subscriptionTier?: string | null;
     themePreference?: string | null;
   } | null;
+};
+
+export type UsernameAvailableQueryVariables = Exact<{
+  username: Scalars['String']['input'];
+}>;
+
+export type UsernameAvailableQuery = {
+  __typename?: 'Query';
+  usernameAvailable?: boolean | null;
 };
 
 export type UpdateUserThemeMutationVariables = Exact<{
@@ -26516,6 +26531,94 @@ export type UpdateUsernameMutationResult =
 export type UpdateUsernameMutationOptions = BaseMutationOptions<
   UpdateUsernameMutation,
   UpdateUsernameMutationVariables
+>;
+export const UsernameAvailable = gql`
+  query UsernameAvailable($username: String!) {
+    usernameAvailable(username: $username)
+  }
+`;
+
+/**
+ * __useUsernameAvailableQuery__
+ *
+ * To run a query within a React component, call `useUsernameAvailableQuery` and pass it any options that fit your needs.
+ * When your component renders, `useUsernameAvailableQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useUsernameAvailableQuery({
+ *   variables: {
+ *      username: // value for 'username'
+ *   },
+ * });
+ */
+export function useUsernameAvailableQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    UsernameAvailableQuery,
+    UsernameAvailableQueryVariables
+  > &
+    (
+      | { variables: UsernameAvailableQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    UsernameAvailableQuery,
+    UsernameAvailableQueryVariables
+  >(UsernameAvailable, options);
+}
+export function useUsernameAvailableLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    UsernameAvailableQuery,
+    UsernameAvailableQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    UsernameAvailableQuery,
+    UsernameAvailableQueryVariables
+  >(UsernameAvailable, options);
+}
+export function useUsernameAvailableSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        UsernameAvailableQuery,
+        UsernameAvailableQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    UsernameAvailableQuery,
+    UsernameAvailableQueryVariables
+  >(
+    UsernameAvailable,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          UsernameAvailableQuery,
+          UsernameAvailableQueryVariables
+        >,
+  );
+}
+export type UsernameAvailableQueryHookResult = ReturnType<
+  typeof useUsernameAvailableQuery
+>;
+export type UsernameAvailableLazyQueryHookResult = ReturnType<
+  typeof useUsernameAvailableLazyQuery
+>;
+export type UsernameAvailableSuspenseQueryHookResult = ReturnType<
+  typeof useUsernameAvailableSuspenseQuery
+>;
+export type UsernameAvailableQueryResult = Apollo.QueryResult<
+  UsernameAvailableQuery,
+  UsernameAvailableQueryVariables
 >;
 export const UpdateUserTheme = gql`
   mutation UpdateUserTheme($themePreference: String!) {

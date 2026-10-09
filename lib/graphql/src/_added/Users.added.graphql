@@ -80,6 +80,10 @@ mutation UpdateUsername($username: String!) {
   }
 }
 
+query UsernameAvailable($username: String!) {
+  usernameAvailable(username: $username)
+}
+
 mutation UpdateUserTheme($themePreference: String!) {
   updateUserTheme(themePreference: $themePreference) {
     id

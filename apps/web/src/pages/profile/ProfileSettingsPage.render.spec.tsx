@@ -142,6 +142,11 @@ jest.mock('@legacy-sports/graphql', () => ({
     jest.fn(),
     { loading: mockUsernameLoading },
   ],
+  useUsernameAvailableQuery: () => ({
+    data: undefined,
+    loading: false,
+    error: undefined,
+  }),
 }));
 
 jest.mock('../../components/profile/TwoFactorSection', () => ({

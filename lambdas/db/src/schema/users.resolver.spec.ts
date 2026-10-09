@@ -1307,12 +1307,14 @@ describe('updateUsername mutation rate limit (LS-7239)', () => {
     db: Record<string, never>;
   };
   let mockUpdateUsername: jest.Mock;
+  let mockGetUsers: jest.Mock;
   let mockCheckAndIncrementRateLimit: jest.Mock;
 
   beforeEach(() => {
     jest.resetModules();
 
     mockUpdateUsername = jest.fn();
+    mockGetUsers = jest.fn();
     mockCheckAndIncrementRateLimit = jest
       .fn()
       .mockResolvedValue({ allowed: true });
@@ -1350,6 +1352,7 @@ describe('updateUsername mutation rate limit (LS-7239)', () => {
         createDatabaseService: jest.fn(() => ({
           users: {
             getUserById: jest.fn(),
+            getUsers: mockGetUsers,
             updateUsername: mockUpdateUsername,
           },
           statistics: {
@@ -1574,6 +1577,100 @@ describe('updateUsername mutation rate limit (LS-7239)', () => {
 
     expect(mockUpdateUsername).toHaveBeenCalledWith(42, 'admin');
     expect(result).toMatchObject({ username: 'admin' });
+  });
+
+  describe('usernameAvailable query (LS-7241)', () => {
+    function getAvailableResolver() {
+      const field = schema.getQueryType()?.getFields().usernameAvailable;
+      if (!field?.resolve) {
+        throw new Error('usernameAvailable resolver not found');
+      }
+      return field.resolve;
+    }
+
+    it('returns true when no user holds the name', async () => {
+      mockGetUsers.mockResolvedValue([]);
+
+      const result = await getAvailableResolver()(
+        {},
+        { username: ' freename ' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toBe(true);
+      expect(mockGetUsers).toHaveBeenCalledWith({
+        filters: { username: 'freename' },
+        limit: 1,
+      });
+      expect(mockCheckAndIncrementRateLimit).toHaveBeenCalledWith(
+        mockContext.db,
+        expect.objectContaining({ bucket: 'username_available', userId: 42 }),
+      );
+    });
+
+    it('returns false when another user holds the name', async () => {
+      mockGetUsers.mockResolvedValue([{ id: 7, username: 'taken' }]);
+
+      const result = await getAvailableResolver()(
+        {},
+        { username: 'taken' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toBe(false);
+    });
+
+    it('returns true when the caller already holds the name', async () => {
+      mockGetUsers.mockResolvedValue([{ id: 42, username: 'user42' }]);
+
+      const result = await getAvailableResolver()(
+        {},
+        { username: 'user42' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toBe(true);
+    });
+
+    it('returns false for invalid names without querying the db', async () => {
+      const resolve = getAvailableResolver();
+
+      for (const username of ['ab', 'has space', 'a'.repeat(51)]) {
+        await expect(
+          resolve({}, { username }, mockContext, undefined as never),
+        ).resolves.toBe(false);
+      }
+      expect(mockGetUsers).not.toHaveBeenCalled();
+    });
+
+    it('rejects with RATE_LIMITED once over the limit', async () => {
+      mockCheckAndIncrementRateLimit.mockResolvedValue({ allowed: false });
+
+      await expect(
+        getAvailableResolver()(
+          {},
+          { username: 'freename' },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'RATE_LIMITED' } });
+      expect(mockGetUsers).not.toHaveBeenCalled();
+    });
+
+    it('requires authentication', async () => {
+      await expect(
+        getAvailableResolver()(
+          {},
+          { username: 'freename' },
+          { user: null },
+          undefined as never,
+        ),
+      ).rejects.toThrow(/Authentication required|UNAUTHENTICATED/i);
+      expect(mockCheckAndIncrementRateLimit).not.toHaveBeenCalled();
+    });
   });
 });
 

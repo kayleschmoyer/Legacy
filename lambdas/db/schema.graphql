@@ -5325,6 +5325,11 @@ type Query {
     limit: Int
   ): [League!]!
   userTeamId(leagueId: Int!): Int
+
+  """
+  Whether the given username can be claimed by the current user. True when it is unused or already the caller's own; false when taken or invalid.
+  """
+  usernameAvailable(username: String!): Boolean
   users(
     accessLevel: String
     includeTestUsers: Boolean

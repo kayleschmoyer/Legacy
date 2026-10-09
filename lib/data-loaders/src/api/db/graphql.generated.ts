@@ -4127,6 +4127,8 @@ export type Query = {
   userLeagueCount: Scalars['Int']['output'];
   userLeagues: Array<League>;
   userTeamId?: Maybe<Scalars['Int']['output']>;
+  /** Whether the given username can be claimed by the current user. True when it is unused or already the caller's own; false when taken or invalid. */
+  usernameAvailable?: Maybe<Scalars['Boolean']['output']>;
   users?: Maybe<Array<User>>;
   usersCount?: Maybe<Scalars['Int']['output']>;
   validateInviteCode?: Maybe<InviteCodeInfo>;
@@ -4856,6 +4858,10 @@ export type QueryUserLeaguesArgs = {
 
 export type QueryUserTeamIdArgs = {
   leagueId: Scalars['Int']['input'];
+};
+
+export type QueryUsernameAvailableArgs = {
+  username: Scalars['String']['input'];
 };
 
 export type QueryUsersArgs = {
