@@ -2916,13 +2916,18 @@ export function LeagueCreatePage(): React.JSX.Element {
             </Text>
           </YStack>
 
-          <YStack gap="$2" alignItems="flex-end">
+          <YStack
+            gap="$2"
+            alignItems="flex-end"
+            $sm={{ width: '100%', alignItems: 'stretch' }}
+          >
             <XStack
               gap="$2.5"
               alignItems="center"
               data-testid="fast-lane-toggle"
+              $sm={{ justifyContent: 'space-between' }}
             >
-              <YStack alignItems="flex-end">
+              <YStack alignItems="flex-end" flexShrink={1} minWidth={0}>
                 <Text
                   fontFamily="$display"
                   fontWeight="700"
@@ -2945,7 +2950,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                 disabled={isFormDisabled}
               />
             </XStack>
-            <XStack gap="$2">
+            <XStack gap="$2" flexWrap="wrap">
               <Button
                 size="$2"
                 variant="outlined"
@@ -2973,7 +2978,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                 onPress={collapseAll}
                 disabled={isFormDisabled || fastLane}
               >
-                Collapse
+                Collapse all
               </Button>
             </XStack>
           </YStack>
