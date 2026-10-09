@@ -919,6 +919,19 @@ describe('HomeScreen', () => {
       expect(queryByTestId('home-see-all-leagues')).toBeNull();
     });
 
+    // LS-10502: web passes no onSeeAllLeagues (no "my leagues" page), so the
+    // narrow layout must list every league rather than hide the 3rd+.
+    it('lists every league when no "Show all" handler is supplied', () => {
+      const { getByText } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league, secondLeague, thirdLeague]}
+        />,
+      );
+      expect(getByText('Second League')).toBeTruthy();
+      expect(getByText('Third League')).toBeTruthy();
+    });
+
     it('caps the inline league list at 2 leagues (hero + one row)', () => {
       const { getByText, queryByText } = render(
         <HomeScreen

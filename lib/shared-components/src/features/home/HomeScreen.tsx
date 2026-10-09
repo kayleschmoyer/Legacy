@@ -167,7 +167,8 @@ export interface HomeScreenProps {
   /**
    * Navigates to the full Leagues list — the narrow layout's "Show all
    * leagues" control, shown only once the user has more than
-   * `MAX_INLINE_LEAGUES` leagues (LS-9783).
+   * `MAX_INLINE_LEAGUES` leagues (LS-9783). When omitted (web), the narrow
+   * layout is uncapped and lists every league (LS-10502).
    */
   onSeeAllLeagues?: () => void;
   /** Navigates to the You/profile tab — the narrow greeting's avatar. */
@@ -3086,14 +3087,18 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
   if (hasLeagues) {
     const heroLeague = sortedSummaries[0];
     const secondaryLeagues = sortedSummaries.slice(1);
-    // Home page shows at most MAX_INLINE_LEAGUES leagues inline (hero card +
-    // remaining rows); anything beyond that is reached via "Show all
-    // leagues", which routes to the full Leagues tab list (LS-9783).
-    const visibleSecondaryLeagues = secondaryLeagues.slice(
-      0,
-      MAX_INLINE_LEAGUES - 1,
-    );
-    const hasMoreLeagues = sortedSummaries.length > MAX_INLINE_LEAGUES;
+    // Native passes `onSeeAllLeagues`, so the narrow layout shows at most
+    // MAX_INLINE_LEAGUES leagues inline (hero card + remaining rows); anything
+    // beyond that is reached via "Show all leagues", which routes to the full
+    // Leagues tab list (LS-9783). Without that destination (web has no "my
+    // leagues" page) the cap would hide leagues unreachably, so show them all
+    // (LS-10502).
+    const capInlineLeagues = onSeeAllLeagues !== undefined;
+    const visibleSecondaryLeagues = capInlineLeagues
+      ? secondaryLeagues.slice(0, MAX_INLINE_LEAGUES - 1)
+      : secondaryLeagues;
+    const hasMoreLeagues =
+      capInlineLeagues && sortedSummaries.length > MAX_INLINE_LEAGUES;
 
     /* ── Narrow-viewport ("Scoreboard First") branch (LS-8794, folded in by
        LS-9055) — greeting + live-matchup ticker + the same hero
