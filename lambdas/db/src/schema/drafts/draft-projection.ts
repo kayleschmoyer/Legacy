@@ -50,6 +50,10 @@ export function buildProjectedMatchupPointsExpr(rules: {
  * never joins it for football (it sorts those boards alphabetically with no
  * projection column), so a drafted football player has no projection on
  * either side.
+ *
+ * A player with no default scoring-cache row is omitted (resolves to null),
+ * not given the board's COALESCE'd 0 — a fabricated 0 would read as a real
+ * projection (LS-10485).
  */
 export async function loadDraftedPlayerProjections(
   db: PublicDb,
@@ -61,7 +65,8 @@ export async function loadDraftedPlayerProjections(
   const result = await withPoolTimeoutRetry(() =>
     db.execute(sql`
       SELECT dp.player_id,
-        ${buildProjectedMatchupPointsExpr(rules)} AS projected_matchup_pts
+        CASE WHEN cs.player_id IS NULL THEN NULL
+          ELSE ${buildProjectedMatchupPointsExpr(rules)} END AS projected_matchup_pts
       FROM public.draft_picks dp
       LEFT JOIN public.player_scoring_cache cs
         ON cs.player_id = dp.player_id AND cs.league_id IS NULL

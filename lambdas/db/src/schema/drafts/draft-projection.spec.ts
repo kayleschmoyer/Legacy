@@ -6,8 +6,19 @@
  * showed while they were available.
  */
 
+const loadDraftRules = jest.fn();
+jest.mock('./draft-rules', () => ({ loadDraftRules }));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    withPoolTimeoutRetry: async (queryFn: () => Promise<unknown>) => queryFn(),
+  }),
+);
+
 import { PgDialect } from 'drizzle-orm/pg-core';
-import { buildProjectedMatchupPointsExpr } from './draft-projection';
+import {
+  buildProjectedMatchupPointsExpr,
+  loadDraftedPlayerProjections,
+} from './draft-projection';
 
 const dialect = new PgDialect();
 
@@ -28,5 +39,56 @@ describe('buildProjectedMatchupPointsExpr', () => {
     ).toBe(
       'COALESCE(cs.hitter_avg_ppg, 0) * 5 + COALESCE(cs.pitching_avg_ppg, 0) * 1',
     );
+  });
+});
+
+describe('loadDraftedPlayerProjections (LS-10485)', () => {
+  const run = (rows: unknown[]) => {
+    const execute = jest.fn().mockResolvedValue({ rows });
+    return {
+      execute,
+      result: loadDraftedPlayerProjections({ execute } as never, 7),
+    };
+  };
+
+  beforeEach(() => {
+    loadDraftRules.mockResolvedValue({
+      sport: 'baseball',
+      gamesPerMatchup: 6,
+      pitcherStartsPerMatchup: 2,
+    });
+  });
+
+  it('maps each drafted player to the projection the query computed', async () => {
+    const { result } = run([
+      { player_id: 1, projected_matchup_pts: '14.5' },
+      { player_id: 2, projected_matchup_pts: 6.25 },
+    ]);
+    expect(await result).toEqual(
+      new Map([
+        [1, 14.5],
+        [2, 6.25],
+      ]),
+    );
+  });
+
+  it('omits players with no scoring-cache row instead of reporting 0', async () => {
+    const { result } = run([
+      { player_id: 1, projected_matchup_pts: 14.5 },
+      { player_id: 2, projected_matchup_pts: null },
+    ]);
+    expect((await result).has(2)).toBe(false);
+  });
+
+  it('keeps a real 0 projection', async () => {
+    const { result } = run([{ player_id: 3, projected_matchup_pts: 0 }]);
+    expect((await result).get(3)).toBe(0);
+  });
+
+  it('returns an empty map for football without querying', async () => {
+    loadDraftRules.mockResolvedValue({ sport: 'football' });
+    const { execute, result } = run([]);
+    expect((await result).size).toBe(0);
+    expect(execute).not.toHaveBeenCalled();
   });
 });
