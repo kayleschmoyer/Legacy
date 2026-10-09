@@ -97,6 +97,23 @@ function textRecord(text: string): unknown {
   };
 }
 
+/** Real harness shape: auto mode as a top-level attachment record (LS-10255). */
+const AUTO_MODE_ATTACHMENT_RECORD = {
+  parentUuid: null,
+  isSidechain: false,
+  attachment: {
+    type: 'auto_mode',
+    autoModeConsentFlow: false,
+    bashFirst: true,
+    bashFirstSteer: 'relaxed',
+    steerOnly: true,
+    bypass: false,
+  },
+  type: 'attachment',
+  uuid: 'b1f0c2a4-0000-4000-8000-000000000001',
+  timestamp: '2026-10-06T12:00:00.000Z',
+};
+
 describe('audit-session-bash-parse', () => {
   let fixtureDir: string;
 
@@ -1091,6 +1108,21 @@ describe('audit-session-bash-parse', () => {
       expect(detectAutoModeFromContent(raw)).toBe(true);
     });
 
+    it('returns true for the structured auto_mode attachment record with no prose (LS-10255)', () => {
+      const raw = toJsonl([
+        bashUseRecord('ls -la'),
+        AUTO_MODE_ATTACHMENT_RECORD,
+      ]);
+      expect(detectAutoModeFromContent(raw)).toBe(true);
+    });
+
+    it('ignores attachment records of other types (LS-10255)', () => {
+      const raw = toJsonl([
+        { type: 'attachment', attachment: { type: 'todo_reminder' } },
+      ]);
+      expect(detectAutoModeFromContent(raw)).toBe(false);
+    });
+
     it('returns false when no transcript block mentions auto mode', () => {
       const raw = toJsonl([bashUseRecord('ls -la')]);
       expect(detectAutoModeFromContent(raw)).toBe(false);
@@ -1132,14 +1164,15 @@ describe('audit-session-bash-parse', () => {
     });
   });
 
-  describe('auto-mode carve-out, end to end from the real directive (LS-10135)', () => {
+  describe.each([
+    ['prose directive (LS-10135)', textRecord(VERBATIM_AUTO_MODE_DIRECTIVE)],
+    ['structured auto_mode attachment (LS-10255)', AUTO_MODE_ATTACHMENT_RECORD],
+  ])('auto-mode carve-out, end to end from the %s', (_label, directive) => {
     it('moves the four FILE-READ/GREP carve-out families into informational.auto_mode_excluded', () => {
       // Detection and classification are wired together here deliberately:
       // LS-10135 was invisible to both halves' own specs because each passed
       // in isolation while the seam between them never fired in practice.
-      const autoModeActive = detectAutoModeFromContent(
-        toJsonl([textRecord(VERBATIM_AUTO_MODE_DIRECTIVE)]),
-      );
+      const autoModeActive = detectAutoModeFromContent(toJsonl([directive]));
       expect(autoModeActive).toBe(true);
 
       const calls = [

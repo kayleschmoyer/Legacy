@@ -196,9 +196,22 @@ const AUTO_MODE_MARKERS: readonly RegExp[] = [
  * text-bearing content block (system-reminders arrive as ordinary `text`
  * blocks in the transcript), not just top-level message text, so the
  * marker is found regardless of which turn introduced it.
+ *
+ * Newer harness builds do not write the directive as prose in a content block
+ * at all (LS-10255): auto mode is a top-level structured record,
+ * `{"type":"attachment","attachment":{"type":"auto_mode",...}}`, with no
+ * `message.content`. That record is detected by shape, which also covers
+ * transcripts whose rendered text carries none of the prose markers.
  */
 export function detectAutoModeFromContent(rawContent: string): boolean {
   for (const { record } of parseJsonlContent(rawContent)) {
+    if (
+      record['type'] === 'attachment' &&
+      isRecord(record['attachment']) &&
+      record['attachment']['type'] === 'auto_mode'
+    ) {
+      return true;
+    }
     const blocks = contentBlocks(record);
     if (!blocks) continue;
     for (const block of blocks) {
