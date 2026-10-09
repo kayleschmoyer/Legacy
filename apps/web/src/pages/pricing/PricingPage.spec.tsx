@@ -336,6 +336,35 @@ describe('PricingPage — Help Center link (LS-7186)', () => {
   });
 });
 
+// LS-7178: the downgrade FAQ must describe the full downgrade impact, not only
+// the league cap (advanced playoff formats reset, salary cap off, FAAB reset).
+describe('PricingPage — downgrade FAQ (LS-7178)', () => {
+  it('describes playoff format reset, salary cap removal and waiver reset', async () => {
+    const user = userEvent.setup();
+    mockUseStripePrices.mockReturnValue({
+      monthlyPrice: 4.99,
+      annualTotal: 39.99,
+      annualSavingsPct: '33%',
+      trialPeriodDays: 0,
+      loading: false,
+    });
+
+    render(<PricingPage />);
+
+    const item = screen.getByTestId('pricing-faq-item-1');
+    within(item).getByRole('button').focus();
+    await user.keyboard('{Enter}');
+
+    const answer = within(item).getByRole('region');
+    expect(answer).toHaveTextContent(
+      /6-team and 8-team playoff brackets reset to 4-team/,
+    );
+    expect(answer).toHaveTextContent(/salary cap is disabled/);
+    expect(answer).toHaveTextContent(/FAAB waivers switch to standard/);
+    expect(answer).toHaveTextContent(/read-only/);
+  });
+});
+
 // LS-7201: testimonials must use blockquote + cite semantics for a11y/SEO.
 describe('PricingPage — testimonial semantics (LS-7201)', () => {
   it('renders each testimonial as a blockquote with the author in a cite', () => {

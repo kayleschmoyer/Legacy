@@ -459,7 +459,7 @@ const OTHER_FAQ_ITEMS = [
   {
     question: 'What happens to my leagues if I downgrade?',
     answer:
-      'Your existing leagues remain active. If you have more than 3 leagues, they become read-only until you reduce to 3 or reactivate Premium.',
+      'Your first 3 leagues remain active, but Premium-only settings are turned off: 6-team and 8-team playoff brackets reset to 4-team, salary cap is disabled, and FAAB waivers switch to standard waivers. Any leagues beyond 3 become read-only until you reduce to 3 or reactivate Premium. Your salary cap values are kept, so they are there if you upgrade again.',
   },
   {
     question: 'Is the annual plan billed upfront?',
