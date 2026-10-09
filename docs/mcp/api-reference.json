@@ -3709,6 +3709,16 @@
               "optional": true,
               "description": "Branch name filter"
             },
+            "prNumber": {
+              "type": "number",
+              "optional": true,
+              "constraints": [
+                "coerced",
+                "integer",
+                "> 0"
+              ],
+              "description": "PR number: runs for its head SHA (beats branch)"
+            },
             "workflow": {
               "type": "union",
               "optional": true,

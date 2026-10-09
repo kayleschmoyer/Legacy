@@ -180,7 +180,7 @@ If ANY conflict signal fires — `mergeable: "CONFLICTING"`, the `CI: Conflicts`
 If CI is failing:
 
 0. **Step 0: stale-base check (mandatory, before any rerun or code fix)** — `github_pr_why_blocked({ number: <PR#> })`: if `hint: "STALE_BASE"` or `behindBy >= 1` on a non-flake failure, go to Priority 4 (rebase) instead of continuing; never `ci_rerun` on a stale base (it replays the old merge ref). Full checklist (behind-by, red-on-main, `git merge-base --is-ancestor`, rerun-vs-rebase rule, test-count-mismatch tell): [ci-event-response.md § Failing CI Checks](ci-event-response.md#failing-ci-checks).
-1. Get the run ID: `ci_list_runs(branch: "<headRefName>", limit: 1)`
+1. Get the run ID: `ci_list_runs(prNumber: <PR#>, limit: 1)`
 2. Check if it's a flaky test (only when `behindBy == 0`) — `ci_rerun(runId: <id>, failedOnly: true)` if it looks transient
 3. If persistent, get logs: `ci_get_logs(runId: <id>, errorSummary: true)`
 4. Load debugging skill if code changes are needed: read `../../debugging/SKILL.md`

@@ -176,6 +176,7 @@ Prefer this over `gh run list` or `mcp__github__actions_list` (can silently drop
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
 | `branch` | string |  | — | Branch name filter |
+| `prNumber` | number |  | coerced, integer, > 0 | PR number: runs for its head SHA (beats branch) |
 | `workflow` | string \| number |  | — | Workflow filename, display name, or numeric ID |
 | `status` | string |  | — | Run status or conclusion |
 | `event` | string |  | — | Trigger event name |

@@ -67,7 +67,7 @@ Quick-reference decision trees for the most common failure scenarios agents enco
 
 **Decision tree**:
 
-1. Get the run ID: `ci_list_runs({ branch: "<headRefName>", limit: 1 })`.
+1. Get the run ID: `ci_list_runs({ prNumber: <PR#>, limit: 1 })`.
 2. Get the failure details: `ci_get_logs({ runId, errorSummary: true })`.
 3. Common failure patterns:
    - **Same error as local `make pc` would catch**: validation hadn't run yet (normal while the PR is still draft — the [spine gate](ticket-to-merge-spine.md#critical-gates-preconditions) is `make pc` before **mark-ready**, not before push) or was skipped. Fix locally, re-run the failing chunk, push again.

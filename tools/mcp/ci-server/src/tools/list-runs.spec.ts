@@ -225,3 +225,91 @@ describe('listRuns (LS-9589)', () => {
     expect(result.content[0].text).toBe('No workflow runs found.');
   });
 });
+
+describe('listRuns PR-branch lookup (LS-10348)', () => {
+  const headSha = 'c'.repeat(40);
+  const run = {
+    id: 36747759322,
+    run_number: 7,
+    run_attempt: 1,
+    conclusion: 'failure',
+    created_at: '2026-09-30T00:00:00Z',
+    display_title: 'pr',
+    event: 'pull_request',
+    head_branch: 'refs-differ',
+    head_sha: headSha,
+    name: 'Legacy Sports CI Orchestrator',
+    status: 'completed',
+    updated_at: '2026-09-30T00:00:00Z',
+    html_url: 'https://github.com/x/y/actions/runs/36747759322',
+    workflow_id: 5,
+  };
+
+  beforeEach(() => {
+    mockGithubGet.mockReset();
+  });
+
+  it('lists runs for a PR by its head SHA when prNumber is passed', async () => {
+    mockGithubGet.mockImplementation((path: string) => {
+      if (path === '/pulls/8226') {
+        return Promise.resolve({ head: { sha: headSha } });
+      }
+      return Promise.resolve({ total_count: 1, workflow_runs: [run] });
+    });
+
+    const result = await listRuns({ prNumber: 8226 });
+
+    expect(mockGithubGet).toHaveBeenCalledWith(
+      '/actions/runs',
+      expect.objectContaining({ head_sha: headSha }),
+    );
+    expect(result.isError).toBeUndefined();
+    expect(result.content[0].text).toContain('36747759322');
+  });
+
+  it('retries by branch tip SHA when the branch filter matches no runs', async () => {
+    mockGithubGet.mockImplementation(
+      (path: string, query?: Record<string, string>) => {
+        if (path === '/commits/claude%2Ffriendly-babbage') {
+          return Promise.resolve({ sha: headSha });
+        }
+        if (query?.branch) {
+          return Promise.resolve({ total_count: 0, workflow_runs: [] });
+        }
+        return Promise.resolve({ total_count: 1, workflow_runs: [run] });
+      },
+    );
+
+    const result = await listRuns({ branch: 'claude/friendly-babbage' });
+
+    expect(mockGithubGet).toHaveBeenLastCalledWith(
+      '/actions/runs',
+      expect.objectContaining({ head_sha: headSha }),
+    );
+    expect(mockGithubGet).toHaveBeenLastCalledWith(
+      '/actions/runs',
+      expect.not.objectContaining({ branch: expect.anything() }),
+    );
+    expect(result.content[0].text).toContain('36747759322');
+  });
+
+  it('does not retry when the branch filter already matched runs', async () => {
+    mockGithubGet.mockResolvedValue({ total_count: 1, workflow_runs: [run] });
+
+    await listRuns({ branch: 'main' });
+
+    expect(mockGithubGet).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the empty result when the branch tip cannot be resolved', async () => {
+    mockGithubGet.mockImplementation((path: string) =>
+      path.startsWith('/commits/')
+        ? Promise.reject(new Error('GitHub API 404'))
+        : Promise.resolve({ total_count: 0, workflow_runs: [] }),
+    );
+
+    const result = await listRuns({ branch: 'gone' });
+
+    expect(result.isError).toBeUndefined();
+  });
+});

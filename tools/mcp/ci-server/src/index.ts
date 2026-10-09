@@ -203,6 +203,12 @@ export function createServer(): McpServer {
     'Prefer this over `gh run list` or `mcp__github__actions_list` (can silently drop filters). List recent CI runs, filtered.',
     {
       branch: z.string().optional().describe('Branch name filter'),
+      prNumber: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('PR number: runs for its head SHA (beats branch)'),
       workflow: z
         .union([z.string(), z.number().transform(String)])
         .optional()

@@ -135,6 +135,7 @@ export async function resolveCommitSha(commit: string): Promise<string> {
 
 interface ListRunsParams {
   branch?: string;
+  prNumber?: number;
   workflow?: string;
   status?: string;
   event?: string;
@@ -190,16 +191,60 @@ function mapRun(run: GitHubWorkflowRun) {
   };
 }
 
+/**
+ * Resolve a PR number to its current head SHA (LS-10348). A PR's CI runs are
+ * reliably keyed by `head_sha`, whereas the `branch` filter matches the run's
+ * `head_branch`, which does not always equal the PR head branch (orchestrator
+ * `workflow_dispatch` runs, re-targeted PRs) and then returns nothing.
+ */
+async function resolvePrHeadSha(prNumber: number): Promise<string> {
+  const pr = await githubGet<{ head: { sha: string } }>(`/pulls/${prNumber}`);
+  return pr.head.sha;
+}
+
+/**
+ * Resolve a branch name to its tip SHA, or undefined when it can't be
+ * resolved (deleted branch, lookup error) so callers keep today's behavior.
+ */
+async function resolveBranchTipSha(
+  branch: string,
+): Promise<string | undefined> {
+  try {
+    const data = await githubGet<{ sha: string }>(
+      `/commits/${encodeURIComponent(branch)}`,
+    );
+    return data.sha;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function listRuns(params: ListRunsParams): Promise<ToolResult> {
   const limit = params.limit ?? 10;
   const queryParams: Record<string, string> = {
     per_page: String(limit),
   };
 
-  if (params.branch) queryParams.branch = params.branch;
+  if (params.prNumber !== undefined) {
+    try {
+      queryParams.head_sha = await resolvePrHeadSha(params.prNumber);
+    } catch (error) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: `Failed to resolve PR #${params.prNumber} head SHA: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+      };
+    }
+  } else if (params.branch) {
+    queryParams.branch = params.branch;
+  }
   if (params.status) queryParams.status = params.status;
   if (params.event) queryParams.event = params.event;
-  if (params.commit)
+  if (params.commit && params.prNumber === undefined)
     queryParams.head_sha = await resolveCommitSha(params.commit);
   if (params.user) queryParams.actor = params.user;
   if (params.created) queryParams.created = params.created;
@@ -214,7 +259,26 @@ export async function listRuns(params: ListRunsParams): Promise<ToolResult> {
       ? `/actions/workflows/${encodeURIComponent(String(workflowId))}/runs`
       : '/actions/runs';
 
-    const data = await githubGet<GitHubRunsResponse>(path, queryParams);
+    let data = await githubGet<GitHubRunsResponse>(path, queryParams);
+    // The `branch` filter matches `head_branch`, which can differ from a PR's
+    // head branch, so PR-driven CI comes back empty (LS-10348). Retry once by
+    // the branch tip SHA, which every run of the current head carries.
+    if (
+      data.workflow_runs.length === 0 &&
+      params.branch &&
+      params.prNumber === undefined &&
+      !params.commit
+    ) {
+      const tipSha = await resolveBranchTipSha(params.branch);
+      if (tipSha) {
+        const retryParams: Record<string, string> = {
+          ...queryParams,
+          head_sha: tipSha,
+        };
+        delete retryParams.branch;
+        data = await githubGet<GitHubRunsResponse>(path, retryParams);
+      }
+    }
     // GitHub's list-runs endpoints don't document a guaranteed sort order
     // (unlike the search API's explicit `sort` param) — LS-9426 observed a
     // response where month-old scheduled runs preceded same-day runs for the
