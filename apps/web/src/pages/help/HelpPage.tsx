@@ -819,7 +819,7 @@ export default function HelpPage() {
             >
               <SectionHead
                 title="Jump back in"
-                sub="Five spots most managers head to first."
+                sub="Where most managers head first."
               />
               <XStack
                 flexWrap="wrap"
