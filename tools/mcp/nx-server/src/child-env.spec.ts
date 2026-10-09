@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 
-import { buildChildEnv } from './child-env.js';
+import { buildChildEnv, ensureGitBashOnPath } from './child-env.js';
 
 describe('buildChildEnv', () => {
   const originalTsxTsconfigPath = process.env.TSX_TSCONFIG_PATH;
@@ -41,6 +41,48 @@ describe('buildChildEnv', () => {
     const childEnv = buildChildEnv();
     expect(childEnv.PATH ?? childEnv.Path).toBe(
       process.env.PATH ?? process.env.Path,
+    );
+  });
+});
+
+describe('ensureGitBashOnPath (LS-10370)', () => {
+  const git = 'C:\\Program Files\\Git';
+  const env = { ProgramFiles: 'C:\\Program Files' } as NodeJS.ProcessEnv;
+  const existing = new Set([
+    `${git}\\usr\\bin`,
+    `${git}\\bin`,
+    `${git}\\usr\\bin\\bash.exe`,
+    `${git}\\bin\\bash.exe`,
+  ]);
+  const exists = (p: string): boolean => existing.has(p);
+
+  it('appends Git usr\\bin and bin when bash is not on PATH', () => {
+    const result = ensureGitBashOnPath(
+      `${git}\\cmd;C:\\Windows`,
+      env,
+      'win32',
+      exists,
+    );
+    expect(result).toBe(`${git}\\cmd;C:\\Windows;${git}\\usr\\bin;${git}\\bin`);
+  });
+
+  it('leaves PATH alone when bash already resolves', () => {
+    const pathValue = `${git}\\bin;C:\\Windows`;
+    expect(ensureGitBashOnPath(pathValue, env, 'win32', exists)).toBe(
+      pathValue,
+    );
+  });
+
+  it('leaves PATH alone when no Git install exists', () => {
+    const pathValue = 'C:\\Windows';
+    expect(ensureGitBashOnPath(pathValue, env, 'win32', () => false)).toBe(
+      pathValue,
+    );
+  });
+
+  it('is a no-op on non-Windows platforms', () => {
+    expect(ensureGitBashOnPath('/usr/bin', env, 'linux', exists)).toBe(
+      '/usr/bin',
     );
   });
 });

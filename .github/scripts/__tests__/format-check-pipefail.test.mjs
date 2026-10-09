@@ -76,6 +76,9 @@ function runPipeline({ filter, downstream }) {
       encoding: 'utf8',
       env: PIPELINE_ENV,
     });
+    // A spawn failure (e.g. bash missing from PATH, status null) must never
+    // satisfy a `notEqual(status, 0)` assertion without the pipeline running.
+    assert.ifError(result.error);
     // An xargs startup abort says nothing about the filter under test. Fail
     // loudly rather than let it satisfy the `notEqual(status, 0)` assertions.
     assert.doesNotMatch(
