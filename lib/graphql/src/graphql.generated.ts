@@ -298,6 +298,20 @@ export type BaseballMatchupStats = {
   totalPoints: Scalars['Float']['output'];
 };
 
+/** One billing event (payment, refund, dispute) from Stripe, Apple or Google. */
+export type BillingHistoryEntry = {
+  __typename?: 'BillingHistoryEntry';
+  amountCents?: Maybe<Scalars['Int']['output']>;
+  currency?: Maybe<Scalars['String']['output']>;
+  description?: Maybe<Scalars['String']['output']>;
+  id: Scalars['String']['output'];
+  /** ISO 8601 timestamp. */
+  occurredAt: Scalars['String']['output'];
+  /** 'stripe', 'apple', or 'google'. */
+  platform: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+};
+
 export type BillingPortalSessionResult = {
   __typename?: 'BillingPortalSessionResult';
   url?: Maybe<Scalars['String']['output']>;
@@ -4108,6 +4122,8 @@ export type Query = {
   sportPlayerPools: Array<SportPlayerPool>;
   /** Return live subscription prices from Stripe. No authentication required — pricing is public. Results are cached server-side for 5 minutes. */
   stripePrices?: Maybe<StripePriceInfo>;
+  /** Unified billing history (Stripe, Apple, Google, ledger refunds/disputes) for the authenticated user, newest first. Google reports current purchase state only. */
+  subscriptionBillingHistory: Array<BillingHistoryEntry>;
   /** Return earned badges for a team in a league */
   teamBadges?: Maybe<Array<UserBadge>>;
   teamById?: Maybe<Team>;
@@ -9814,6 +9830,24 @@ export type GetMyInvoicesQuery = {
     created: string;
     hostedInvoiceUrl?: string | null;
     invoicePdf?: string | null;
+  }>;
+};
+
+export type GetMySubscriptionBillingHistoryQueryVariables = Exact<{
+  [key: string]: never;
+}>;
+
+export type GetMySubscriptionBillingHistoryQuery = {
+  __typename?: 'Query';
+  subscriptionBillingHistory: Array<{
+    __typename?: 'BillingHistoryEntry';
+    id: string;
+    platform: string;
+    amountCents?: number | null;
+    currency?: string | null;
+    status: string;
+    description?: string | null;
+    occurredAt: string;
   }>;
 };
 
@@ -24514,6 +24548,97 @@ export type GetMyInvoicesSuspenseQueryHookResult = ReturnType<
 export type GetMyInvoicesQueryResult = Apollo.QueryResult<
   GetMyInvoicesQuery,
   GetMyInvoicesQueryVariables
+>;
+export const GetMySubscriptionBillingHistory = gql`
+  query GetMySubscriptionBillingHistory {
+    subscriptionBillingHistory {
+      id
+      platform
+      amountCents
+      currency
+      status
+      description
+      occurredAt
+    }
+  }
+`;
+
+/**
+ * __useGetMySubscriptionBillingHistoryQuery__
+ *
+ * To run a query within a React component, call `useGetMySubscriptionBillingHistoryQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMySubscriptionBillingHistoryQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMySubscriptionBillingHistoryQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetMySubscriptionBillingHistoryQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetMySubscriptionBillingHistoryQuery,
+    GetMySubscriptionBillingHistoryQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetMySubscriptionBillingHistoryQuery,
+    GetMySubscriptionBillingHistoryQueryVariables
+  >(GetMySubscriptionBillingHistory, options);
+}
+export function useGetMySubscriptionBillingHistoryLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetMySubscriptionBillingHistoryQuery,
+    GetMySubscriptionBillingHistoryQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetMySubscriptionBillingHistoryQuery,
+    GetMySubscriptionBillingHistoryQueryVariables
+  >(GetMySubscriptionBillingHistory, options);
+}
+export function useGetMySubscriptionBillingHistorySuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetMySubscriptionBillingHistoryQuery,
+        GetMySubscriptionBillingHistoryQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetMySubscriptionBillingHistoryQuery,
+    GetMySubscriptionBillingHistoryQueryVariables
+  >(
+    GetMySubscriptionBillingHistory,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetMySubscriptionBillingHistoryQuery,
+          GetMySubscriptionBillingHistoryQueryVariables
+        >,
+  );
+}
+export type GetMySubscriptionBillingHistoryQueryHookResult = ReturnType<
+  typeof useGetMySubscriptionBillingHistoryQuery
+>;
+export type GetMySubscriptionBillingHistoryLazyQueryHookResult = ReturnType<
+  typeof useGetMySubscriptionBillingHistoryLazyQuery
+>;
+export type GetMySubscriptionBillingHistorySuspenseQueryHookResult = ReturnType<
+  typeof useGetMySubscriptionBillingHistorySuspenseQuery
+>;
+export type GetMySubscriptionBillingHistoryQueryResult = Apollo.QueryResult<
+  GetMySubscriptionBillingHistoryQuery,
+  GetMySubscriptionBillingHistoryQueryVariables
 >;
 export const GetMyBillingInterval = gql`
   query GetMyBillingInterval {

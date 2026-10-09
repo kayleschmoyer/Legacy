@@ -329,6 +329,27 @@ type BaseballMatchupStats {
   totalPoints: Float!
 }
 
+"""
+One billing event (payment, refund, dispute) from Stripe, Apple or Google.
+"""
+type BillingHistoryEntry {
+  amountCents: Int
+  currency: String
+  description: String
+  id: String!
+
+  """
+  ISO 8601 timestamp.
+  """
+  occurredAt: String!
+
+  """
+  'stripe', 'apple', or 'google'.
+  """
+  platform: String!
+  status: String!
+}
+
 type BillingPortalSessionResult {
   url: String
 }
@@ -5261,6 +5282,11 @@ type Query {
   Return live subscription prices from Stripe. No authentication required — pricing is public. Results are cached server-side for 5 minutes.
   """
   stripePrices: StripePriceInfo
+
+  """
+  Unified billing history (Stripe, Apple, Google, ledger refunds/disputes) for the authenticated user, newest first. Google reports current purchase state only.
+  """
+  subscriptionBillingHistory: [BillingHistoryEntry!]!
 
   """
   Return earned badges for a team in a league

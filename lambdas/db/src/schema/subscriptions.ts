@@ -32,6 +32,7 @@ import {
   isActiveGoogleSubscription,
   type SubscriptionPurchaseV2,
 } from '../server/google-play';
+import { fetchAppleTransactionHistory } from '../server/app-store-server-api';
 import {
   decodeAndVerifyJwsTransaction,
   type VerifiedAppleTransactionPayload,
@@ -391,6 +392,24 @@ MyInvoiceRef.implement({
 
 const MY_INVOICES_LIMIT = 20;
 
+/** Fetches a customer's recent Stripe invoices. Throws on Stripe errors. */
+async function fetchStripeInvoices(customerId: string): Promise<MyInvoice[]> {
+  const stripe = await getStripeClient();
+  const invoices = await stripe.invoices.list({
+    customer: customerId,
+    limit: MY_INVOICES_LIMIT,
+  });
+  return invoices.data.map((invoice) => ({
+    id: invoice.id ?? '',
+    amountPaidCents: invoice.amount_paid,
+    currency: invoice.currency,
+    status: invoice.status ?? null,
+    created: new Date(invoice.created * 1000).toISOString(),
+    hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
+    invoicePdf: invoice.invoice_pdf ?? null,
+  }));
+}
+
 /**
  * Lists the user's most recent Stripe invoices. Returns [] when the user has no
  * Stripe customer, and on any Stripe error (billing history is non-critical, so
@@ -403,20 +422,7 @@ export async function listInvoicesForUser(
   if (!subscription?.stripeCustomerId) return [];
 
   try {
-    const stripe = await getStripeClient();
-    const invoices = await stripe.invoices.list({
-      customer: subscription.stripeCustomerId,
-      limit: MY_INVOICES_LIMIT,
-    });
-    return invoices.data.map((invoice) => ({
-      id: invoice.id ?? '',
-      amountPaidCents: invoice.amount_paid,
-      currency: invoice.currency,
-      status: invoice.status ?? null,
-      created: new Date(invoice.created * 1000).toISOString(),
-      hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
-      invoicePdf: invoice.invoice_pdf ?? null,
-    }));
+    return await fetchStripeInvoices(subscription.stripeCustomerId);
   } catch (error) {
     LOGGER.warn('Failed to list Stripe invoices; returning empty list', {
       userId,
@@ -424,6 +430,238 @@ export async function listInvoicesForUser(
     });
     return [];
   }
+}
+
+// ─── Unified billing history (LS-10403) ─────────────────────────────────────
+
+export interface BillingHistoryEntry {
+  id: string;
+  platform: 'stripe' | 'apple' | 'google';
+  amountCents: number | null;
+  currency: string | null;
+  status: string;
+  description: string | null;
+  occurredAt: string;
+}
+
+const BillingHistoryEntryRef = builder.objectRef<BillingHistoryEntry>(
+  'BillingHistoryEntry',
+);
+
+BillingHistoryEntryRef.implement({
+  description:
+    'One billing event (payment, refund, dispute) from Stripe, Apple or Google.',
+  fields: (t) => ({
+    id: t.exposeString('id', { nullable: false }),
+    platform: t.exposeString('platform', {
+      nullable: false,
+      description: "'stripe', 'apple', or 'google'.",
+    }),
+    amountCents: t.exposeInt('amountCents', { nullable: true }),
+    currency: t.exposeString('currency', { nullable: true }),
+    status: t.exposeString('status', { nullable: false }),
+    description: t.exposeString('description', { nullable: true }),
+    occurredAt: t.exposeString('occurredAt', {
+      nullable: false,
+      description: 'ISO 8601 timestamp.',
+    }),
+  }),
+});
+
+type SubscriptionRow = Awaited<
+  ReturnType<typeof getSubscriptionRowsForUser>
+>[number];
+
+async function stripeBillingEntries(
+  rows: SubscriptionRow[],
+): Promise<BillingHistoryEntry[]> {
+  const customerIds = [
+    ...new Set(rows.map((r) => r.stripeCustomerId).filter(Boolean)),
+  ] as string[];
+  const perCustomer = await Promise.all(customerIds.map(fetchStripeInvoices));
+  return perCustomer.flat().map((invoice) => ({
+    id: `stripe:invoice:${invoice.id}`,
+    platform: 'stripe' as const,
+    amountCents: invoice.amountPaidCents,
+    currency: invoice.currency,
+    status: invoice.status ?? 'unknown',
+    description: 'Stripe subscription invoice',
+    occurredAt: invoice.created,
+  }));
+}
+
+/**
+ * Ledger rows for refunds and disputes only: payment rows are keyed by webhook
+ * event id, so they cannot be matched to invoices and would double-count them.
+ */
+async function ledgerBillingEntries(
+  userId: number,
+): Promise<BillingHistoryEntry[]> {
+  const ledger = await runWithInternalClient(getDbOptions(), async (db) =>
+    db
+      .select({
+        provider: InternalSchema.subscriptionTransactions.provider,
+        eventType: InternalSchema.subscriptionTransactions.eventType,
+        amountCents: InternalSchema.subscriptionTransactions.amountCents,
+        currency: InternalSchema.subscriptionTransactions.currency,
+        providerEventId:
+          InternalSchema.subscriptionTransactions.providerEventId,
+        occurredAt: InternalSchema.subscriptionTransactions.occurredAt,
+      })
+      .from(InternalSchema.subscriptionTransactions)
+      .where(
+        and(
+          eq(InternalSchema.subscriptionTransactions.userId, userId),
+          inArray(InternalSchema.subscriptionTransactions.eventType, [
+            'refund',
+            'dispute_created',
+          ]),
+        ),
+      ),
+  );
+  return ledger.map((row) => ({
+    id: `${row.provider}:ledger:${row.providerEventId}`,
+    platform: row.provider,
+    amountCents: row.amountCents,
+    currency: row.currency,
+    status: row.eventType === 'refund' ? 'refunded' : 'disputed',
+    description: row.eventType === 'refund' ? 'Refund' : 'Dispute opened',
+    occurredAt: row.occurredAt.toISOString(),
+  }));
+}
+
+async function appleBillingEntries(
+  rows: SubscriptionRow[],
+): Promise<BillingHistoryEntry[]> {
+  const originalIds = [
+    ...new Set(rows.map((r) => r.appleOriginalTransactionId).filter(Boolean)),
+  ] as string[];
+  const histories = await Promise.all(
+    originalIds.map((id) => fetchAppleTransactionHistory(id)),
+  );
+  const entries: BillingHistoryEntry[] = [];
+  for (const tx of histories.flat()) {
+    entries.push({
+      id: `apple:${tx.transactionId}`,
+      platform: 'apple',
+      amountCents: tx.priceCents,
+      currency: tx.currency,
+      status: tx.revocation ? 'revoked' : 'paid',
+      description: tx.type,
+      occurredAt: new Date(tx.purchaseDate).toISOString(),
+    });
+    if (tx.revocation) {
+      entries.push({
+        id: `apple:${tx.transactionId}:revocation`,
+        platform: 'apple',
+        amountCents: tx.priceCents,
+        currency: tx.currency,
+        status: 'refunded',
+        description: 'Refund',
+        occurredAt: new Date(tx.revocation.revocationDate).toISOString(),
+      });
+    }
+  }
+  return entries;
+}
+
+/**
+ * Google limitation: the Play Developer API exposes only the current purchase
+ * state per token, not a purchase history, so each token yields one entry.
+ */
+async function googleBillingEntries(
+  rows: SubscriptionRow[],
+): Promise<BillingHistoryEntry[]> {
+  const tokens = [
+    ...new Set(rows.map((r) => r.googlePurchaseToken).filter(Boolean)),
+  ] as string[];
+  const subs = await Promise.all(
+    tokens.map((token) =>
+      fetchGoogleSubscription(GOOGLE_PLAY_PACKAGE_NAME, token),
+    ),
+  );
+  const entries: BillingHistoryEntry[] = [];
+  subs.forEach((sub, i) => {
+    if (!sub.startTime) return;
+    entries.push({
+      id: `google:${sub.latestOrderId ?? tokens[i]}`,
+      platform: 'google',
+      amountCents: null,
+      currency: null,
+      status: sub.subscriptionState
+        .replace('SUBSCRIPTION_STATE_', '')
+        .toLowerCase(),
+      description: 'Google Play subscription (current purchase state)',
+      occurredAt: new Date(sub.startTime).toISOString(),
+    });
+  });
+  return entries;
+}
+
+/**
+ * Merges entries from all sources, dropping duplicates (same id, or same
+ * platform/status/amount/currency/timestamp, e.g. an Apple revocation that is
+ * also in the ledger) and sorting newest first.
+ */
+export function mergeBillingHistory(
+  groups: BillingHistoryEntry[][],
+): BillingHistoryEntry[] {
+  const seen = new Set<string>();
+  const merged: BillingHistoryEntry[] = [];
+  for (const entry of groups.flat()) {
+    const semanticKey = [
+      entry.platform,
+      entry.status,
+      entry.amountCents,
+      entry.currency,
+      entry.occurredAt,
+    ].join('|');
+    if (seen.has(entry.id) || seen.has(semanticKey)) continue;
+    seen.add(entry.id);
+    seen.add(semanticKey);
+    merged.push(entry);
+  }
+  return merged.sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
+}
+
+/**
+ * One chronological list across Stripe, ledger, Apple and Google. Each source
+ * is fetched independently; a failing source is logged and omitted.
+ */
+export async function listBillingHistoryForUser(
+  userId: number,
+): Promise<BillingHistoryEntry[]> {
+  const rows = await getSubscriptionRowsForUser(userId);
+  const sources = [
+    ['stripe', () => stripeBillingEntries(rows)],
+    ['ledger', () => ledgerBillingEntries(userId)],
+    ['apple', () => appleBillingEntries(rows)],
+    ['google', () => googleBillingEntries(rows)],
+  ] as const;
+  const results = await Promise.allSettled(sources.map(([, load]) => load()));
+  const groups: BillingHistoryEntry[][] = [];
+  results.forEach((result, i) => {
+    if (result.status === 'fulfilled') {
+      groups.push(result.value);
+      return;
+    }
+    const source = sources[i][0];
+    LOGGER.warn('Billing history source failed; omitting', {
+      userId,
+      source,
+      error:
+        result.reason instanceof Error
+          ? result.reason.message
+          : String(result.reason),
+    });
+    captureWarning(
+      result.reason instanceof Error
+        ? result.reason
+        : new Error(String(result.reason)),
+      { context: 'subscriptionBillingHistory', source },
+    );
+  });
+  return mergeBillingHistory(groups);
 }
 
 // ─── Stripe Prices ──────────────────────────────────────────────────────────
@@ -620,6 +858,19 @@ builder.queryField('myInvoices', (t) =>
     resolve: async (_parent, _args, context) => {
       if (!context.user) throw AuthenticationError();
       return listInvoicesForUser(context.user.id);
+    },
+  }),
+);
+
+builder.queryField('subscriptionBillingHistory', (t) =>
+  t.field({
+    type: [BillingHistoryEntryRef],
+    nullable: false,
+    description:
+      'Unified billing history (Stripe, Apple, Google, ledger refunds/disputes) for the authenticated user, newest first. Google reports current purchase state only.',
+    resolve: async (_parent, _args, context) => {
+      if (!context.user) throw AuthenticationError();
+      return listBillingHistoryForUser(context.user.id);
     },
   }),
 );
@@ -1518,23 +1769,42 @@ export function subscriptionStatusPriority() {
 END`;
 }
 
+function subscriptionSelectColumns() {
+  return {
+    id: InternalSchema.subscriptions.id,
+    status: InternalSchema.subscriptions.status,
+    tier: InternalSchema.subscriptions.tier,
+    currentPeriodEnd: InternalSchema.subscriptions.currentPeriodEnd,
+    cancelAtPeriodEnd: InternalSchema.subscriptions.cancelAtPeriodEnd,
+    trialEndsAt: InternalSchema.subscriptions.trialEndsAt,
+    gracePeriodEndsAt: InternalSchema.subscriptions.gracePeriodEndsAt,
+    stripeCustomerId: InternalSchema.subscriptions.stripeCustomerId,
+    stripeSubscriptionId: InternalSchema.subscriptions.stripeSubscriptionId,
+    appleOriginalTransactionId:
+      InternalSchema.subscriptions.appleOriginalTransactionId,
+    googlePurchaseToken: InternalSchema.subscriptions.googlePurchaseToken,
+  };
+}
+
+/** All subscriptions rows for the user, best (active) first. */
+export async function getSubscriptionRowsForUser(userId: number) {
+  return runWithInternalClient(getDbOptions(), async (db) =>
+    db
+      .select(subscriptionSelectColumns())
+      .from(InternalSchema.subscriptions)
+      .where(eq(InternalSchema.subscriptions.userId, userId))
+      .orderBy(
+        desc(subscriptionStatusPriority()),
+        sql`${InternalSchema.subscriptions.currentPeriodEnd} DESC NULLS LAST`,
+        desc(InternalSchema.subscriptions.id),
+      ),
+  );
+}
+
 export async function getSubscriptionForUser(userId: number) {
   return runWithInternalClient(getDbOptions(), async (db) => {
     const rows = await db
-      .select({
-        id: InternalSchema.subscriptions.id,
-        status: InternalSchema.subscriptions.status,
-        tier: InternalSchema.subscriptions.tier,
-        currentPeriodEnd: InternalSchema.subscriptions.currentPeriodEnd,
-        cancelAtPeriodEnd: InternalSchema.subscriptions.cancelAtPeriodEnd,
-        trialEndsAt: InternalSchema.subscriptions.trialEndsAt,
-        gracePeriodEndsAt: InternalSchema.subscriptions.gracePeriodEndsAt,
-        stripeCustomerId: InternalSchema.subscriptions.stripeCustomerId,
-        stripeSubscriptionId: InternalSchema.subscriptions.stripeSubscriptionId,
-        appleOriginalTransactionId:
-          InternalSchema.subscriptions.appleOriginalTransactionId,
-        googlePurchaseToken: InternalSchema.subscriptions.googlePurchaseToken,
-      })
+      .select(subscriptionSelectColumns())
       .from(InternalSchema.subscriptions)
       .where(eq(InternalSchema.subscriptions.userId, userId))
       .orderBy(

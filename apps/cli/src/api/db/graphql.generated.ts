@@ -292,6 +292,20 @@ export type BaseballMatchupStats = {
   totalPoints: Scalars['Float']['output'];
 };
 
+/** One billing event (payment, refund, dispute) from Stripe, Apple or Google. */
+export type BillingHistoryEntry = {
+  __typename?: 'BillingHistoryEntry';
+  amountCents?: Maybe<Scalars['Int']['output']>;
+  currency?: Maybe<Scalars['String']['output']>;
+  description?: Maybe<Scalars['String']['output']>;
+  id: Scalars['String']['output'];
+  /** ISO 8601 timestamp. */
+  occurredAt: Scalars['String']['output'];
+  /** 'stripe', 'apple', or 'google'. */
+  platform: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+};
+
 export type BillingPortalSessionResult = {
   __typename?: 'BillingPortalSessionResult';
   url?: Maybe<Scalars['String']['output']>;
@@ -4102,6 +4116,8 @@ export type Query = {
   sportPlayerPools: Array<SportPlayerPool>;
   /** Return live subscription prices from Stripe. No authentication required — pricing is public. Results are cached server-side for 5 minutes. */
   stripePrices?: Maybe<StripePriceInfo>;
+  /** Unified billing history (Stripe, Apple, Google, ledger refunds/disputes) for the authenticated user, newest first. Google reports current purchase state only. */
+  subscriptionBillingHistory: Array<BillingHistoryEntry>;
   /** Return earned badges for a team in a league */
   teamBadges?: Maybe<Array<UserBadge>>;
   teamById?: Maybe<Team>;
