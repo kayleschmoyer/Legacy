@@ -2,7 +2,8 @@
 /**
  * Classify changed files for make pc optimization.
  *
- * Compares the current branch against a base ref (default: origin/main) and outputs
+ * Compares the current branch (committed history plus uncommitted working-tree
+ * changes and untracked files, LS-10202) against a base ref (default: origin/main) and outputs
  * Make-compatible variable assignments that the pre-commit target uses to skip
  * irrelevant steps.
  *
@@ -27,7 +28,7 @@
  *                         is to .github/scripts/'s suites.
  *   PC_DOCS_ONLY       — ALL changed files are docs (.md, .agents/skills/, docs/)
  *
- * Fail-safe: if git diff fails or no changes detected, all flags default to
+ * Fail-safe: if git fails or no changes (committed or not) are detected, all flags default to
  * "run everything" so nothing is accidentally skipped.
  */
 
@@ -77,23 +78,32 @@ function classify(baseRef) {
 
   let files;
   try {
-    const output = execFileSync(
-      'git',
-      ['diff', '--name-only', `${baseRef}...HEAD`],
-      {
+    // LS-10202: classify committed history (<base>...HEAD) plus the working
+    // tree (staged + unstaged tracked changes vs HEAD, and untracked files),
+    // so validating before the first commit doesn't look like "no changes".
+    const gitLines = (args) =>
+      execFileSync('git', args, {
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
-      },
-    ).trim();
+      })
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean);
 
-    if (!output) {
-      // No changes detected — run everything (fail-safe)
+    files = [
+      ...new Set([
+        ...gitLines(['diff', '--name-only', `${baseRef}...HEAD`]),
+        ...gitLines(['diff', '--name-only', 'HEAD']),
+        ...gitLines(['ls-files', '--others', '--exclude-standard']),
+      ]),
+    ];
+
+    if (files.length === 0) {
+      // Nothing committed, staged, modified, or untracked — run everything (fail-safe)
       return { ...FAIL_SAFE, reason: 'no-changes' };
     }
-
-    files = output.split('\n').filter(Boolean);
   } catch {
-    // git diff failed — run everything (fail-safe)
+    // git failed — run everything (fail-safe)
     return { ...FAIL_SAFE, reason: 'git-diff-failed' };
   }
 

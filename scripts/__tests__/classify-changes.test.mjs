@@ -320,6 +320,64 @@ test('classify() leaves hasRootScripts false for .github/scripts-only changes', 
   }
 });
 
+/**
+ * LS-10202: uncommitted work (0 commits ahead of base) must be classified from
+ * the working tree instead of tripping the "no changes" fail-safe.
+ */
+test('classify() scopes uncommitted tracked changes instead of the no-changes fail-safe', () => {
+  const root = makeSimpleFixture();
+  const originalCwd = process.cwd();
+  try {
+    writeFileSync(join(root, 'base.txt'), 'edited');
+    process.chdir(root);
+    const result = classify('main');
+    assert.equal(result.reason, null);
+    assert.equal(result.hasDb, false);
+    assert.equal(result.hasWorkflows, false);
+    assert.equal(result.hasGithubScripts, false);
+    assert.equal(result.hasPs1, false);
+    assert.equal(result.hasRootScripts, false);
+  } finally {
+    process.chdir(originalCwd);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('classify() detects untracked and staged files', () => {
+  const root = makeSimpleFixture();
+  const originalCwd = process.cwd();
+  try {
+    mkdirSync(join(root, 'scripts'), { recursive: true });
+    writeFileSync(join(root, 'scripts', 'new.mjs'), '// untracked');
+    mkdirSync(join(root, 'lib', 'db-client'), { recursive: true });
+    writeFileSync(join(root, 'lib', 'db-client', 'x.sql'), 'staged');
+    git(root, ['add', 'lib/db-client/x.sql']);
+    process.chdir(root);
+    const result = classify('main');
+    assert.equal(result.reason, null);
+    assert.equal(result.hasRootScripts, true);
+    assert.equal(result.hasDb, true);
+    assert.equal(result.hasWorkflows, false);
+  } finally {
+    process.chdir(originalCwd);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('classify() still fail-safes when nothing at all changed', () => {
+  const root = makeSimpleFixture();
+  const originalCwd = process.cwd();
+  try {
+    process.chdir(root);
+    const result = classify('main');
+    assert.equal(result.reason, 'no-changes');
+    assert.equal(result.hasWorkflows, true);
+  } finally {
+    process.chdir(originalCwd);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('refreshBaseRef does not throw when the fetch fails (offline fail-safe)', () => {
   const root = mkdtempSync(join(tmpdir(), 'classify-changes-noremote-'));
   const originalCwd = process.cwd();
