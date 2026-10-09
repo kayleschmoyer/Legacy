@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { ScrollView, Text, XStack } from 'tamagui';
+import { Button, ScrollView, XStack } from 'tamagui';
 import { ExternalLink } from '@tamagui/lucide-icons/icons/ExternalLink';
+import { X } from '@tamagui/lucide-icons/icons/X';
 import { FootballPlayerDetail } from '@legacy-sports/shared-components/football';
 import { config } from '@legacy-sports/app-config/web';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
@@ -11,7 +12,10 @@ import { useHasEntitlement } from '../hooks/useIsPremium';
 import {
   BG_DARK,
   OUTLINE_SUBTLE,
+  STATS_BORDER,
+  TEXT_INTERFACE,
   TEXT_MUTED,
+  WHITE,
   withAlpha,
 } from '../constants/colors';
 
@@ -80,41 +84,44 @@ export function FootballPlayerDetailModal({
           maxHeight="min(88dvh, calc(100dvh - 32px))"
           backgroundColor={BG_DARK}
         >
-          {onViewFullPage && (
-            <XStack
-              paddingHorizontal={16}
-              paddingTop={12}
-              justifyContent="flex-end"
-            >
-              <XStack
-                role="button"
-                tabIndex={0}
+          <XStack
+            paddingHorizontal={16}
+            paddingTop={12}
+            justifyContent="flex-end"
+            alignItems="center"
+            gap={8}
+          >
+            {onViewFullPage && (
+              <Button
+                size="$3"
+                icon={<ExternalLink size={14} color={TEXT_MUTED} />}
                 aria-label="Open full page"
                 onPress={onViewFullPage}
-                onKeyDown={(e: { key: string; preventDefault: () => void }) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    onViewFullPage();
-                  }
-                }}
-                alignItems="center"
-                gap={6}
-                paddingHorizontal={10}
-                paddingVertical={6}
-                borderRadius={8}
-                borderWidth={1}
+                backgroundColor="transparent"
                 borderColor={OUTLINE_SUBTLE}
-                cursor="pointer"
+                borderWidth={1}
+                color={TEXT_MUTED}
+                fontSize={12}
                 hoverStyle={{ backgroundColor: withAlpha(TEXT_MUTED, 0.1) }}
                 pressStyle={{ opacity: 0.8 }}
               >
-                <ExternalLink size={14} color={TEXT_MUTED} />
-                <Text fontSize={12} color={TEXT_MUTED}>
-                  Full page
-                </Text>
-              </XStack>
-            </XStack>
-          )}
+                Full page
+              </Button>
+            )}
+            <Button
+              size="$3"
+              circular
+              icon={X}
+              aria-label="Close"
+              onPress={() => onOpenChange(false)}
+              backgroundColor={withAlpha(WHITE, 0.08)}
+              borderColor={STATS_BORDER}
+              borderWidth={1}
+              color={TEXT_INTERFACE}
+              hoverStyle={{ backgroundColor: withAlpha(WHITE, 0.14) }}
+              pressStyle={{ backgroundColor: withAlpha(WHITE, 0.18) }}
+            />
+          </XStack>
           <FootballPlayerDetail
             player={player}
             loading={loading}
