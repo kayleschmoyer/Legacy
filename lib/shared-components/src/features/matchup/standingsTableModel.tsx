@@ -90,6 +90,32 @@ export const formatMedianRecord = (s: StandingRecord): string =>
 export const teamDisplayName = (s: StandingRecord): string =>
   s.teamName ?? `Team ${s.teamId}`;
 
+/** Default order of the standings table: win percentage, best first. */
+export const DEFAULT_SORT_KEY: SortKey = 'winPct';
+export const DEFAULT_SORT_DIRECTION: SortDirection = 'desc';
+
+const SORT_LABELS: Record<SortKey, string> = {
+  rank: 'win percentage',
+  team: 'team name',
+  wins: 'wins',
+  losses: 'losses',
+  ties: 'ties',
+  winPct: 'win percentage',
+  pointsFor: 'PF',
+  pointsAgainst: 'PA',
+  diff: 'point differential',
+  waiverOrder: 'waiver order',
+  medianRecord: 'median record',
+};
+
+/** Caption fragment naming the active sort, e.g. "Sorted by PF ↓". */
+export function describeStandingsSort(
+  sortKey: SortKey,
+  sortDirection: SortDirection,
+): string {
+  return `Sorted by ${SORT_LABELS[sortKey]} ${sortDirection === 'asc' ? '↑' : '↓'}`;
+}
+
 export function sortStandings(
   list: StandingRecord[],
   sortKey: SortKey,

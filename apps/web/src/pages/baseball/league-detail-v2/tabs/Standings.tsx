@@ -1,5 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import {
+  DEFAULT_SORT_DIRECTION,
+  DEFAULT_SORT_KEY,
+  describeStandingsSort,
   PlayoffBracket,
   StandingsTable,
 } from '@legacy-sports/shared-components/matchup';
@@ -30,6 +33,12 @@ export const StandingsTab: React.FC<StandingsTabProps> = ({
 
   // null = current (live) standings; a number pins the view to "as of Week N".
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
+
+  // Mirrors the table's private sort state so the caption names the real order.
+  const [sort, setSort] = useState({
+    key: DEFAULT_SORT_KEY,
+    direction: DEFAULT_SORT_DIRECTION,
+  });
 
   const weekOptions = useMemo(
     () =>
@@ -121,9 +130,7 @@ export const StandingsTab: React.FC<StandingsTabProps> = ({
     selectedWeek != null ? ` · As of Week ${selectedWeek}` : '';
   const subtitle = standingsLoading
     ? 'Loading…'
-    : isFootball
-      ? `${standingsForTable.length} teams · Sorted by W, then PF${asOfSuffix}`
-      : `${standingsForTable.length} teams · Sorted by win percentage${asOfSuffix}`;
+    : `${standingsForTable.length} teams · ${describeStandingsSort(sort.key, sort.direction)}${asOfSuffix}`;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -172,6 +179,7 @@ export const StandingsTab: React.FC<StandingsTabProps> = ({
         showWaiverOrder={showWaiverOrder}
         waiverOrders={waiverOrders}
         showMedianRecord={showMedianRecord}
+        onSortChange={(key, direction) => setSort({ key, direction })}
       />
 
       {bracket ? <PlayoffBracket bracket={bracket} /> : null}

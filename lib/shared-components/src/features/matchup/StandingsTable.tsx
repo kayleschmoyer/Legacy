@@ -3,6 +3,8 @@ import { Card, H3, Separator, Text, useMedia, XStack, YStack } from 'tamagui';
 import { Eye } from '@tamagui/lucide-icons/icons/Eye';
 import {
   ClinchBadge,
+  DEFAULT_SORT_DIRECTION,
+  DEFAULT_SORT_KEY,
   diffOf,
   formatDiff,
   formatMedianRecord,
@@ -52,7 +54,15 @@ export interface StandingsTableProps {
    * option — LS-6344). Sourced from `standing.medianWins`/`medianLosses`.
    */
   showMedianRecord?: boolean;
+  /** Fires when the user changes the sort, so callers can caption it. */
+  onSortChange?: (sortKey: SortKey, sortDirection: SortDirection) => void;
 }
+
+export {
+  DEFAULT_SORT_DIRECTION,
+  DEFAULT_SORT_KEY,
+  describeStandingsSort,
+} from './standingsTableModel';
 
 function streakColor(streak: string | null | undefined): string | undefined {
   if (!streak) return undefined;
@@ -344,21 +354,27 @@ export function StandingsTable({
   showWaiverOrder = false,
   waiverOrders,
   showMedianRecord = false,
+  onSortChange,
 }: StandingsTableProps) {
   const media = useMedia();
   const wide = media.gtMd === true;
-  const [sortKey, setSortKey] = useState<SortKey>('winPct');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [sortKey, setSortKey] = useState<SortKey>(DEFAULT_SORT_KEY);
+  const [sortDirection, setSortDirection] = useState<SortDirection>(
+    DEFAULT_SORT_DIRECTION,
+  );
 
   const handleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortKey(key);
-      setSortDirection(
-        key === 'team' || key === 'waiverOrder' ? 'asc' : 'desc',
-      );
-    }
+    const nextDirection: SortDirection =
+      sortKey === key
+        ? sortDirection === 'asc'
+          ? 'desc'
+          : 'asc'
+        : key === 'team' || key === 'waiverOrder'
+          ? 'asc'
+          : 'desc';
+    setSortKey(key);
+    setSortDirection(nextDirection);
+    onSortChange?.(key, nextDirection);
   };
 
   const hasDivisions = useMemo(

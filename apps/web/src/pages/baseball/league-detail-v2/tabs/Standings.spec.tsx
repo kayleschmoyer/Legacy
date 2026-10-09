@@ -7,7 +7,7 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- test mocks use any */
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 
 import { StandingsTab } from './Standings';
 
@@ -19,6 +19,10 @@ let mockCurrentWeek: number | null = null;
 const mockStandingsTable = jest.fn(() => null);
 jest.mock('@legacy-sports/shared-components/matchup', () => ({
   StandingsTable: (props: any) => mockStandingsTable(props),
+  DEFAULT_SORT_KEY: 'winPct',
+  DEFAULT_SORT_DIRECTION: 'desc',
+  describeStandingsSort: (key: string, dir: string) =>
+    `Sorted by ${{ winPct: 'win percentage', pointsFor: 'PF', team: 'team name' }[key]} ${dir === 'asc' ? '↑' : '↓'}`,
   PlayoffBracket: jest.fn(() => <div data-testid="playoff-bracket" />),
 }));
 
@@ -167,7 +171,24 @@ describe('StandingsTab', () => {
     );
   });
 
-  it('shows football subtitle "Sorted by W, then PF" for football leagues', () => {
+  it.each(['football', 'baseball'])(
+    'default %s subtitle matches the default win-percentage order',
+    (sport) => {
+      mockStandings = [makeRow()];
+      render(
+        <StandingsTab
+          league={{ ...league, sport }}
+          teams={[]}
+          myTeamId={null}
+          onTeam={jest.fn()}
+        />,
+      );
+      const subtitle = mockStandingsTable.mock.calls[0][0].subtitle as string;
+      expect(subtitle).toBe('1 teams · Sorted by win percentage ↓');
+    },
+  );
+
+  it('updates the subtitle when the table sort changes', () => {
     mockStandings = [makeRow()];
     render(
       <StandingsTab
@@ -177,22 +198,19 @@ describe('StandingsTab', () => {
         onTeam={jest.fn()}
       />,
     );
-    const subtitle = mockStandingsTable.mock.calls[0][0].subtitle as string;
-    expect(subtitle).toMatch(/Sorted by W, then PF/);
-  });
-
-  it('shows baseball subtitle "Sorted by win percentage" for baseball leagues', () => {
-    mockStandings = [makeRow()];
-    render(
-      <StandingsTab
-        league={{ ...league, sport: 'baseball' }}
-        teams={[]}
-        myTeamId={null}
-        onTeam={jest.fn()}
-      />,
-    );
-    const subtitle = mockStandingsTable.mock.calls[0][0].subtitle as string;
-    expect(subtitle).toMatch(/Sorted by win percentage/);
+    const { onSortChange } = mockStandingsTable.mock.calls[0][0] as {
+      onSortChange: (key: string, dir: string) => void;
+    };
+    act(() => onSortChange('pointsFor', 'desc'));
+    const last = mockStandingsTable.mock.calls.at(-1)?.[0] as {
+      subtitle: string;
+    };
+    expect(last.subtitle).toBe('1 teams · Sorted by PF ↓');
+    act(() => onSortChange('team', 'asc'));
+    const last2 = mockStandingsTable.mock.calls.at(-1)?.[0] as {
+      subtitle: string;
+    };
+    expect(last2.subtitle).toBe('1 teams · Sorted by team name ↑');
   });
 
   it('falls back to teams list when standings are empty', () => {
