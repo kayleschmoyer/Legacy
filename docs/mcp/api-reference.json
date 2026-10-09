@@ -1963,7 +1963,7 @@
         },
         {
           "name": "make_run",
-          "description": "Prefer this over `make <target>` via shell. Run a whitelisted Makefile target (pc, build, test, lint, typecheck, format, codegen, install, kill-stale, ...). A target still running after ~45s returns { status: \"running\", jobId }; call make_run_wait({ jobId }) to keep waiting and do NOT re-run it. The pc pipeline also runs as ordered chunks (pc-db-prep, pc-typecheck, pc-lint, pc-format, pc-workflows, pc-test, pc-build) — equivalent to `pc` only when all run in that order. runner-apply prompts interactively: always pass variables=\"NO_CONFIRM=1\". Target details and per-environment validation: .agents/skills/repo-tooling/SKILL.md.",
+          "description": "Prefer this over `make <target>` via shell. Run a whitelisted Makefile target (pc, build, test, lint, typecheck, format, codegen, install, kill-stale, ...). A target still running after ~45s returns { status: \"running\", jobId }; call make_run_wait({ jobId }) to keep waiting and do NOT re-run it. The pc pipeline also runs as ordered chunks (pc-db-prep, pc-typecheck, pc-lint, pc-format, pc-workflows, pc-test, pc-build) — equivalent to `pc` only when all run in that order. test-github-scripts/test-root-scripts: variables=\"FILE=<path>\" runs one file. runner-apply prompts interactively: always pass variables=\"NO_CONFIRM=1\". Target details and per-environment validation: .agents/skills/repo-tooling/SKILL.md.",
           "inputs": {
             "target": {
               "type": "string",

@@ -56,6 +56,12 @@ describe('runTarget — allowlist gate', () => {
     expect(result.content[0].text).toContain('lockfile');
   });
 
+  it('allows the node:test suite targets (LS-10358)', async () => {
+    const result = await runTarget({ target: '__not_a_real_target__' });
+    expect(result.content[0].text).toContain('test-github-scripts');
+    expect(result.content[0].text).toContain('test-root-scripts');
+  });
+
   it('allows the LS-10152 AC3 recurrence-guard cleanup targets', async () => {
     const result = await runTarget({ target: '__not_a_real_target__' });
     for (const target of [

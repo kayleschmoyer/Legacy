@@ -37,6 +37,7 @@ server.tool(
     '{ status: "running", jobId }; call make_run_wait({ jobId }) to keep waiting and do NOT re-run it. ' +
     'The pc pipeline also runs as ordered chunks (pc-db-prep, pc-typecheck, pc-lint, pc-format, pc-workflows, ' +
     'pc-test, pc-build) — equivalent to `pc` only when all run in that order. ' +
+    'test-github-scripts/test-root-scripts: variables="FILE=<path>" runs one file. ' +
     'runner-apply prompts interactively: always pass variables="NO_CONFIRM=1". ' +
     'Target details and per-environment validation: .agents/skills/repo-tooling/SKILL.md.',
   {

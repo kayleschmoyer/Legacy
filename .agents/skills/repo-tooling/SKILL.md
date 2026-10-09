@@ -43,24 +43,25 @@ Design rationale: `docs/rfcs/modules-pool/README.md` (Accepted).
 
 All wrap Nx and set `NODE_OPTIONS` for the Windows windowsHide patch + `NX_DAEMON=false` (LS-102) — prefer them (or the equivalent MCP tools `nx_run` / `nx_run_affected` / `make_run`, see [mcp-first](../mcp-first/SKILL.md)) over raw `pnpm exec nx`.
 
-| Task                  | Command                            | Scope                                                       |
-| --------------------- | ---------------------------------- | ----------------------------------------------------------- |
-| Full pre-commit       | `make pc`                          | 9 steps ([pc-pipeline.md](references/pc-pipeline.md))       |
-| Fast iteration        | `make quick-check`                 | typecheck + lint --fix, affected                            |
-| Lint / fix            | `make lint` / `make lint-fix`      | affected                                                    |
-| Typecheck             | `make typecheck`                   | affected                                                    |
-| Test                  | `make test` / `make test-all`      | affected / all projects                                     |
-| Build                 | `make build` / `make build-all`    | affected / all projects                                     |
-| Format                | `make format`                      | prettier, whole repo                                        |
-| Format as own commit  | `make format-commit`               | clean tree required                                         |
-| Codegen               | `make codegen`                     | run-many (all codegen projects)                             |
-| Workflow lint         | `make lint-workflows`              | `.github/workflows/`                                        |
-| Skill validation      | `make lint-skills`                 | `.agents/skills/`                                           |
-| Diagrams              | `make diagrams`                    | `.mmd` → `.svg` (needs `mmdc`)                              |
-| Post-rebase stabilize | `make stabilize-after-rebase`      | install → schema → codegen → pc                             |
-| Ship PR               | `make ship-pr TITLE="LS-#### ..."` | draft → label → ready → review                              |
-| E2E auth token        | `make e2e-auth`                    | human-interactive; caches `~/.legacy-sports/e2e-token.json` |
-| Discover targets      | `make help`                        | lists all targets with descriptions                         |
+| Task                  | Command                                                                       | Scope                                                       |
+| --------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Full pre-commit       | `make pc`                                                                     | 9 steps ([pc-pipeline.md](references/pc-pipeline.md))       |
+| Fast iteration        | `make quick-check`                                                            | typecheck + lint --fix, affected                            |
+| Lint / fix            | `make lint` / `make lint-fix`                                                 | affected                                                    |
+| Typecheck             | `make typecheck`                                                              | affected                                                    |
+| Test                  | `make test` / `make test-all`                                                 | affected / all projects                                     |
+| node:test suites      | `make test-github-scripts` / `make test-root-scripts` (`FILE=<path>` for one) | `.github/scripts` / `scripts/__tests__`                     |
+| Build                 | `make build` / `make build-all`                                               | affected / all projects                                     |
+| Format                | `make format`                                                                 | prettier, whole repo                                        |
+| Format as own commit  | `make format-commit`                                                          | clean tree required                                         |
+| Codegen               | `make codegen`                                                                | run-many (all codegen projects)                             |
+| Workflow lint         | `make lint-workflows`                                                         | `.github/workflows/`                                        |
+| Skill validation      | `make lint-skills`                                                            | `.agents/skills/`                                           |
+| Diagrams              | `make diagrams`                                                               | `.mmd` → `.svg` (needs `mmdc`)                              |
+| Post-rebase stabilize | `make stabilize-after-rebase`                                                 | install → schema → codegen → pc                             |
+| Ship PR               | `make ship-pr TITLE="LS-#### ..."`                                            | draft → label → ready → review                              |
+| E2E auth token        | `make e2e-auth`                                                               | human-interactive; caches `~/.legacy-sports/e2e-token.json` |
+| Discover targets      | `make help`                                                                   | lists all targets with descriptions                         |
 
 Database targets (`db-migrate`, `db-studio`, …) and the MCP-first migration tools: [database](../database/SKILL.md).
 

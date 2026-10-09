@@ -83,6 +83,10 @@ const ALLOWED_TARGETS = new Set([
   'test',
   'test-all',
   'test-e2e',
+  // node:test suites with no nx project (LS-10358) — whole suite, or one file
+  // via variables: "FILE=<path>" (validated by scripts/run-node-tests.mjs).
+  'test-github-scripts',
+  'test-root-scripts',
 
   // Linting / formatting
   'lint',

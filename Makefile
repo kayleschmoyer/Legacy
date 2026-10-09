@@ -4,7 +4,7 @@
 .PHONY: help install install-force refresh install-tools install-node install-python setup setup-force \
 	clean clean-safe clean-cache clean-node clean-python force-clean reset \
 	lint lint-fix lint-workflows update-workflow-schemas lint-skills sync-agent-prompts lint-agent-prompts sync-skill-index lint-skill-index lint-eslint-nx-exclude-sync lint-eslint-tsconfig-anchored mcp-api-reference lint-mcp-api-reference mcp-tool-budget mcp-docs audit-session lint-theme-compliance update-theme-baseline lint-animated-theme-vars lint-workspace-deps lint-case-collisions lint-mandated-make-targets hash-design-bundle format fmt typecheck validate \
-	test test-all test-watch test-e2e e2e-auth check-skipped-tests check-skipped-tests-verbose \
+	test test-all test-github-scripts test-root-scripts test-watch test-e2e e2e-auth check-skipped-tests check-skipped-tests-verbose \
 	build build-all build-web build-mobile build-lambdas build-libs \
 	start dev dev-web dev-mobile dev-db dev-graphql dev-storybook graphiql docker-up \
 	android ios app-dev build-android build-ios maestro \
@@ -439,6 +439,12 @@ test: ## Run tests on changed files. Pass MAXWORKERS=N to cap Jest worker parall
 test-all: ## Run all tests
 	@$(call echo_blue,Running all tests...)
 	pnpm exec nx run-many -t test
+
+test-github-scripts: ## Run .github/scripts node:test suites (LS-10358). Pass FILE=.github/scripts/**/__tests__/x.test.mjs for one file
+	@node scripts/run-node-tests.mjs github "$(FILE)"
+
+test-root-scripts: ## Run scripts/__tests__ node:test suites (LS-10358). Pass FILE=scripts/__tests__/x.test.mjs for one file
+	@node scripts/run-node-tests.mjs root "$(FILE)"
 
 test-watch: ## Run tests in watch mode
 	@$(call echo_blue,Running tests in watch mode...)

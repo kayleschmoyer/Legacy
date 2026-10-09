@@ -16,7 +16,7 @@ Exposes Makefile targets as structured MCP tools for AI agents. Prevents agents 
 
 **Validation:** pc, pre-commit, quick-check, validate
 **Build:** build, build-all, build-web, build-mobile, build-lambdas, build-libs
-**Test:** test, test-all, test-e2e
+**Test:** test, test-all, test-e2e, test-github-scripts, test-root-scripts (node:test suites; `variables: "FILE=<path>"` runs one file)
 **Lint/Format:** lint, lint-fix, lint-workflows, lint-skills, format, fmt, format-commit
 **Types:** typecheck
 **Codegen:** codegen
