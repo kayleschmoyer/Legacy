@@ -109,7 +109,7 @@ Prefer this over raw `npx playwright test` shell commands. Hermetic mode (defaul
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
 | `specs` | string[] | **required** | min 1 | Spec file paths relative to apps/web-e2e/ (e.g. ["src/tests/roster-management.spec.ts"] for hermetic, "src/integration/tests/league.spec.ts" for integration). Absolute paths are also accepted. |
-| `project` | string |  | — | Playwright project/browser to run against. Allowed: chromium, firefox, webkit, Mobile Chrome, Mobile Safari (default: chromium). |
+| `project` | string |  | — | Playwright project. Hermetic: chromium (default), firefox, webkit, Mobile Chrome, Mobile Safari. Integration: integration, shared-live (omit = all). |
 | `grep` | string |  | — | Filter tests by title regex (Playwright --grep). E.g. "@critical" or "should show roster". |
 | `worktreePath` | string |  | — | Worktree path (default: repo root) |
 | `integration` | boolean |  | — | When true, runs specs against the live backend using playwright.integration.config.ts instead of the hermetic config. Enforces workers=1. Checks JWT freshness and E2EPOOLPASSWORD before launching. |

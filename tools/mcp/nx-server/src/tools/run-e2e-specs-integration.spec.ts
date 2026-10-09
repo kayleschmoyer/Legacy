@@ -160,6 +160,45 @@ describe('runE2ESpecs — integration mode', () => {
     expect(jobCallOpts().args).toContain('--workers=1');
   });
 
+  // --- Project selection (LS-10173) ---
+
+  it('omits --project when project is not given (no chromium default)', async () => {
+    await runE2ESpecs({ specs: [SPEC], integration: true });
+    expect(jobCallOpts().args.some((a) => a.startsWith('--project='))).toBe(
+      false,
+    );
+  });
+
+  it.each(['integration', 'shared-live'])(
+    'accepts integration project "%s"',
+    async (project) => {
+      const result = await runE2ESpecs({
+        specs: [SPEC],
+        integration: true,
+        project,
+      });
+      expect(result.isError).toBeUndefined();
+      expect(jobCallOpts().args).toContain(`--project=${project}`);
+    },
+  );
+
+  it('rejects hermetic browser projects in integration mode', async () => {
+    const result = await runE2ESpecs({
+      specs: [SPEC],
+      integration: true,
+      project: 'chromium',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/integration, shared-live/);
+    expect(mockRunJob).not.toHaveBeenCalled();
+  });
+
+  it('rejects integration project names in hermetic mode', async () => {
+    const result = await runE2ESpecs({ specs: [SPEC], project: 'integration' });
+    expect(result.isError).toBe(true);
+    expect(mockRunJob).not.toHaveBeenCalled();
+  });
+
   it('applies INTEGRATION_TIMEOUT_MS (480 000 ms) as the process timeout', async () => {
     await runE2ESpecs({ specs: [SPEC], integration: true });
     expect(jobCallOpts().timeoutMs).toBe(480_000);

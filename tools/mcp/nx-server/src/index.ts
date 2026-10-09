@@ -309,9 +309,9 @@ server.tool(
       ),
     project: z
       .string()
-      .default('chromium')
+      .optional()
       .describe(
-        'Playwright project/browser to run against. Allowed: chromium, firefox, webkit, Mobile Chrome, Mobile Safari (default: chromium).',
+        'Playwright project. Hermetic: chromium (default), firefox, webkit, Mobile Chrome, Mobile Safari. Integration: integration, shared-live (omit = all).',
       ),
     grep: z
       .string()

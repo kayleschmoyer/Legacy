@@ -31,13 +31,16 @@ const UNSAFE_SPEC_CHARS = /[;&`$(){}|<>'"\r\n]/;
  */
 const UNSAFE_GREP_CHARS = /[;&`{}<>'"\r\n]/;
 
-const ALLOWED_PROJECTS = new Set([
+const HERMETIC_PROJECTS = new Set([
   'chromium',
   'firefox',
   'webkit',
   'Mobile Chrome',
   'Mobile Safari',
 ]);
+
+/** Project names declared in apps/web-e2e/playwright.integration.config.ts (and the hermetic variant). */
+const INTEGRATION_PROJECTS = new Set(['integration', 'shared-live']);
 
 /**
  * 30 minutes — matches the other nx-server long-running job tools
@@ -342,16 +345,21 @@ export async function runE2ESpecs(
   }
 
   // Strict allowlist, not a blocklist: project must exactly match one of the
-  // five known Playwright project names below, so no shell metacharacter can
-  // ever reach the spawned args via this parameter regardless of the (also
-  // shell:false, see binJobSpec) spawn mode.
-  const project = params.project ?? 'chromium';
-  if (!ALLOWED_PROJECTS.has(project)) {
+  // known Playwright project names for the selected mode, so no shell
+  // metacharacter can ever reach the spawned args via this parameter
+  // regardless of the (also shell:false, see binJobSpec) spawn mode.
+  // Integration mode (LS-10173) has its own project names and no default:
+  // omitting --project lets Playwright run every project the config defines.
+  const allowedProjects = integration
+    ? INTEGRATION_PROJECTS
+    : HERMETIC_PROJECTS;
+  const project = params.project ?? (integration ? undefined : 'chromium');
+  if (project != null && !allowedProjects.has(project)) {
     return {
       content: [
         {
           type: 'text',
-          text: `project "${project}" is not allowed. Allowed: ${[...ALLOWED_PROJECTS].join(', ')}.`,
+          text: `project "${project}" is not allowed${integration ? ' in integration mode' : ''}. Allowed: ${[...allowedProjects].join(', ')}.`,
         },
       ],
       isError: true,
@@ -485,7 +493,7 @@ export async function runE2ESpecs(
   const args = [
     'test',
     `--config=${configFile}`,
-    `--project=${project}`,
+    ...(project != null ? [`--project=${project}`] : []),
     ...resolvedSpecs,
   ];
   if (params.grep != null) {
