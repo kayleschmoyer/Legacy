@@ -69,18 +69,65 @@ function mapJob(job: GitHubJob, includeSteps: boolean) {
   return mapped;
 }
 
+function fetchJobs(runId: number, attempt?: number) {
+  const attemptSuffix = attempt ? `/attempts/${attempt}` : '';
+  // Fetch all jobs (max 100 per page; most runs have far fewer)
+  return githubGet<GitHubJobsResponse>(
+    `/actions/runs/${runId}${attemptSuffix}/jobs`,
+    { per_page: '100', filter: 'latest' },
+  );
+}
+
+/**
+ * LS-10480: after a rerun the newest attempt has no jobs until its runners pick
+ * them up, so the default (latest) attempt reports `total: 0` even though the
+ * previous attempt's jobs exist. When the requested attempt is empty, look up
+ * the run's attempt count and either fall back to the newest earlier attempt
+ * that has jobs (default attempt only) or name the attempts that exist.
+ */
+async function resolveEmptyAttempt(
+  runId: number,
+  requestedAttempt: number | undefined,
+): Promise<{ jobsData?: GitHubJobsResponse; attempt?: number; note?: string }> {
+  const run = await githubGet<{ run_attempt: number }>(
+    `/actions/runs/${runId}`,
+  );
+  const latest = run.run_attempt;
+  if (latest <= 1 && !requestedAttempt) return {};
+  const exists = `run has attempts 1-${latest}`;
+  if (requestedAttempt) {
+    return {
+      note: `Attempt ${requestedAttempt} has no jobs; ${exists}. Pass attempt:<n> to view another.`,
+    };
+  }
+  for (let attempt = latest - 1; attempt >= 1; attempt--) {
+    const jobsData = await fetchJobs(runId, attempt);
+    if (jobsData.jobs.length > 0) {
+      return {
+        jobsData,
+        attempt,
+        note: `Latest attempt ${latest} has no jobs yet (${exists}); showing jobs from attempt ${attempt}.`,
+      };
+    }
+  }
+  return { note: `Latest attempt ${latest} has no jobs yet; ${exists}.` };
+}
+
 export async function viewRunJobs(
   params: ViewRunJobsParams,
 ): Promise<ToolResult> {
   try {
-    const attemptSuffix = params.attempt ? `/attempts/${params.attempt}` : '';
     const includeSteps = params.includeSteps ?? false;
 
-    // Fetch all jobs (max 100 per page; most runs have far fewer)
-    const jobsData = await githubGet<GitHubJobsResponse>(
-      `/actions/runs/${params.runId}${attemptSuffix}/jobs`,
-      { per_page: '100', filter: 'latest' },
-    );
+    let jobsData = await fetchJobs(params.runId, params.attempt);
+    let shownAttempt = params.attempt;
+    let note: string | undefined;
+    if (jobsData.jobs.length === 0) {
+      const resolved = await resolveEmptyAttempt(params.runId, params.attempt);
+      if (resolved.jobsData) jobsData = resolved.jobsData;
+      shownAttempt = resolved.attempt ?? shownAttempt;
+      note = resolved.note;
+    }
 
     let jobs = jobsData.jobs;
     if (params.filter) {
@@ -93,6 +140,8 @@ export async function viewRunJobs(
     const mapped = jobs.map((j) => mapJob(j, includeSteps));
 
     const summary = {
+      ...(shownAttempt ? { attempt: shownAttempt } : {}),
+      ...(note ? { note } : {}),
       total: jobsData.total_count,
       returned: mapped.length,
       passed: jobsData.jobs.filter((j) => j.conclusion === 'success').length,
