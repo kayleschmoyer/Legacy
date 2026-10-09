@@ -27,8 +27,8 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
 }));
 
 const mockLeaguesFixture = [
-  { id: 1, name: 'Baseball League', playerPool: 'baseball' },
-  { id: 2, name: 'Football League', playerPool: 'football' },
+  { id: 1, name: 'Baseball League', sport: 'baseball', playerPool: 'all' },
+  { id: 2, name: 'Football League', sport: 'football', playerPool: 'all' },
 ];
 
 let mockUserLeagues: unknown[] = [];
@@ -282,5 +282,54 @@ describe('LeagueSwitcherChip — LS-10705 fluid chip in the mobile header', () =
     const chip = screen.getByTestId('league-switcher-chip');
     expect(chip.style.flexShrink).toBe('0');
     expect((chip.parentElement as HTMLElement).style.flexShrink).toBe('0');
+  });
+});
+
+/**
+ * LS-10511: sport must come from `league.sport`, not be inferred from
+ * `playerPool` (football leagues use pools like `all`).
+ */
+describe('LeagueSwitcherChip — LS-10511 uses league.sport', () => {
+  beforeEach(() => {
+    mockNavigate.mockReset();
+    mockUserLeagues = [
+      { id: 1, name: 'Baseball League', sport: 'baseball', playerPool: 'all' },
+      { id: 2, name: 'NFL League', sport: 'football', playerPool: 'all' },
+    ];
+  });
+
+  const renderAt = (path: string) =>
+    render(
+      <MemoryRouter initialEntries={[path]}>
+        <LeagueSwitcherChip />
+      </MemoryRouter>,
+    );
+
+  it('detects the current league on a /football/ route and lists it under Football', () => {
+    renderAt('/football/league/2');
+    expect(screen.getByTestId('league-switcher-chip')).toHaveTextContent(
+      'NFL League',
+    );
+    fireEvent.click(screen.getByTestId('league-switcher-chip'));
+    expect(screen.getByRole('option', { name: /NFL League/ })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(
+      screen.queryByRole('option', { name: /Baseball League/ }),
+    ).toBeNull();
+  });
+
+  it('navigates a football league to its football URL', () => {
+    renderAt('/football/league/2');
+    fireEvent.click(screen.getByTestId('league-switcher-chip'));
+    fireEvent.click(screen.getByRole('option', { name: /NFL League/ }));
+    expect(mockNavigate).toHaveBeenCalledWith('/football/league/2');
+  });
+
+  it('opens on the URL sport tab when there is no current league', () => {
+    renderAt('/football/leagues');
+    fireEvent.click(screen.getByTestId('league-switcher-chip'));
+    expect(screen.getByRole('option', { name: /NFL League/ })).toBeTruthy();
   });
 });

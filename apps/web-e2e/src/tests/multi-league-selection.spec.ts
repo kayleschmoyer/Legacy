@@ -43,6 +43,7 @@ const MULTI_LEAGUES = [
   mockLeague({
     id: 3,
     name: 'Gridiron Generals',
+    sport: 'football',
     playerPool: 'football',
     leaguePhase: 'active',
     currentWeekNumber: 5,
@@ -62,7 +63,7 @@ const LEAGUE_SUMMARIES = MULTI_LEAGUES.map((league) => ({
   __typename: 'UserLeagueSummary',
   leagueId: league.id,
   leagueName: league.name,
-  sport: league.playerPool,
+  sport: league.sport,
   leaguePhase: league.leaguePhase,
   seasonNumber: 1,
   draftStatus: league.draftStatus,

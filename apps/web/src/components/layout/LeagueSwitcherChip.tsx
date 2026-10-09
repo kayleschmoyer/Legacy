@@ -122,13 +122,17 @@ function getInitials(name: string | null | undefined): string {
   return (words[0][0] + words[1][0]).toUpperCase();
 }
 
-function getSportLabel(
-  playerPool: string | null | undefined,
-): 'baseball' | 'football' {
-  if (!playerPool) return 'baseball';
-  const p = playerPool.toLowerCase();
-  if (p.includes('football') || p === 'nfl') return 'football';
-  return 'baseball';
+type SportKey = 'baseball' | 'football';
+
+/** A league's real sport discriminator (LS-10511); legacy rows default to baseball. */
+function getLeagueSport(league: { sport?: string | null }): SportKey {
+  return league.sport === 'football' ? 'football' : 'baseball';
+}
+
+/** The sport segment of the current URL (`/football/...`), if any. */
+function getUrlSport(pathname: string): SportKey | null {
+  const match = pathname.match(/^\/(baseball|football)(?:\/|$)/);
+  return match ? (match[1] as SportKey) : null;
 }
 
 function getLeagueContext(
@@ -167,7 +171,9 @@ export const LeagueSwitcherChip: React.FC<Props> = ({
   const location = useLocation();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
-  const [sport, setSport] = useState<'baseball' | 'football'>('baseball');
+  const [sport, setSport] = useState<SportKey>(
+    () => getUrlSport(location.pathname) ?? 'baseball',
+  );
   const ref = useRef<HTMLDivElement>(null);
   const [panelLayout, setPanelLayout] = useState<PanelLayout | null>(null);
   const chipPalette =
@@ -180,8 +186,11 @@ export const LeagueSwitcherChip: React.FC<Props> = ({
   const leagues = data?.userLeagues ?? [];
 
   // Detect current league from URL
-  const leagueIdMatch = location.pathname.match(/\/baseball\/league\/(\d+)/);
+  const leagueIdMatch = location.pathname.match(
+    /\/(?:baseball|football)\/league\/(\d+)/,
+  );
   const currentLeagueId = leagueIdMatch ? parseInt(leagueIdMatch[1], 10) : null;
+  const urlLeague = leagues.find((l) => l.id === currentLeagueId) ?? null;
   // Off a league route (dashboard, /games, …) fall back to the league the user
   // last opened — persisted in localStorage, so it follows them across tabs and
   // reloads — before defaulting to the first league (LS-10458).
@@ -190,17 +199,21 @@ export const LeagueSwitcherChip: React.FC<Props> = ({
       ? (getLastVisitedLeagueForUser(auth?.user?.id)?.leagueId ?? null)
       : null;
   const currentLeague =
-    leagues.find((l) => l.id === currentLeagueId) ??
+    urlLeague ??
     leagues.find((l) => l.id === lastVisitedLeagueId) ??
     leagues[0] ??
     null;
 
-  // Sync sport filter to current league
+  // Sync sport filter to the URL's league, else the URL's sport, else the
+  // fallback league's sport (LS-10511).
+  const urlSport = getUrlSport(location.pathname);
+  const syncSport =
+    (urlLeague && getLeagueSport(urlLeague)) ||
+    urlSport ||
+    (currentLeague && getLeagueSport(currentLeague));
   useEffect(() => {
-    if (currentLeague?.playerPool) {
-      setSport(getSportLabel(currentLeague.playerPool));
-    }
-  }, [currentLeague?.playerPool]);
+    if (syncSport) setSport(syncSport);
+  }, [syncSport]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -237,9 +250,7 @@ export const LeagueSwitcherChip: React.FC<Props> = ({
 
   const initials = getInitials(currentLeague?.name);
   const leagueName = currentLeague?.name ?? 'My Leagues';
-  const filteredLeagues = leagues.filter(
-    (l) => getSportLabel(l.playerPool) === sport,
-  );
+  const filteredLeagues = leagues.filter((l) => getLeagueSport(l) === sport);
 
   const chipStyle: React.CSSProperties = {
     ...CHIP_STYLES,
@@ -410,16 +421,14 @@ export const LeagueSwitcherChip: React.FC<Props> = ({
                 {
                   id: 'baseball' as const,
                   label: 'Baseball',
-                  count: leagues.filter(
-                    (l) => getSportLabel(l.playerPool) === 'baseball',
-                  ).length,
+                  count: leagues.filter((l) => getLeagueSport(l) === 'baseball')
+                    .length,
                 },
                 {
                   id: 'football' as const,
                   label: 'Football',
-                  count: leagues.filter(
-                    (l) => getSportLabel(l.playerPool) === 'football',
-                  ).length,
+                  count: leagues.filter((l) => getLeagueSport(l) === 'football')
+                    .length,
                 },
               ] as const
             ).map((s) => (
@@ -511,7 +520,9 @@ export const LeagueSwitcherChip: React.FC<Props> = ({
                 aria-selected={isCurrent}
                 onClick={() => {
                   if (league.id) {
-                    navigate(`/${sport}/league/${league.id}`);
+                    navigate(
+                      `/${league.sport ?? 'baseball'}/league/${league.id}`,
+                    );
                     setIsOpen(false);
                   }
                 }}

@@ -30,25 +30,10 @@ const MenuIconBox = styled(YStack, {
   flexShrink: 0,
 });
 
-/**
- * Returns "Baseball", "Football", or null based on playerPool value.
- * Baseball playerPool values are "all", "al", "nl" (MLB pool filters).
- */
-function getSportLabel(playerPool: string | null | undefined): string | null {
-  if (!playerPool) return null;
-  const pool = playerPool.toLowerCase();
-  // Baseball pools: "all" (all of MLB), "al" (American League), "nl" (National League)
-  if (
-    pool === 'all' ||
-    pool === 'al' ||
-    pool === 'nl' ||
-    pool.includes('baseball') ||
-    pool === 'mlb'
-  )
-    return 'Baseball';
-  if (pool.includes('football') || pool === 'nfl') return 'Football';
-  return null;
-}
+const SPORT_LABELS: Record<string, string> = {
+  baseball: 'Baseball',
+  football: 'Football',
+};
 
 /** Returns a secondary context string like "Week 3", "Active", or "Pre-Draft". */
 function getLeagueContext(
@@ -64,16 +49,10 @@ function getLeagueContext(
   return leaguePhase;
 }
 
-interface SportIconInBoxProps {
-  playerPool: string | null | undefined;
-}
-
-function SportIconInBox({ playerPool }: SportIconInBoxProps) {
-  const pool = (playerPool ?? '').toLowerCase();
-  if (pool.includes('football') || pool === 'nfl') {
+function SportIconInBox({ sport }: { sport: string | null | undefined }) {
+  if (sport === 'football') {
     return <FootballIcon size={18} color="currentColor" />;
   }
-  // Default to baseball (primary sport)
   return <BaseballIcon size={18} color="currentColor" />;
 }
 
@@ -92,7 +71,7 @@ export const MyLeaguesDropdown: React.FC = () => {
   });
 
   const leagues = data?.userLeagues ?? [];
-  const isActive = location.pathname.startsWith('/baseball/league/');
+  const isActive = /^\/(baseball|football)\/league\//.test(location.pathname);
   const isHighlighted = isActive || isOpen;
 
   useEffect(() => {
@@ -259,9 +238,10 @@ export const MyLeaguesDropdown: React.FC = () => {
           {!loading &&
             leagues.map((league) => {
               if (!league.id) return null;
-              const href = `/baseball/league/${league.id}`;
+              const leagueSport = league.sport ?? 'baseball';
+              const href = `/${leagueSport}/league/${league.id}`;
               const isLeagueActive = location.pathname.startsWith(href);
-              const sportLabel = getSportLabel(league.playerPool);
+              const sportLabel = SPORT_LABELS[leagueSport];
               const phaseContext = getLeagueContext(
                 league.leaguePhase,
                 league.currentWeekNumber,
@@ -290,7 +270,7 @@ export const MyLeaguesDropdown: React.FC = () => {
                       overflow="hidden"
                     >
                       <MenuIconBox>
-                        <SportIconInBox playerPool={league.playerPool} />
+                        <SportIconInBox sport={leagueSport} />
                       </MenuIconBox>
                       <YStack flex={1} gap="$1" overflow="hidden">
                         <XStack alignItems="center" gap="$2">

@@ -34,7 +34,12 @@ const LEAGUES = [
   ...BASEBALL_LEAGUE_NAMES.map((name, i) =>
     mockLeague({ id: i + 1, name, playerPool: 'baseball' }),
   ),
-  mockLeague({ id: 7, name: 'Gridiron Generals', playerPool: 'football' }),
+  mockLeague({
+    id: 7,
+    name: 'Gridiron Generals',
+    sport: 'football',
+    playerPool: 'football',
+  }),
 ];
 
 async function mockUserLeagues(page: Page) {
