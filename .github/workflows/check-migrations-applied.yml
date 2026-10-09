@@ -304,7 +304,14 @@ jobs:
             // The required status check (LS-9776, mirrors LS-9604). Posted as
             // a commit status scoped to the resolved head SHA, not this job's
             // own check-run — see the job-name comment above for why.
-            await github.rest.repos.createCommitStatus({
+            // LS-10296: retry + explicit "rerun" failure on an installation
+            // rate-limit 403 instead of an unhandled exception.
+            // This step runs under `if: always()`, so a failed checkout must
+            // not stop the failure status from posting: degrade to a plain
+            // post when the helper is unavailable.
+            let rl;
+            try { rl = require('./.github/scripts/rate-limit-retry.js'); } catch { rl = null; }
+            const params = {
               owner,
               repo,
               sha: '${{ steps.pr-info.outputs.head_sha }}',
@@ -314,7 +321,12 @@ jobs:
                 ? 'All migrations applied'
                 : 'Migration check failed — see workflow run',
               target_url: `https://github.com/${owner}/${repo}/actions/runs/${process.env.GITHUB_RUN_ID}`,
-            });
+            };
+            if (rl) {
+              await rl.postCommitStatusResilient({ github, core, params });
+            } else {
+              await github.rest.repos.createCommitStatus(params);
+            }
 
       - name: "Label PR on Migration Failure"
         if: always() && steps.pr-info.outputs.pr_number
@@ -329,27 +341,18 @@ jobs:
             const checkResult = '${{ steps.migration-check.outcome }}';
             const label = 'CI: Migration';
 
-            const { data: pr } = await github.rest.pulls.get({
+            // LS-10296: shared helper also retries the primary "API rate limit
+            // exceeded for installation" 403 (the old inline retry did not).
+            let rl;
+            try { rl = require('./.github/scripts/rate-limit-retry.js'); } catch { rl = null; }
+            const withRetry = (fn) => (rl ? rl.withRateLimitRetry(fn, { core, label: 'migration label' }) : fn());
+
+            const { data: pr } = await withRetry(() => github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: prNumber,
-            });
+            }));
             const existingLabels = pr.labels.map(l => l.name);
-
-            async function withRetry(fn, retries = 3) {
-              for (let i = 0; i < retries; i++) {
-                try { return await fn(); }
-                catch (e) {
-                  const isPrimaryRateLimit = e.status === 429;
-                  const isSecondaryRateLimit = e.status === 403 && /secondary rate limit/i.test(typeof e.message === 'string' ? e.message : '');
-                  if ((isPrimaryRateLimit || isSecondaryRateLimit) && i < retries - 1) {
-                    const delay = Math.pow(2, i) * 1000;
-                    core.warning(`Rate limited (${e.status}), retrying in ${delay}ms…`);
-                    await new Promise(r => setTimeout(r, delay));
-                  } else throw e;
-                }
-              }
-            }
 
             const shouldHaveLabel = checkResult === 'failure';
             const hasLabel = existingLabels.includes(label);

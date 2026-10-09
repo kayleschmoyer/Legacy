@@ -296,12 +296,18 @@ jobs:
           script: |
             const { owner, repo } = context.repo;
             const mergeable = process.env.MERGEABLE === 'true';
+            // LS-10296: retry + explicit "rerun" failure on an installation
+            // rate-limit 403 instead of an unhandled exception. The helper
+            // lives in the base checkout; if the base predates it, degrade
+            // to a plain post rather than crash.
+            let rl;
+            try { rl = require('./.github/scripts/rate-limit-retry.js'); } catch { rl = null; }
             // The required status check (LS-9604). Posted as a commit status,
             // not this job's own check-run — see the job-name comment above
             // for why. Latest-status-per-context-wins makes this immune to
             // the duplicate-required-name ambiguity a check-run has under
             // concurrency cancellation.
-            await github.rest.repos.createCommitStatus({
+            const params = {
               owner,
               repo,
               sha: '${{ steps.pr-info.outputs.head_sha }}',
@@ -311,7 +317,12 @@ jobs:
                 ? 'No merge conflicts detected'
                 : 'Merge conflicts with the base branch',
               target_url: `https://github.com/${owner}/${repo}/actions/runs/${process.env.GITHUB_RUN_ID}`,
-            });
+            };
+            if (rl) {
+              await rl.postCommitStatusResilient({ github, core, params });
+            } else {
+              await github.rest.repos.createCommitStatus(params);
+            }
 
       - name: Sync conflict label and comment
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
@@ -332,30 +343,22 @@ jobs:
             // absent->present edge is unreliable as a "comment once" signal and
             // caused both duplicate comments and silently-dropped ones (LS-8229).
             const MARKER = '<!-- conflict-notice -->';
-            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
-            const hasLabel = pr.labels.some(l => l.name === label);
+            // LS-10296: shared helper also retries the primary "API rate limit
+            // exceeded for installation" 403 (the old inline retry only matched
+            // 429 / secondary limits). Falls back to a pass-through if the
+            // base checkout predates the helper.
+            let rl;
+            try { rl = require('./.github/scripts/rate-limit-retry.js'); } catch { rl = null; }
+            const withRetry = (fn) => (rl ? rl.withRateLimitRetry(fn, { core, label: 'conflict sync' }) : fn());
 
-            async function withRetry(fn, retries = 3) {
-              for (let i = 0; i < retries; i++) {
-                try { return await fn(); }
-                catch (e) {
-                  const rateLimited =
-                    e.status === 429 ||
-                    (e.status === 403 && /secondary rate limit/i.test(e.message ?? ''));
-                  if (rateLimited && i < retries - 1) {
-                    const delay = Math.pow(2, i) * 1000;
-                    core.warning(`Rate limited (${e.status}), retrying in ${delay} ms…`);
-                    await new Promise(r => setTimeout(r, delay));
-                  } else throw e;
-                }
-              }
-            }
+            const { data: pr } = await withRetry(() => github.rest.pulls.get({ owner, repo, pull_number: prNumber }));
+            const hasLabel = pr.labels.some(l => l.name === label);
 
             // Locate the existing sticky conflict comment (if any) by marker.
             async function findConflictComment() {
-              const comments = await github.paginate(github.rest.issues.listComments, {
+              const comments = await withRetry(() => github.paginate(github.rest.issues.listComments, {
                 owner, repo, issue_number: prNumber, per_page: 100,
-              });
+              }));
               return comments.find(c => (c.body ?? '').includes(MARKER)) ?? null;
             }
 
