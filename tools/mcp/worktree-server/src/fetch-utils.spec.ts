@@ -528,4 +528,84 @@ describe('executeWorktreeFetch', () => {
     );
     expect(res.content[0].text).toContain('spawn git ENOENT');
   });
+
+  describe('runFetch (exit-code based success, LS-10279)', () => {
+    const divergenceGit = (args: string[]): string => {
+      if (args.join(' ') === 'rev-parse --is-shallow-repository')
+        return 'false';
+      if (args.join(' ') === 'rev-list --count HEAD') return '50';
+      return '';
+    };
+
+    it('returns success when git exits 0 with non-empty stderr (ref updates + auto packing)', () => {
+      const stderr =
+        'From github.com:org/repo\n   a4efd414..f4208578  feature -> origin/feature\nAuto packing the repository for optimum performance.\nSee "git help gc" for manual housekeeping.';
+      const runGit = jest
+        .fn<FetchDeps['runGit']>()
+        .mockImplementation(divergenceGit);
+      const runFetch = jest
+        .fn<NonNullable<FetchDeps['runFetch']>>()
+        .mockReturnValue({ status: 0, stdout: '', stderr });
+
+      const res = executeWorktreeFetch(
+        {},
+        { resolveTargetDir: okResolver, runGit, runFetch },
+      );
+
+      expect(res.isError).toBeUndefined();
+      const parsed = JSON.parse(res.content[0].text) as {
+        success: boolean;
+        output: string;
+      };
+      expect(parsed.success).toBe(true);
+      expect(parsed.output).toContain('Auto packing the repository');
+      expect(parsed.output).toContain('feature -> origin/feature');
+    });
+
+    it('returns an error with the real exit code when git exits non-zero', () => {
+      const runGit = jest.fn<FetchDeps['runGit']>();
+      const runFetch = jest
+        .fn<NonNullable<FetchDeps['runFetch']>>()
+        .mockReturnValue({
+          status: 128,
+          stdout: '',
+          stderr: "fatal: 'bogus' does not appear to be a git repository",
+        });
+
+      const res = executeWorktreeFetch(
+        { remote: 'bogus' },
+        { resolveTargetDir: okResolver, runGit, runFetch },
+      );
+
+      expect(res.isError).toBe(true);
+      expect(res.content[0].text).toContain('git fetch failed (exit code 128)');
+      expect(res.content[0].text).toContain(
+        'does not appear to be a git repository',
+      );
+    });
+
+    it('reports exit code unknown with the spawn error when git never exits (timeout/spawn failure)', () => {
+      const runFetch = jest
+        .fn<NonNullable<FetchDeps['runFetch']>>()
+        .mockReturnValue({
+          status: null,
+          stdout: '',
+          stderr: '',
+          error: 'spawnSync git ETIMEDOUT',
+        });
+
+      const res = executeWorktreeFetch(
+        {},
+        {
+          resolveTargetDir: okResolver,
+          runGit: jest.fn<FetchDeps['runGit']>(),
+          runFetch,
+        },
+      );
+
+      expect(res.isError).toBe(true);
+      expect(res.content[0].text).toContain('exit code unknown');
+      expect(res.content[0].text).toContain('ETIMEDOUT');
+    });
+  });
 });

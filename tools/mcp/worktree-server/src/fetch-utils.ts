@@ -68,6 +68,23 @@ export interface FetchDeps {
     worktreeKey?: string,
   ) => { path: string } | { error: string };
   runGit: (args: string[], cwd: string) => string;
+  /**
+   * Runs `git fetch` and reports the real exit status plus both streams
+   * (LS-10279). git writes ref-update lines and `gc --auto` housekeeping
+   * notices to stderr even on success, so success must be judged by `status`
+   * alone. When omitted, the fetch falls back to `runGit` (throws on failure).
+   */
+  runFetch?: (args: string[], cwd: string) => FetchProcessResult;
+}
+
+/** Outcome of a `git fetch` process: exit status plus both captured streams. */
+export interface FetchProcessResult {
+  /** Exit code, or `null` when the process was killed / failed to spawn. */
+  status: number | null;
+  stdout: string;
+  stderr: string;
+  /** Spawn/timeout error message when `status` is `null`. */
+  error?: string;
 }
 
 /**
@@ -282,10 +299,19 @@ export function executeWorktreeFetch(
   }
 
   try {
-    const output = deps.runGit(
-      buildFetchArgs(remote, branch, deepen, unshallow),
-      target.path,
-    );
+    const fetchArgs = buildFetchArgs(remote, branch, deepen, unshallow);
+    let output: string;
+    if (deps.runFetch) {
+      const proc = deps.runFetch(fetchArgs, target.path);
+      if (proc.status !== 0) {
+        return fetchFailure(proc.status, proc);
+      }
+      // Exit 0 is success regardless of stderr; surface git's ref-update and
+      // housekeeping lines as output (LS-10279).
+      output = [proc.stdout, proc.stderr].filter(Boolean).join('\n');
+    } else {
+      output = deps.runGit(fetchArgs, target.path);
+    }
     const divergence = computeRemoteDivergence(
       deps.runGit,
       target.path,
@@ -329,18 +355,27 @@ export function executeWorktreeFetch(
       status?: number;
       message?: string;
     };
-    const output =
-      [e.stdout, e.stderr].filter(Boolean).join('\n') ||
-      e.message ||
-      String(err);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `git fetch failed (exit code ${e.status ?? 'unknown'}):\n${output}`,
-        },
-      ],
-      isError: true,
-    };
+    return fetchFailure(e.status ?? null, e, e.message ?? String(err));
   }
+}
+
+function fetchFailure(
+  status: number | null,
+  streams: { stdout?: string; stderr?: string; error?: string },
+  fallback?: string,
+): ToolResponse {
+  const output =
+    [streams.stdout, streams.stderr].filter(Boolean).join('\n') ||
+    streams.error ||
+    fallback ||
+    '';
+  return {
+    content: [
+      {
+        type: 'text',
+        text: `git fetch failed (exit code ${status ?? 'unknown'}):\n${output}`,
+      },
+    ],
+    isError: true,
+  };
 }

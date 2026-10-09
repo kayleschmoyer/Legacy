@@ -10,7 +10,12 @@ import {
   pickFields,
 } from '@legacy-sports/mcp-format';
 import { validateOutputPath } from '@legacy-sports/mcp-path-safety';
-import { execFile, execFileSync, execSync } from 'node:child_process';
+import {
+  execFile,
+  execFileSync,
+  execSync,
+  spawnSync,
+} from 'node:child_process';
 import {
   appendFileSync,
   existsSync,
@@ -12742,6 +12747,27 @@ const handleCallTool = async (
       return executeWorktreeFetch(args as FetchArgs, {
         resolveTargetDir,
         runGit,
+        runFetch: (fetchArgs, cwd) => {
+          // gc.autoDetach=false keeps `gc --auto` in the foreground so a
+          // detached gc cannot hold the stderr pipe open past git's exit.
+          const r = spawnSync(
+            'git',
+            ['-c', 'gc.autoDetach=false', ...fetchArgs],
+            {
+              cwd,
+              encoding: 'utf-8',
+              timeout: 120_000,
+              maxBuffer: 10 * 1024 * 1024,
+              windowsHide: true,
+            },
+          );
+          return {
+            status: r.status,
+            stdout: r.stdout ?? '',
+            stderr: r.stderr ?? '',
+            error: r.error?.message,
+          };
+        },
       });
     }
 
