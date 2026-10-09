@@ -817,6 +817,28 @@ describe('ProfileSettingsScreen', () => {
     });
   });
 
+  describe('premium profile card (LS-7234)', () => {
+    it('shows the gold Premium chip for premium users', () => {
+      mockSubscriptionState = {
+        isPremium: true,
+        tier: 'monthly',
+        subscription: null,
+      };
+      render(<ProfileSettingsScreen />);
+      expect(screen.getByTestId('premium-chip')).toBeTruthy();
+    });
+
+    it('does not show the Premium chip for free users', () => {
+      mockSubscriptionState = {
+        isPremium: false,
+        tier: null,
+        subscription: null,
+      };
+      render(<ProfileSettingsScreen />);
+      expect(screen.queryByTestId('premium-chip')).toBeNull();
+    });
+  });
+
   describe('subscription grace state (LS-7228)', () => {
     const premium = {
       isPremium: true,

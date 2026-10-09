@@ -529,7 +529,20 @@ const ProfileSettingsPage: React.FC = () => {
           </PageHeader>
 
           {/* ── Profile Card ── */}
-          <SectionCard style={sectionCardGradientStyle}>
+          <SectionCard
+            data-testid="profile-card"
+            data-premium={isPremium ? 'true' : undefined}
+            style={
+              isPremium
+                ? {
+                    ...sectionCardGradientStyle,
+                    border: '2px solid var(--brandGoldLight)',
+                    boxShadow:
+                      '0 0 0 1px color-mix(in srgb, var(--brandGold) 35%, transparent)',
+                  }
+                : sectionCardGradientStyle
+            }
+          >
             <SectionHeader>
               <SectionIconBox>
                 <Paragraph fontSize={16} lineHeight={18}>
@@ -612,6 +625,34 @@ const ProfileSettingsPage: React.FC = () => {
                       {getAccessLevelLabel(accessLevel)}
                     </Paragraph>
                   </AccessLevelBadge>
+                  {isPremium ? (
+                    <XStack
+                      data-testid="premium-chip"
+                      alignSelf="flex-start"
+                      alignItems="center"
+                      gap="$1.5"
+                      paddingHorizontal="$3"
+                      paddingVertical="$1"
+                      borderRadius="$10"
+                      borderWidth={1}
+                      style={{
+                        borderColor: 'var(--brandGoldLight)',
+                        background:
+                          'color-mix(in srgb, var(--brandGold) 18%, transparent)',
+                      }}
+                    >
+                      <span role="img" aria-label="star">
+                        ⭐
+                      </span>
+                      <Paragraph
+                        size="$2"
+                        fontWeight="600"
+                        style={{ color: 'var(--brandGoldLight)' }}
+                      >
+                        Premium member
+                      </Paragraph>
+                    </XStack>
+                  ) : null}
                 </YStack>
               </XStack>
 

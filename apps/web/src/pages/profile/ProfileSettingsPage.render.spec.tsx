@@ -211,6 +211,25 @@ describe('ProfileSettingsPage avatar (LS-7232)', () => {
   });
 });
 
+describe('ProfileSettingsPage premium differentiation (LS-7234)', () => {
+  afterEach(() => {
+    mockPremiumStatus = { isPremium: false, isLoading: false };
+  });
+
+  it('shows the gold Premium chip for premium users', () => {
+    mockPremiumStatus = { isPremium: true, isLoading: false };
+    renderPage(null);
+
+    expect(screen.getByText('Premium member')).toBeInTheDocument();
+  });
+
+  it('does not show the Premium chip for free users', () => {
+    renderPage(null);
+
+    expect(screen.queryByText('Premium member')).not.toBeInTheDocument();
+  });
+});
+
 describe('ProfileSettingsPage username save in flight (LS-7237)', () => {
   afterEach(() => {
     mockUsernameLoading = false;

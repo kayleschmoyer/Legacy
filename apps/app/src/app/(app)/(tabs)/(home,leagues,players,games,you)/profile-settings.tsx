@@ -267,9 +267,10 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
           {/* Profile Card */}
           <YStack
             borderRadius="$6"
-            borderWidth={1}
-            borderColor="$borderColor"
+            borderWidth={isPremium ? 2 : 1}
+            borderColor={isPremium ? brand.goldLight : '$borderColor'}
             overflow="hidden"
+            testID="profile-card"
           >
             <XStack
               paddingHorizontal="$5"
@@ -365,6 +366,29 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
                       {getAccessLevelLabel(isAdmin ? 'admin' : 'none')}
                     </Paragraph>
                   </XStack>
+                  {isPremium ? (
+                    <XStack
+                      alignItems="center"
+                      gap="$1.5"
+                      paddingHorizontal="$3"
+                      paddingVertical="$1"
+                      borderRadius="$10"
+                      borderWidth={1}
+                      alignSelf="flex-start"
+                      borderColor={brand.goldLight}
+                      backgroundColor={`${brand.goldLight}33`}
+                      testID="premium-chip"
+                    >
+                      <Text fontSize={12}>{'⭐'}</Text>
+                      <Paragraph
+                        size="$2"
+                        fontWeight="600"
+                        color={brand.goldLight}
+                      >
+                        Premium member
+                      </Paragraph>
+                    </XStack>
+                  ) : null}
                 </YStack>
               </XStack>
 
