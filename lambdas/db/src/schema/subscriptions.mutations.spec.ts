@@ -402,6 +402,10 @@ describe('Google Play mutation validation (LS-5121)', () => {
         ],
       });
       mockIsActiveGoogleSubscription.mockReturnValue(true);
+      // Cross-provider guard (LS-7382) is the first DB call: no active rows.
+      jest
+        .requireMock('@legacy-sports/db-client')
+        .runWithInternalClient.mockResolvedValueOnce([]);
       const mockNotifySubscriptionUpdated = jest
         .fn()
         .mockResolvedValue(undefined);
@@ -441,6 +445,10 @@ describe('Google Play mutation validation (LS-5121)', () => {
         ],
       });
       mockIsActiveGoogleSubscription.mockReturnValue(true);
+      // Cross-provider guard (LS-7382) is the first DB call: no active rows.
+      jest
+        .requireMock('@legacy-sports/db-client')
+        .runWithInternalClient.mockResolvedValueOnce([]);
 
       const resolve = getResolver('verifyGooglePurchase');
       // mockContext has no notificationService — resolver must not throw.
@@ -909,6 +917,112 @@ describe('Google Play mutation validation (LS-5121)', () => {
 
   // LS-5191: the active path must record currentPeriodEnd from the Google Play
   // lineItems[0].expiryTime so Android subscribers have a renewal date.
+  describe('cross-provider guard (LS-7382)', () => {
+    const productId = 'com.legacysports.app.premium.monthly';
+
+    function installActiveRows(rows: unknown[]) {
+      const insert = jest.fn();
+      const db = {
+        select: () => ({
+          from: () => ({
+            where: () => ({
+              orderBy: async () => rows,
+              limit: async () => [],
+            }),
+          }),
+        }),
+        insert,
+        update: () => ({ set: () => ({ where: async () => undefined }) }),
+      };
+      const dbClient = jest.requireMock('@legacy-sports/db-client');
+      dbClient.runWithInternalClient.mockImplementation(
+        async (_opts: unknown, cb: (db: unknown) => unknown) => cb(db),
+      );
+      return insert;
+    }
+
+    it('verifyGooglePurchase is blocked when an active Apple row exists', async () => {
+      mockFetchGoogleSubscription.mockResolvedValue({
+        subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
+        lineItems: [{ productId }],
+      });
+      mockIsActiveGoogleSubscription.mockReturnValue(true);
+      const insert = installActiveRows([
+        {
+          status: 'active',
+          stripeCustomerId: null,
+          appleOriginalTransactionId: 'apple-1',
+          googlePurchaseToken: null,
+        },
+      ]);
+
+      const resolve = getResolver('verifyGooglePurchase');
+      await expect(
+        resolve(
+          {},
+          { purchaseToken: 't', productId },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+      expect(insert).not.toHaveBeenCalled();
+    });
+
+    it('verifyGooglePurchase renewal succeeds when the active row is the same Google token', async () => {
+      mockFetchGoogleSubscription.mockResolvedValue({
+        subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
+        lineItems: [{ productId }],
+      });
+      mockIsActiveGoogleSubscription.mockReturnValue(true);
+      const insert = installActiveRows([
+        {
+          status: 'active',
+          stripeCustomerId: null,
+          appleOriginalTransactionId: null,
+          googlePurchaseToken: 't',
+        },
+      ]);
+      insert.mockReturnValue({
+        values: () => ({ onConflictDoUpdate: () => Promise.resolve() }),
+      });
+
+      const resolve = getResolver('verifyGooglePurchase');
+      await expect(
+        resolve(
+          {},
+          { purchaseToken: 't', productId },
+          mockContext,
+          undefined as never,
+        ),
+      ).resolves.toMatchObject({ success: true });
+    });
+
+    it('verifyApplePurchase is blocked when an active Stripe row exists', async () => {
+      const { decodeAndVerifyJwsTransaction } =
+        jest.requireMock('../apple-jws');
+      decodeAndVerifyJwsTransaction.mockResolvedValue({
+        originalTransactionId: 'apple-1',
+        productId: 'com.legacysports.app.premium.monthly',
+        expiresDate: Date.now() + 86_400_000,
+        bundleId: 'com.legacysports.app',
+      });
+      const insert = installActiveRows([
+        {
+          status: 'active',
+          stripeCustomerId: 'cus_1',
+          appleOriginalTransactionId: null,
+          googlePurchaseToken: null,
+        },
+      ]);
+
+      const resolve = getResolver('verifyApplePurchase');
+      await expect(
+        resolve({}, { jwsTransaction: 'jws' }, mockContext, undefined as never),
+      ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+      expect(insert).not.toHaveBeenCalled();
+    });
+  });
+
   describe('currentPeriodEnd recording (LS-5191)', () => {
     /**
      * Build a mock db whose insert chain captures the values passed to
@@ -926,7 +1040,11 @@ describe('Google Play mutation validation (LS-5121)', () => {
       const mockDb = {
         select: () => ({
           from: () => ({
-            where: () => ({ limit: async () => [] }),
+            where: () => ({
+              limit: async () => [],
+              // getActiveSubscriptionsForUser (LS-7382) awaits orderBy directly.
+              orderBy: async () => [],
+            }),
           }),
         }),
         insert: () => ({
@@ -1116,7 +1234,13 @@ describe('Google Play mutation validation (LS-5121)', () => {
       let capturedValues: unknown;
       const mockDb = {
         select: () => ({
-          from: () => ({ where: () => ({ limit: async () => [] }) }),
+          from: () => ({
+            where: () => ({
+              limit: async () => [],
+              // getActiveSubscriptionsForUser (LS-7382) awaits orderBy directly.
+              orderBy: async () => [],
+            }),
+          }),
         }),
         insert: () => ({
           values: (v: unknown) => {
@@ -1535,16 +1659,21 @@ describe('Google Play mutation validation (LS-5121)', () => {
         select: () => ({
           from: () => ({
             where: () => ({
-              orderBy: () => ({
-                limit: async () => [
+              orderBy: () => {
+                const rows = [
                   {
                     id: 1,
                     status: 'active',
                     tier: 'premium',
                     stripeCustomerId: 'cus_123',
                   },
-                ],
-              }),
+                ];
+                // Awaited directly by getActiveSubscriptionsForUser (LS-7382);
+                // chained to limit(1) by getSubscriptionForUser.
+                return Object.assign(Promise.resolve(rows), {
+                  limit: async () => rows,
+                });
+              },
             }),
           }),
         }),

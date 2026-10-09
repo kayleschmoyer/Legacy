@@ -5,7 +5,7 @@ import {
   reapplyLeagueRestrictions,
   runWithInternalClient,
 } from '@legacy-sports/db-client';
-import { and, desc, eq, gte, isNotNull, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNotNull, lt, sql } from 'drizzle-orm';
 import Stripe from 'stripe';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
@@ -952,6 +952,10 @@ builder.mutationField('createCheckoutSession', (t) =>
       // send them to the Billing Portal to manage it rather than creating a new
       // checkout (which would duplicate the subscription for a trialing user).
       const existing = await getSubscriptionForUser(userId);
+      // Refuse a second, Stripe-billed subscription when Apple/Google is
+      // already active (LS-7382). Stripe-active users fall through to the
+      // billing-portal redirect below.
+      await assertNoConflictingProviderSubscription(userId, 'stripe');
       if (shouldRedirectToBillingPortal(existing)) {
         LOGGER.info('User already subscribed; redirecting to billing portal', {
           userId,
@@ -1543,6 +1547,100 @@ export async function getSubscriptionForUser(userId: number) {
   });
 }
 
+export type SubscriptionProvider = 'stripe' | 'apple' | 'google';
+
+/**
+ * Returns every active, trialing, or past-due subscription row for a user — one
+ * per provider at most in practice. `getSubscriptionForUser` only returns the
+ * single highest-priority row, which hides a second provider's row (LS-7382).
+ */
+export async function getActiveSubscriptionsForUser(userId: number) {
+  return runWithInternalClient(getDbOptions(), async (db) => {
+    const rows = await db
+      .select({
+        id: InternalSchema.subscriptions.id,
+        status: InternalSchema.subscriptions.status,
+        stripeCustomerId: InternalSchema.subscriptions.stripeCustomerId,
+        stripeSubscriptionId: InternalSchema.subscriptions.stripeSubscriptionId,
+        appleOriginalTransactionId:
+          InternalSchema.subscriptions.appleOriginalTransactionId,
+        googlePurchaseToken: InternalSchema.subscriptions.googlePurchaseToken,
+      })
+      .from(InternalSchema.subscriptions)
+      .where(
+        and(
+          eq(InternalSchema.subscriptions.userId, userId),
+          inArray(InternalSchema.subscriptions.status, [
+            ...BILLING_PORTAL_SUBSCRIPTION_STATUSES,
+          ]),
+        ),
+      )
+      .orderBy(desc(InternalSchema.subscriptions.id));
+    return rows;
+  });
+}
+
+/**
+ * Returns the first active row billed through a provider other than
+ * `incomingProvider`, or null. A row belongs to a provider when it carries that
+ * provider's identifier; rows for the incoming provider (renewals, resubscribes)
+ * never conflict.
+ */
+export function findConflictingProviderSubscription<
+  T extends {
+    status: string;
+    stripeCustomerId: string | null;
+    stripeSubscriptionId?: string | null;
+    appleOriginalTransactionId: string | null;
+    googlePurchaseToken: string | null;
+  },
+>(
+  rows: readonly T[],
+  incomingProvider: SubscriptionProvider,
+): { row: T; provider: SubscriptionProvider } | null {
+  for (const row of rows) {
+    if (!BILLING_PORTAL_SUBSCRIPTION_STATUSES.has(row.status)) continue;
+    const providers: SubscriptionProvider[] = [];
+    if (row.stripeCustomerId || row.stripeSubscriptionId)
+      providers.push('stripe');
+    if (row.appleOriginalTransactionId) providers.push('apple');
+    if (row.googlePurchaseToken) providers.push('google');
+    if (providers.length === 0 || providers.includes(incomingProvider))
+      continue;
+    return { row, provider: providers[0] };
+  }
+  return null;
+}
+
+const PROVIDER_LABELS: Record<SubscriptionProvider, string> = {
+  stripe: 'Stripe (web)',
+  apple: 'Apple',
+  google: 'Google Play',
+};
+
+/**
+ * Throws a user-facing error when the user already has an active subscription
+ * billed through a different provider, preventing duplicate billing (LS-7382).
+ */
+export async function assertNoConflictingProviderSubscription(
+  userId: number,
+  incomingProvider: SubscriptionProvider,
+): Promise<void> {
+  const rows = await getActiveSubscriptionsForUser(userId);
+  const conflict = findConflictingProviderSubscription(rows, incomingProvider);
+  if (conflict) {
+    LOGGER.warn('Blocked cross-provider subscription', {
+      userId,
+      incomingProvider,
+      existingProvider: conflict.provider,
+    });
+    throw UserInputError(
+      `You already have an active subscription via ${PROVIDER_LABELS[conflict.provider]}. ` +
+        'Manage it from that platform before subscribing here.',
+    );
+  }
+}
+
 export async function getOrCreateStripeCustomer(
   stripe: Stripe,
   userId: number,
@@ -1844,6 +1942,8 @@ builder.mutationField('verifyApplePurchase', (t) =>
       const status = 'active';
       const currentPeriodEnd = expiresDate ? new Date(expiresDate) : null;
 
+      await assertNoConflictingProviderSubscription(userId, 'apple');
+
       // Upsert the subscription record
       const previousTier = await getPreviousTierForAppleSubscription(
         originalTransactionId,
@@ -1959,6 +2059,9 @@ builder.mutationField('restoreApplePurchases', (t) =>
         );
       }
 
+      // Intentionally exempt from the cross-provider guard (LS-7382): restore
+      // re-syncs a purchase the user already owns on Apple, which is billing
+      // them regardless; refusing it would not prevent double billing.
       const { originalTransactionId, productId, expiresDate } = transaction;
       const now = new Date();
 
@@ -2247,6 +2350,8 @@ builder.mutationField('verifyGooglePurchase', (t) =>
       const expiryTime = verifiedLineItem.expiryTime;
       const currentPeriodEnd = expiryTime ? new Date(expiryTime) : null;
 
+      await assertNoConflictingProviderSubscription(userId, 'google');
+
       // Determine previous tier to apply side effects on tier change
       const previousTier =
         await getPreviousTierForGooglePurchase(purchaseToken);
@@ -2326,6 +2431,10 @@ builder.mutationField('verifyGooglePurchase', (t) =>
  * user with a stale token (cancelled, refunded, expired) to restore premium
  * indefinitely. Now we validate the token against purchases.subscriptionsv2.get
  * before writing, matching the expiry-aware logic in restoreApplePurchases.
+ *
+ * Intentionally exempt from the cross-provider guard (LS-7382): restore
+ * re-syncs a purchase the user already owns on Google Play, which is billing
+ * them regardless; refusing it would not prevent double billing.
  */
 builder.mutationField('restoreGooglePurchases', (t) =>
   t.field({

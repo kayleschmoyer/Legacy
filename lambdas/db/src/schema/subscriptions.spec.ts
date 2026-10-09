@@ -101,6 +101,8 @@ import {
   deriveSubscriptionManagedBy,
   expireSubscriptionGracePeriods,
   fetchStripePrices,
+  findConflictingProviderSubscription,
+  getActiveSubscriptionsForUser,
   getCachedAdminRevenueStats,
   getOrCreateStripeCustomer,
   getSubscriptionForUser,
@@ -1039,7 +1041,16 @@ describe('createCheckoutSession resolver email guard (LS-7422)', () => {
       const limit = jest.fn(() => Promise.resolve(existing ? [existing] : []));
       const db = {
         select: () => ({
-          from: () => ({ where: () => ({ orderBy: () => ({ limit }) }) }),
+          from: () => ({
+            where: () => ({
+              // orderBy is awaited directly by getActiveSubscriptionsForUser
+              // and chained to limit(1) by getSubscriptionForUser.
+              orderBy: () =>
+                Object.assign(Promise.resolve(existing ? [existing] : []), {
+                  limit,
+                }),
+            }),
+          }),
         }),
       };
       mockRunWithInternalClient.mockImplementation(
@@ -1087,6 +1098,39 @@ describe('createCheckoutSession resolver email guard (LS-7422)', () => {
 
     expect(stripe.customers.create).not.toHaveBeenCalled();
     expect(stripe.customers.retrieve).not.toHaveBeenCalled();
+    expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses a Stripe checkout when an Apple subscription is active (LS-7382)', async () => {
+    const stripe = stubStripe();
+    const resolve = getResolver();
+
+    await expect(
+      resolve('a@b.co', {
+        status: 'active',
+        stripeCustomerId: null,
+        appleOriginalTransactionId: 'apple-1',
+        googlePurchaseToken: null,
+      }),
+    ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+
+    expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
+    expect(stripe.billingPortal.sessions.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses a Stripe checkout when a Google subscription is past_due (LS-7382)', async () => {
+    const stripe = stubStripe();
+    const resolve = getResolver();
+
+    await expect(
+      resolve('a@b.co', {
+        status: 'past_due',
+        stripeCustomerId: null,
+        appleOriginalTransactionId: null,
+        googlePurchaseToken: 'gp-1',
+      }),
+    ).rejects.toThrow(/Google Play/);
+
     expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
   });
 
@@ -1179,6 +1223,78 @@ describe('SubscriptionInfo.billingInterval resolver', () => {
     });
 
     await expect(getResolver()('sub_123')).resolves.toBeNull();
+  });
+});
+
+describe('cross-provider subscription guard (LS-7382)', () => {
+  const row = (over: Record<string, unknown>) => ({
+    status: 'active',
+    stripeCustomerId: null,
+    stripeSubscriptionId: null,
+    appleOriginalTransactionId: null,
+    googlePurchaseToken: null,
+    ...over,
+  });
+
+  describe('getActiveSubscriptionsForUser', () => {
+    it('returns every active row for the user, not just one', async () => {
+      const rows = [
+        row({ id: 2, appleOriginalTransactionId: 'a' }),
+        row({ id: 1, stripeCustomerId: 'cus_1' }),
+      ];
+      const orderBy = jest.fn(() => Promise.resolve(rows));
+      const where = jest.fn(() => ({ orderBy }));
+      const db = { select: () => ({ from: () => ({ where }) }) };
+      mockRunWithInternalClient.mockImplementation(
+        async (_opts: unknown, cb: (db: unknown) => Promise<unknown>) => cb(db),
+      );
+
+      expect(await getActiveSubscriptionsForUser(5)).toEqual(rows);
+      expect(where).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('findConflictingProviderSubscription', () => {
+    it('blocks Apple when a Stripe row is active', () => {
+      const stripe = row({ stripeCustomerId: 'cus_1' });
+      expect(findConflictingProviderSubscription([stripe], 'apple')).toEqual({
+        row: stripe,
+        provider: 'stripe',
+      });
+    });
+
+    it('blocks Google when an Apple row is active', () => {
+      const apple = row({ appleOriginalTransactionId: 'a' });
+      expect(findConflictingProviderSubscription([apple], 'google')).toEqual({
+        row: apple,
+        provider: 'apple',
+      });
+    });
+
+    it('blocks Stripe when a Google row is trialing', () => {
+      const google = row({ status: 'trialing', googlePurchaseToken: 't' });
+      expect(findConflictingProviderSubscription([google], 'stripe')).toEqual({
+        row: google,
+        provider: 'google',
+      });
+    });
+
+    it.each([
+      ['stripe', row({ stripeCustomerId: 'cus_1' })],
+      ['apple', row({ appleOriginalTransactionId: 'a' })],
+      ['google', row({ googlePurchaseToken: 't' })],
+    ] as const)('allows same-provider %s renewal', (provider, same) => {
+      expect(findConflictingProviderSubscription([same], provider)).toBeNull();
+    });
+
+    it('ignores inactive rows and rows with no provider identifier', () => {
+      expect(
+        findConflictingProviderSubscription(
+          [row({ status: 'canceled', stripeCustomerId: 'cus_1' }), row({})],
+          'apple',
+        ),
+      ).toBeNull();
+    });
   });
 });
 
