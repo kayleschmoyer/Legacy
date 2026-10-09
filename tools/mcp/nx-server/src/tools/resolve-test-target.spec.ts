@@ -1,4 +1,11 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
 
 jest.mock('../run-command.js', () => ({ runNx: jest.fn() }));
 
@@ -6,6 +13,7 @@ import {
   resolveTestTargetPlan,
   targetShellJoinsArgs,
 } from './resolve-test-target.js';
+import { PREFLIGHT_TIMEOUT_MS } from '../nx-job.js';
 import { runNx } from '../run-command.js';
 
 const mockRunNx = runNx as jest.MockedFunction<typeof runNx>;
@@ -189,6 +197,7 @@ describe('resolveTestTargetPlan', () => {
     expect(mockRunNx).toHaveBeenCalledWith(
       ['show', 'project', '@legacy-sports/video', '--json'],
       '/repo',
+      { timeoutMs: PREFLIGHT_TIMEOUT_MS },
     );
   });
 
@@ -204,6 +213,39 @@ describe('resolveTestTargetPlan', () => {
       shellJoinsArgs: false,
     });
     expect(mockRunNx).not.toHaveBeenCalled();
+  });
+});
+
+describe('pre-flight deadline (LS-10174)', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('falls back to "single" when nx show project outlives the pre-flight cap', async () => {
+    // Never settles: models a cold project graph that hangs past the cap.
+    mockRunNx.mockReturnValue(new Promise<string>(() => undefined));
+
+    const planPromise = resolveTestTargetPlan('db', '/repo');
+    await jest.advanceTimersByTimeAsync(PREFLIGHT_TIMEOUT_MS);
+
+    expect(await planPromise).toEqual({
+      kind: 'single',
+      target: 'test',
+      shellJoinsArgs: false,
+    });
+  });
+
+  it('resolves false from targetShellJoinsArgs when the lookup outlives the cap', async () => {
+    mockRunNx.mockReturnValue(new Promise<string>(() => undefined));
+
+    const resultPromise = targetShellJoinsArgs('db', 'test:web', '/repo');
+    await jest.advanceTimersByTimeAsync(PREFLIGHT_TIMEOUT_MS);
+
+    expect(await resultPromise).toBe(false);
   });
 });
 

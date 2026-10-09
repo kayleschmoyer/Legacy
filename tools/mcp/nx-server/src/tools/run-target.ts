@@ -88,6 +88,12 @@ interface RunTargetParams {
    * targets, where the shape would be meaningless.
    */
   jestReport?: JestReportRequest;
+  /**
+   * Sync wait for the job, defaulting to `SYNC_BUDGET_MS`. Callers that spent
+   * part of the single-call allowance on pre-flight work pass what is left
+   * (LS-10174) so the whole tool call stays under the transport timeout.
+   */
+  syncBudgetMs?: number;
 }
 
 /**
@@ -335,7 +341,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
             }
           : {}),
       },
-      SYNC_BUDGET_MS,
+      params.syncBudgetMs ?? SYNC_BUDGET_MS,
     );
 
     if (snapshot.status === 'running' || snapshot.status === 'orphaned') {

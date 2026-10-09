@@ -1,4 +1,4 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { afterEach, describe, expect, it, jest } from '@jest/globals';
 
 jest.mock('./run-target.js', () => ({ runTarget: jest.fn() }));
 jest.mock('./resolve-test-target.js', () => ({
@@ -13,6 +13,7 @@ import {
   resolveTestTargetPlan,
   targetShellJoinsArgs,
 } from './resolve-test-target.js';
+import { SYNC_BUDGET_MS } from '../nx-job.js';
 import type { ToolResult } from '../types.js';
 
 const mockRunTarget = runTarget as jest.MockedFunction<typeof runTarget>;
@@ -82,6 +83,7 @@ describe('runTest', () => {
       updateSnapshot: true,
       args: ['--testPathPatterns', 'LeagueListRow'],
       worktreePath: '/repo/worktree',
+      syncBudgetMs: SYNC_BUDGET_MS,
     });
   });
 
@@ -306,6 +308,7 @@ describe('runTest node --test target (LS-10159)', () => {
         'lib/__tests__/multi-pass.test.mjs',
       ],
       worktreePath: undefined,
+      syncBudgetMs: SYNC_BUDGET_MS,
     });
   });
 
@@ -753,5 +756,74 @@ describe('runTest multi-word pattern quoting (LS-10153)', () => {
         MULTI_WORD,
       ]);
     }
+  });
+
+  describe('call-wide sync budget (LS-10174)', () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('hands runTarget the full budget when pre-flight is instant', async () => {
+      await runTest({ project: 'db', testPathPatterns: 'x' });
+
+      expect(mockRunTarget).toHaveBeenCalledWith(
+        expect.objectContaining({ syncBudgetMs: SYNC_BUDGET_MS }),
+      );
+    });
+
+    it('deducts pre-flight time from the budget handed to runTarget', async () => {
+      jest.useFakeTimers();
+      mockResolveTestTargetPlan.mockImplementation(() => {
+        jest.setSystemTime(Date.now() + 9_000);
+        return Promise.resolve({
+          kind: 'single',
+          target: 'test',
+          shellJoinsArgs: false,
+        });
+      });
+
+      await runTest({ project: 'db', testPathPatterns: 'x' });
+
+      expect(mockRunTarget).toHaveBeenCalledWith(
+        expect.objectContaining({ syncBudgetMs: SYNC_BUDGET_MS - 9_000 }),
+      );
+    });
+
+    it('gives every fanned-out target the same remaining budget', async () => {
+      jest.useFakeTimers();
+      mockResolveTestTargetPlan.mockImplementation(() => {
+        jest.setSystemTime(Date.now() + 9_000);
+        return Promise.resolve({
+          kind: 'fanout',
+          targets: ['test:web', 'test:mobile'],
+          skipped: [],
+        });
+      });
+
+      await runTest({ project: 'shared-components', testPathPatterns: 'x' });
+
+      expect(mockRunTarget).toHaveBeenCalledTimes(2);
+      for (const [call] of mockRunTarget.mock.calls) {
+        expect(call.syncBudgetMs).toBe(SYNC_BUDGET_MS - 9_000);
+      }
+    });
+
+    it('deducts the executor lookup time on the config path', async () => {
+      jest.useFakeTimers();
+      mockTargetShellJoinsArgs.mockImplementation(() => {
+        jest.setSystemTime(Date.now() + 8_000);
+        return Promise.resolve(false);
+      });
+
+      await runTest({
+        project: 'db',
+        config: 'web',
+        testPathPatterns: 'a b',
+      });
+
+      expect(mockRunTarget).toHaveBeenCalledWith(
+        expect.objectContaining({ syncBudgetMs: SYNC_BUDGET_MS - 8_000 }),
+      );
+    });
   });
 });

@@ -1,3 +1,4 @@
+import { PREFLIGHT_TIMEOUT_MS } from '../nx-job.js';
 import { runNx } from '../run-command.js';
 
 /** Minimal shape of an `nx show project --json` target entry we care about. */
@@ -74,11 +75,26 @@ async function loadProjectTargets(
     // Don't spawn `nx show project` with an unvalidated project name.
     return null;
   }
+  // This runs before the job's sync budget starts, so it must not be able to
+  // consume the transport timeout on its own (LS-10174). `timeoutMs` kills the
+  // child; the race also bounds `runNx`'s retry loop, which `timeoutMs` alone
+  // does not (each retry attempt gets a fresh timeout).
+  let timer: NodeJS.Timeout | undefined;
+  const deadline = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), PREFLIGHT_TIMEOUT_MS);
+    timer.unref();
+  });
   try {
-    const output = await runNx(['show', 'project', project, '--json'], cwd);
-    return (JSON.parse(output) as NxProjectConfig).targets ?? {};
+    const lookup = runNx(['show', 'project', project, '--json'], cwd, {
+      timeoutMs: PREFLIGHT_TIMEOUT_MS,
+    }).then((output) => (JSON.parse(output) as NxProjectConfig).targets ?? {});
+    // A lookup that loses the race may still reject later; swallow it.
+    lookup.catch(() => undefined);
+    return await Promise.race([lookup, deadline]);
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 

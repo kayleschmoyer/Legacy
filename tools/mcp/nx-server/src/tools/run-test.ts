@@ -7,6 +7,7 @@ import {
 } from './resolve-test-target.js';
 import { runTarget } from './run-target.js';
 import { MAX_FAILURES } from '../jest-report.js';
+import { remainingSyncBudgetMs } from '../nx-job.js';
 import { getRepoRoot } from '../run-command.js';
 import { quoteForShellJoin } from '../shell-join-quote.js';
 import type { ToolResult } from '../types.js';
@@ -85,6 +86,7 @@ function runJestTarget(
   params: RunTestParams,
   target: string,
   shellJoinsArgs: boolean,
+  syncBudgetMs: number,
 ): Promise<ToolResult> {
   const quote = (value: string) =>
     shellJoinsArgs ? quoteForShellJoin(value) : value;
@@ -102,6 +104,7 @@ function runJestTarget(
     updateSnapshot: params.updateSnapshot,
     args,
     worktreePath: params.worktreePath,
+    syncBudgetMs,
     // One report file per target: a fanned-out run executes several Jest
     // targets concurrently, and a shared path would have them overwrite each
     // other's report.
@@ -120,6 +123,7 @@ function runJestTarget(
 function runNodeTestTarget(
   params: RunTestParams,
   target: string,
+  syncBudgetMs: number,
 ): Promise<ToolResult> {
   return runTarget({
     project: params.project,
@@ -127,6 +131,7 @@ function runNodeTestTarget(
     noCache: params.noCache,
     args: params.files,
     worktreePath: params.worktreePath,
+    syncBudgetMs,
   });
 }
 
@@ -262,6 +267,9 @@ function mergeFanoutResults(
  * a silent full-suite run when `files` is missing.
  */
 export async function runTest(params: RunTestParams): Promise<ToolResult> {
+  // The ~60s MCP transport timeout covers the whole call, so pre-flight
+  // introspection and the job's sync wait share one allowance (LS-10174).
+  const callStartedAt = Date.now();
   const validationError =
     (params.testPathPatterns != null
       ? validatePattern('testPathPatterns', params.testPathPatterns)
@@ -299,10 +307,16 @@ export async function runTest(params: RunTestParams): Promise<ToolResult> {
     const shellJoinsArgs =
       hasWhitespaceValue(params) &&
       (await targetShellJoinsArgs(params.project, target, cwd));
-    return runJestTarget(params, target, shellJoinsArgs);
+    return runJestTarget(
+      params,
+      target,
+      shellJoinsArgs,
+      remainingSyncBudgetMs(callStartedAt),
+    );
   }
 
   const plan = await resolveTestTargetPlan(params.project, cwd);
+  const syncBudgetMs = remainingSyncBudgetMs(callStartedAt);
 
   if (plan.kind === 'error') {
     return {
@@ -323,7 +337,7 @@ export async function runTest(params: RunTestParams): Promise<ToolResult> {
         isError: true,
       };
     }
-    return runNodeTestTarget(params, plan.target);
+    return runNodeTestTarget(params, plan.target, syncBudgetMs);
   }
 
   if (plan.kind === 'single') {
@@ -338,7 +352,12 @@ export async function runTest(params: RunTestParams): Promise<ToolResult> {
         isError: true,
       };
     }
-    return runJestTarget(params, plan.target, plan.shellJoinsArgs);
+    return runJestTarget(
+      params,
+      plan.target,
+      plan.shellJoinsArgs,
+      syncBudgetMs,
+    );
   }
 
   if (!params.testPathPatterns) {
@@ -358,7 +377,7 @@ export async function runTest(params: RunTestParams): Promise<ToolResult> {
       target,
       // Fan-out targets are jest-executor deps only — argv is forwarded
       // untouched, so no shell-join quoting applies.
-      result: await runJestTarget(params, target, false),
+      result: await runJestTarget(params, target, false, syncBudgetMs),
     })),
   );
 

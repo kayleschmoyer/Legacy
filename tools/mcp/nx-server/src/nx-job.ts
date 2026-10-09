@@ -10,6 +10,31 @@ import { escapeCmdShellArg } from './cmd-escape.js';
  */
 export const SYNC_BUDGET_MS = 45_000;
 
+/**
+ * Hard cap on pre-flight introspection (`nx show project --json`) that runs
+ * before a job-backed tool spawns its job (LS-10174). Past it the lookup is
+ * abandoned and the caller falls back to its pre-introspection behavior.
+ */
+export const PREFLIGHT_TIMEOUT_MS = 10_000;
+
+/** Floor so a job always gets a real chance to finish before handing off. */
+const MIN_SYNC_BUDGET_MS = 5_000;
+
+/**
+ * Sync budget left for the job once pre-flight work has consumed part of the
+ * single-call allowance (LS-10174): `SYNC_BUDGET_MS` bounds the whole tool
+ * call, not just the job wait, so pre-flight time is deducted from it. With
+ * `PREFLIGHT_TIMEOUT_MS` capping pre-flight, the floor is never what keeps
+ * the call under the transport timeout.
+ */
+export function remainingSyncBudgetMs(
+  callStartedAt: number,
+  now: number = Date.now(),
+): number {
+  const remaining = SYNC_BUDGET_MS - (now - callStartedAt);
+  return Math.min(SYNC_BUDGET_MS, Math.max(MIN_SYNC_BUDGET_MS, remaining));
+}
+
 export interface JobSpec {
   command: string;
   args: string[];
