@@ -473,6 +473,28 @@ describe('TwentyQuestionsService — askQuestion stat_threshold (LS-10724)', () 
     expect(params).toEqual(expect.arrayContaining([4342, '^[0-9]+TM$']));
   });
 
+  it.each([
+    ['blank string', ''],
+    ['non-numeric string', 'abc'],
+    ['numeric string', '500'],
+    ['NaN', Number.NaN],
+    ['zero', 0],
+    ['negative', -5],
+    ['fractional', 1.5],
+    ['above the maximum', 1e200],
+    ['missing', undefined],
+  ])(
+    'rejects an invalid threshold (%s) without recording a question (LS-10504)',
+    async (_label, threshold) => {
+      const db = setup([{ total: 36 }]);
+      await expect(
+        ask(db, { stat: 'h', threshold, playerType: 'batter' }),
+      ).rejects.toThrow('Invalid threshold');
+      expect(db.values).not.toHaveBeenCalled();
+      expect(db.set).not.toHaveBeenCalled();
+    },
+  );
+
   it('rejects a stat outside the whitelist', async () => {
     const db = setup([]);
     await expect(

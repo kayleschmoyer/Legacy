@@ -75,6 +75,10 @@ export function readNumberList(
   return typeof single === 'number' && Number.isFinite(single) ? [single] : [];
 }
 
+// Accepted range for a stat_threshold question's threshold (LS-10504).
+const MIN_STAT_THRESHOLD = 1;
+const MAX_STAT_THRESHOLD = 1_000_000;
+
 // Whitelisted stat columns for stat_threshold queries
 const VALID_BATTING_STATS = [
   'hr',
@@ -627,8 +631,22 @@ export class TwentyQuestionsService {
 
       case 'stat_threshold': {
         const statRaw = (parameter['stat'] as string).toLowerCase();
-        const threshold = parameter['threshold'] as number;
+        const threshold = parameter['threshold'];
         const playerType = parameter['playerType'] as string;
+
+        // Reject before any question is recorded: blank/NaN/negative/0 or
+        // absurd values would otherwise answer trivially and burn a question
+        // (LS-10504).
+        if (
+          typeof threshold !== 'number' ||
+          !Number.isInteger(threshold) ||
+          threshold < MIN_STAT_THRESHOLD ||
+          threshold > MAX_STAT_THRESHOLD
+        ) {
+          throw new Error(
+            `Invalid threshold: must be an integer between ${MIN_STAT_THRESHOLD} and ${MAX_STAT_THRESHOLD}`,
+          );
+        }
 
         // Typed select, not db.execute: the node-postgres driver returns a
         // QueryResult ({ rows }) from execute, so indexing it as an array read

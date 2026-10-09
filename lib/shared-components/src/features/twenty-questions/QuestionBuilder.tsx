@@ -67,6 +67,21 @@ const MLB_TEAMS = [
 
 const UNIQUE_TEAMS = [...new Set(MLB_TEAMS)];
 
+// Stat-threshold bounds (LS-10504). Every offered stat is a non-negative
+// counting stat, so 0 is always YES and would waste a question.
+export const MIN_STAT_THRESHOLD = 1;
+export const MAX_STAT_THRESHOLD = 99999;
+
+/** Parses a typed threshold; null unless it is a plain integer in range. */
+export const parseStatThreshold = (raw: string): number | null => {
+  const trimmed = raw.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  const value = Number(trimmed);
+  return value >= MIN_STAT_THRESHOLD && value <= MAX_STAT_THRESHOLD
+    ? value
+    : null;
+};
+
 const DECADES = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020];
 
 const BATTING_STATS = [
@@ -120,7 +135,7 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
       case TwentyQuestionsCategory.StatThreshold:
         return JSON.stringify({
           stat,
-          threshold: parseInt(threshold, 10) || 0,
+          threshold: parseStatThreshold(threshold),
           playerType: statPlayerType,
         });
       case TwentyQuestionsCategory.BattingHand:
@@ -147,6 +162,8 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
         return battingHands.length > 0;
       case TwentyQuestionsCategory.ThrowingHand:
         return throwingHands.length > 0;
+      case TwentyQuestionsCategory.StatThreshold:
+        return parseStatThreshold(threshold) !== null;
       default:
         return true;
     }
@@ -307,12 +324,20 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
               size="$3"
               width={100}
               keyboardType="numeric"
+              inputMode="numeric"
+              maxLength={String(MAX_STAT_THRESHOLD).length}
               value={threshold}
               onChangeText={setThreshold}
               placeholder="e.g. 500"
               testID="threshold-input"
             />
           </XStack>
+          {parseStatThreshold(threshold) === null && (
+            <Paragraph fontSize="$2" color="$red10" testID="threshold-error">
+              Enter a whole number from {MIN_STAT_THRESHOLD} to{' '}
+              {MAX_STAT_THRESHOLD.toLocaleString('en-US')}.
+            </Paragraph>
+          )}
         </YStack>
       )}
 
