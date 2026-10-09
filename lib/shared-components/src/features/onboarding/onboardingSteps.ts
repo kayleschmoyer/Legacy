@@ -6,6 +6,7 @@
  * primitives. Web-only illustrations are `slot` blocks the renderer may fill
  * (or skip); links are plain paths the renderer wires to its own navigation.
  */
+import { PREMIUM_FEATURES } from '../../premium-features';
 
 export type OnboardingAccent = 'navyLight' | 'seamRed' | 'goldDark';
 
@@ -328,3 +329,51 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     ],
   },
 ];
+
+/**
+ * Premium-only step (LS-6899): shown to Premium users so they know salary cap,
+ * FAAB and advanced playoff formats are already theirs before creating their
+ * first league. Labels come from the canonical `PREMIUM_FEATURES` list.
+ */
+const PRO_LEAGUE_FEATURE_ICONS: Record<string, string> = {
+  'Salary cap leagues': '💰',
+  'FAAB waivers': '🧾',
+  'Advanced playoff formats (6-team, 8-team)': '🏅',
+};
+
+export const PREMIUM_ONBOARDING_STEP: OnboardingStep = {
+  id: 'pro-features',
+  emoji: '⭐',
+  emojiLabel: 'star',
+  title: 'Your Pro features',
+  accent: 'goldDark',
+  blocks: [
+    para(
+      'lg',
+      text(
+        'Your Premium plan unlocks league formats free accounts can\u2019t use. ',
+      ),
+      strong('Turn them on when you create your first league'),
+      text(' — they\u2019re already included.'),
+    ),
+    {
+      type: 'bullets',
+      items: PREMIUM_FEATURES.filter(
+        (f) => f.label in PRO_LEAGUE_FEATURE_ICONS,
+      ).map((f) => ({
+        icon: PRO_LEAGUE_FEATURE_ICONS[f.label],
+        text: f.label,
+      })),
+    },
+  ],
+};
+
+/** Steps for the tutorial; Premium users get the Pro-features step before the last. */
+export function getOnboardingSteps(isPremium = false): OnboardingStep[] {
+  if (!isPremium) return ONBOARDING_STEPS;
+  return [
+    ...ONBOARDING_STEPS.slice(0, -1),
+    PREMIUM_ONBOARDING_STEP,
+    ONBOARDING_STEPS[ONBOARDING_STEPS.length - 1],
+  ];
+}

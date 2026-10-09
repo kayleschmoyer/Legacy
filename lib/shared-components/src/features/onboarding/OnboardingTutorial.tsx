@@ -14,7 +14,7 @@ import {
   type OnboardingLinkRenderProps,
 } from './OnboardingStepBlocks';
 import {
-  ONBOARDING_STEPS,
+  getOnboardingSteps,
   type OnboardingAccent,
   type OnboardingSlotId,
 } from './onboardingSteps';
@@ -66,6 +66,8 @@ export interface OnboardingTutorialProps {
   /** Illustration overrides; `null` hides a slot, omitted uses the default. */
   slots?: Partial<Record<OnboardingSlotId, React.ReactNode>>;
   analytics?: OnboardingTutorialAnalytics;
+  /** Adds the "Your Pro features" step for Premium users (LS-6899). */
+  isPremium?: boolean;
 }
 
 const ACCENT_TOKEN: Record<OnboardingAccent, string> = {
@@ -73,8 +75,6 @@ const ACCENT_TOKEN: Record<OnboardingAccent, string> = {
   seamRed: '$brandSeamRed',
   goldDark: '$brandGoldDark',
 };
-
-const STEP_COUNT = ONBOARDING_STEPS.length;
 
 /**
  * Web-only capability shim for the WAI-ARIA modal pattern (LS-6902). It
@@ -131,17 +131,20 @@ export function OnboardingTutorial({
   onNavigate,
   slots,
   analytics,
+  isPremium = false,
 }: OnboardingTutorialProps): React.JSX.Element {
+  const steps = React.useMemo(() => getOnboardingSteps(isPremium), [isPremium]);
+  const stepCount = steps.length;
   const [currentStep, setCurrentStepState] = React.useState(() =>
-    Math.min(Math.max(0, initialStep), STEP_COUNT - 1),
+    Math.min(Math.max(0, initialStep), stepCount - 1),
   );
   const setCurrentStep = (next: number) => {
     setCurrentStepState(next);
     onStepChange?.(next);
   };
-  const step = ONBOARDING_STEPS[currentStep];
+  const step = steps[currentStep];
   const isFirst = currentStep === 0;
-  const isLast = currentStep === STEP_COUNT - 1;
+  const isLast = currentStep === stepCount - 1;
 
   // `stepRef` lets the close handlers report the step the user was on;
   // `closedRef` guarantees exactly one terminal event per tutorial run.
@@ -259,7 +262,7 @@ export function OnboardingTutorial({
                   textTransform="uppercase"
                   letterSpacing={1}
                 >
-                  {`Step ${currentStep + 1} of ${STEP_COUNT}`}
+                  {`Step ${currentStep + 1} of ${stepCount}`}
                 </Paragraph>
                 <Dialog.Title asChild>
                   <H2
@@ -296,7 +299,7 @@ export function OnboardingTutorial({
             alignItems="center"
             marginBottom="$2"
           >
-            {ONBOARDING_STEPS.map((s, i) => (
+            {steps.map((s, i) => (
               // A real Button gives Tab focus plus Enter/Space activation; the
               // vertical padding enlarges the 4px bar into a usable target.
               <Button

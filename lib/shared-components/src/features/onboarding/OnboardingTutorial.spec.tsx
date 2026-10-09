@@ -551,3 +551,22 @@ describe('OnboardingTutorial — copy (LS-10774)', () => {
     expect(screen.getByText('Week 7 · Aug 5–14, 2019')).toBeInTheDocument();
   });
 });
+
+describe('OnboardingTutorial — Premium Pro features step (LS-6899)', () => {
+  it('shows the Your Pro features card to Premium users', () => {
+    render(<OnboardingTutorial onClose={jest.fn()} isPremium />);
+
+    expect(screen.getByText('Step 1 of 7')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Go to step 6'));
+    expect(screen.getByText('Your Pro features')).toBeInTheDocument();
+    expect(screen.getByText('Salary cap leagues')).toBeInTheDocument();
+    expect(screen.getByText('FAAB waivers')).toBeInTheDocument();
+  });
+
+  it('omits the card for free users', () => {
+    render(<OnboardingTutorial onClose={jest.fn()} />);
+
+    expect(screen.getByText('Step 1 of 6')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Go to step 7')).toBeNull();
+  });
+});

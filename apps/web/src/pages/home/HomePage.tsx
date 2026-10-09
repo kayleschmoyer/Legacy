@@ -381,6 +381,7 @@ export function HomePage(): React.JSX.Element {
           onStepChange={handleTutorialStepChange}
           analytics={onboardingTutorialAnalytics}
           renderLink={renderOnboardingLink}
+          isPremium={isPremium}
         />
       )}
       <div style={pageBackgroundStyle}>

@@ -1,4 +1,5 @@
 import {
+  getOnboardingSteps,
   ONBOARDING_SAMPLE_GAME_SLOTS,
   ONBOARDING_SAMPLE_SEASON,
   ONBOARDING_SAMPLE_WEEK_LABEL,
@@ -84,5 +85,30 @@ describe('ONBOARDING_STEPS', () => {
       );
       expect(ONBOARDING_SAMPLE_WEEK_LABEL).toBe('Week 7 · Aug 5–14, 2019');
     });
+  });
+});
+
+describe('getOnboardingSteps (LS-6899)', () => {
+  it('returns the free steps unchanged', () => {
+    expect(getOnboardingSteps(false)).toBe(ONBOARDING_STEPS);
+  });
+
+  it('adds a Your Pro features step before the last for Premium', () => {
+    const steps = getOnboardingSteps(true);
+    expect(steps.map((s) => s.id)).toEqual([
+      ...ONBOARDING_STEPS.slice(0, -1).map((s) => s.id),
+      'pro-features',
+      'get-started',
+    ]);
+    const pro = steps.find((s) => s.id === 'pro-features');
+    expect(pro?.title).toBe('Your Pro features');
+    const bullets = pro?.blocks.find((b) => b.type === 'bullets');
+    expect(
+      bullets?.type === 'bullets' && bullets.items.map((i) => i.text),
+    ).toEqual([
+      'Salary cap leagues',
+      'Advanced playoff formats (6-team, 8-team)',
+      'FAAB waivers',
+    ]);
   });
 });
