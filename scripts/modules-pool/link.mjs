@@ -448,12 +448,7 @@ function verifyWorktreeLinkOrFail(target) {
   if (findings.length === 0) return;
   removeEmptyDir(nmPath);
   fail(
-    'node_modules link verification failed:\n  - ' +
-      findings.join('\n  - ') +
-      (process.platform === 'win32'
-        ? '\n\nDirectory symlinks require Windows Developer Mode.\n' +
-          'Enable it: Settings > System > For Developers > Developer Mode'
-        : ''),
+    'node_modules link verification failed:\n  - ' + findings.join('\n  - '),
   );
 }
 
@@ -613,33 +608,56 @@ function ensureDirSymlink(linkPath, target, label) {
   }
 
   if (process.platform === 'win32') {
-    // mklink /D = directory symlink (NOT a junction — safe for recursive-delete).
-    // Requires Windows Developer Mode.
-    let mkErr;
-    try {
-      execFileSync('cmd', ['/c', 'mklink', '/D', linkPath, target], {
-        encoding: 'utf-8',
-        timeout: 15_000,
-        windowsHide: true,
-      });
-    } catch (err) {
-      mkErr = err;
+    // mklink /D = directory symlink, preferred. It requires Windows Developer
+    // Mode; without it mklink fails with "You do not have sufficient
+    // privilege", so fall back to mklink /J — a directory junction needs no
+    // privilege and, for a local absolute directory target like a pool slot,
+    // behaves the same for every consumer here (lstat reports it as a
+    // symlink, realpath resolves it, removeNodeModulesEntry rmdirs it without
+    // touching the target) (LS-11021). MODULES_POOL_FORCE_JUNCTION=1 skips
+    // straight to the junction (lets tests exercise it on Developer Mode hosts).
+    let mkErr =
+      process.env.MODULES_POOL_FORCE_JUNCTION === '1'
+        ? new Error('MODULES_POOL_FORCE_JUNCTION=1 (simulated privilege error)')
+        : winMklink('/D', linkPath, target);
+    let kind = 'directory symlink';
+    if (mkErr && /privilege|EPERM|1314/i.test(String(mkErr.message ?? mkErr))) {
+      const junctionErr = winMklink('/J', linkPath, target);
+      if (!junctionErr) {
+        console.log(
+          `[link] ${label}: directory symlink not permitted (no Developer Mode) — created a junction instead.`,
+        );
+        kind = 'directory junction';
+      }
+      mkErr = junctionErr
+        ? new Error(
+            `${String(mkErr.message ?? mkErr)}\n` +
+              `Junction fallback (mklink /J) also failed: ${String(junctionErr.message ?? junctionErr)}`,
+          )
+        : null;
     }
     if (mkErr || !winPathIsContainer(linkPath)) {
       const msg = mkErr
         ? String(mkErr.message ?? mkErr)
-        : 'mklink exited 0 but path is not accessible';
-      const devMode = /privilege|EPERM|1314/i.test(msg);
-      throw new Error(
-        `Failed to create directory symlink: ${msg}` +
-          (devMode
-            ? '\n\nDirectory symlinks require Windows Developer Mode.\n' +
-              'Enable it: Settings > System > For Developers > Developer Mode'
-            : ''),
-      );
+        : `mklink exited 0 but path is not accessible (${kind})`;
+      throw new Error(`Failed to create directory symlink: ${msg}`);
     }
   } else {
     symlinkSync(target, linkPath);
+  }
+}
+
+/** Run `mklink <flag> linkPath target`; returns the error, or null on success. */
+function winMklink(flag, linkPath, target) {
+  try {
+    execFileSync('cmd', ['/c', 'mklink', flag, linkPath, target], {
+      encoding: 'utf-8',
+      timeout: 15_000,
+      windowsHide: true,
+    });
+    return null;
+  } catch (err) {
+    return err;
   }
 }
 
@@ -1414,24 +1432,12 @@ function linkDir(name) {
   }
 
   try {
-    if (process.platform === 'win32') {
-      execFileSync('cmd', ['/c', 'mklink', '/D', wtPath, mainPath], {
-        encoding: 'utf-8',
-        timeout: 10_000,
-        windowsHide: true,
-      });
-    } else {
-      symlinkSync(mainPath, wtPath);
-    }
+    // Same symlink-then-junction fallback as node_modules (LS-11021).
+    ensureDirSymlink(wtPath, mainPath, name);
   } catch (err) {
-    const msg = String(err.message ?? err);
-    const devMode = /privilege|EPERM|1314/i.test(msg);
     console.warn(
-      `[warn] ${name}: failed to create symlink: ${msg}` +
-        (devMode
-          ? '\n       Directory symlinks require Windows Developer Mode; ' +
-            `copy the main repo's ${name} into this worktree manually instead.`
-          : ''),
+      `[warn] ${name}: ${String(err.message ?? err)}\n` +
+        `       Copy the main repo's ${name} into this worktree manually instead.`,
     );
     return;
   }

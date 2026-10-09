@@ -100,6 +100,19 @@ if ($currentBranch -and $currentBranch -ne 'main') {
 }
 
 # ---------------------------------------------------------------------------
+# Fail fast if twig is missing -- before the branch is pre-created below.
+# Otherwise the script aborts at `twig worktree create` with the branch
+# already made, leaving a half-done state to clean up (LS-11021).
+# ---------------------------------------------------------------------------
+if (-not (Get-Command twig -ErrorAction SilentlyContinue)) {
+    Write-Host "" -ForegroundColor Red
+    Write-Host "[ERROR] twig is not installed (or not on PATH)." -ForegroundColor Red
+    Write-Host "        Install it with: cargo install twig-cli" -ForegroundColor Yellow
+    Write-Host ""
+    exit 1
+}
+
+# ---------------------------------------------------------------------------
 # Fetch latest refs so the worktree is cut from the current remote state.
 # Without this, origin/main (or the parent branch) may be stale and the
 # worktree starts from an outdated base -- requiring a post-create rebase.

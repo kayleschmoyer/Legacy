@@ -25,7 +25,7 @@ for each ticket/PR needing code work:
       Setup (REQUIRED before any pnpm/make command):
       1. git fetch origin <branch-or-main>
       2. git checkout <existing-branch>  (for PRs)  OR  stay on the ephemeral branch (for new tickets)
-      3. node scripts/modules-pool/link.mjs   # links node_modules to the pool slot (requires Developer Mode) — NEVER use mklink /J or New-Item junction commands
+      3. node scripts/modules-pool/link.mjs   # links node_modules to the pool slot (falls back to a junction itself without Developer Mode) — NEVER use mklink /J or New-Item junction commands
       4. <do NOT rename branch — Jira links via PR title + commits containing LS-####>
       5. If you need to install new packages: powershell -NoProfile -Command "Remove-Item -Path node_modules -Force" first, then pnpm add -w <pkg>, then make install
 

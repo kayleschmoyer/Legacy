@@ -184,7 +184,7 @@ Immutability is a convention, not a filesystem guarantee: a `pnpm install` run i
 2. **`.modules.yaml` relocatability.** pnpm records paths in `.modules.yaml`; the existing `checkVirtualStoreDir` guard exists precisely because of this. Confirm a slot built in worktree A and linked from worktree B keeps `pnpm exec`/nx resolution working (paths must be relative or inside the slot).
 3. **Store GC interaction.** `pnpm store prune` must not remove blocks a pool slot still hardlinks. Hardlinks keep inodes alive regardless, but `prune` may delete the store's own index entry; confirm slots survive a prune, or exclude the pool drive's store from prune.
 4. **Hash inputs.** Lockfile-only vs. lockfile + pnpm version. Lockfile alone is ~complete; salting with pnpm version costs nothing and prevents a stale slot after a pnpm upgrade. Recommend salting from day one.
-5. **Windows symlink privilege.** Directory symlinks need Developer Mode — already required today, no regression. Materialisation's atomic rename also needs both tmp and final on the same volume (guaranteed: both under `<repo>\.modules-pool`).
+5. **Windows symlink privilege.** Directory symlinks need Developer Mode — already required today, no regression. (Since LS-11021 `link.mjs` falls back to a directory junction when the symlink is not permitted.) Materialisation's atomic rename also needs both tmp and final on the same volume (guaranteed: both under `<repo>\.modules-pool`).
 6. **In-repo watchers.** With the pool inside the repo, confirm the Nx daemon file-watcher and Metro/Watchman do not index `.modules-pool/` despite the git-ignore (Metro uses its own `blockList`). Covered by §4.6's ignore wiring; verify empirically in the validation phase.
 
 ## 6. Validation plan

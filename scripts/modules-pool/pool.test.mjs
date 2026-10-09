@@ -298,15 +298,15 @@ test(
   },
 );
 
-// The inverse of the skip above: only a host that CANNOT create directory
-// symlinks (Windows without Developer Mode) exercises the real mklink failure.
+// Without Developer Mode `mklink /D` fails with "You do not have sufficient
+// privilege"; link.mjs must fall back to a junction (`mklink /J`) rather than
+// failing (LS-11021) — previously the run left no node_modules (LS-10597).
+// MODULES_POOL_FORCE_JUNCTION=1 simulates that privilege error so the fallback
+// is exercised on Developer Mode hosts too.
 test(
-  'symlink failure exits non-zero and leaves no node_modules behind (LS-10597)',
+  'Windows without symlink privilege falls back to a junction and passes --check (LS-11021)',
   {
-    skip:
-      process.platform === 'win32' && !SYMLINK_OK
-        ? false
-        : 'needs a Windows host without Developer Mode',
+    skip: process.platform === 'win32' ? false : 'mklink /J is Windows-only',
   },
   () => {
     const root = freshMainRepo();
@@ -317,21 +317,30 @@ test(
         `--main-repo=${root}`,
         '--print-hash',
       ]).trim();
-      makeHealthyNodeModules(join(root, '.modules-pool', hash, 'node_modules'));
-      // A pre-existing empty husk must not survive the failed run either.
+      const slotNm = join(root, '.modules-pool', hash, 'node_modules');
+      makeHealthyNodeModules(slotNm);
+      // A pre-existing empty husk must be replaced, not left behind.
       mkdirSync(join(wt, 'node_modules'));
 
-      const { status, output } = runLinkExpectFail([
-        `--worktree=${wt}`,
-        `--main-repo=${root}`,
-      ]);
-      assert.equal(status, 1);
-      assert.match(output, /\[ERROR\] Failed to create directory symlink/);
-      assert.match(output, /Developer Mode/);
-      assert.ok(
-        !existsSync(join(wt, 'node_modules')),
-        'no node_modules dir may be left in the worktree',
-      );
+      const env = { MODULES_POOL_FORCE_JUNCTION: '1' };
+      const out = runLink([`--worktree=${wt}`, `--main-repo=${root}`], env);
+      assert.match(out, /created a junction instead/);
+
+      const nm = join(wt, 'node_modules');
+      assert.ok(lstatSync(nm).isSymbolicLink(), 'junction reads as a link');
+      assert.equal(realpathSync(nm), realpathSync(slotNm));
+
+      // --check treats the junction as a healthy link.
+      runLink([`--worktree=${wt}`, `--main-repo=${root}`, '--check'], env);
+
+      // Idempotent re-run.
+      runLink([`--worktree=${wt}`, `--main-repo=${root}`], env);
+      assert.equal(realpathSync(nm), realpathSync(slotNm));
+
+      // A recursive delete of the junction must not reach into the shared slot.
+      rmSync(nm, { recursive: true, force: true });
+      assert.ok(!existsSync(nm));
+      assert.ok(existsSync(join(slotNm, 'nx', 'package.json')));
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
