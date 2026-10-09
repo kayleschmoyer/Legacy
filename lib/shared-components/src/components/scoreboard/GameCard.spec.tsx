@@ -145,6 +145,28 @@ describe('GameCard', () => {
     expect(queryAllByText('E').length).toBeGreaterThanOrEqual(2);
   });
 
+  it('exposes the linescore toggle as a focusable button with expanded state', () => {
+    const { getByTestId, queryByText } = render(<GameCard game={liveGame} />);
+    const toggle = getByTestId('game-card-toggle-1');
+    expect(toggle.getAttribute('role')).toBe('button');
+    expect(toggle.getAttribute('tabindex')).toBe('0');
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.keyDown(toggle, { key: 'Enter' });
+    expect(queryByText('Hide ▲')).toBeTruthy();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    const controlled = toggle.getAttribute('aria-controls');
+    expect(controlled).toBeTruthy();
+    expect(document.getElementById(controlled as string)).toBeTruthy();
+    fireEvent.keyDown(toggle, { key: ' ' });
+    expect(queryByText('Linescore ▼')).toBeTruthy();
+  });
+
+  it('toggles once when the button itself is clicked', () => {
+    const { getByTestId, queryByText } = render(<GameCard game={liveGame} />);
+    fireEvent.click(getByTestId('game-card-toggle-1'));
+    expect(queryByText('Hide ▲')).toBeTruthy();
+  });
+
   it('marks the winning team for final games via a "WIN" label', () => {
     const { getByText } = render(<GameCard game={finalGame} />);
     expect(getByText(/WIN/)).toBeTruthy();

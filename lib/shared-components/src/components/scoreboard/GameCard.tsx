@@ -10,7 +10,7 @@
  *   - Live trailing: muted gray
  *   - Final winner: heritage gold; loser muted
  */
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { Card, ScrollView, Separator, Text, XStack, YStack } from 'tamagui';
 import { Linescore } from './Linescore';
 import { OutsPips } from './OutsPips';
@@ -177,6 +177,7 @@ export function GameCard({
     (homeTeam.linescoreInnings?.length ?? 0) > 0;
 
   const togglable = hasLinescore && !isUpcoming;
+  const linescoreId = useId();
 
   return (
     <Card
@@ -189,7 +190,6 @@ export function GameCard({
       onPress={togglable ? () => setExpanded((v) => !v) : undefined}
       hoverStyle={togglable ? { borderColor: '$brandGold' } : undefined}
       testID={testID ?? `game-card-${game.gamePk}`}
-      aria-expanded={togglable ? expanded : undefined}
     >
       {/* Top strip: status | outs (live) | start time (upcoming) */}
       <XStack
@@ -344,15 +344,39 @@ export function GameCard({
             </Text>
           </XStack>
           {togglable && (
-            <Text
-              fontSize={11}
-              fontWeight="700"
-              letterSpacing={1.2}
-              textTransform="uppercase"
-              color="$brandNavyLight"
+            <XStack
+              role="button"
+              tabIndex={0}
+              cursor="pointer"
+              accessibilityRole="button"
+              accessibilityState={{ expanded }}
+              aria-expanded={expanded}
+              aria-controls={linescoreId}
+              aria-label={expanded ? 'Hide linescore' : 'Show linescore'}
+              testID={`game-card-toggle-${game.gamePk}`}
+              onPress={(e: { stopPropagation?: () => void }) => {
+                // The card is also pressable for mouse users; don't toggle twice.
+                e?.stopPropagation?.();
+                setExpanded((v) => !v);
+              }}
+              onKeyDown={(e: React.KeyboardEvent) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setExpanded((v) => !v);
+                }
+              }}
             >
-              {expanded ? 'Hide ▲' : 'Linescore ▼'}
-            </Text>
+              <Text
+                fontSize={11}
+                fontWeight="700"
+                letterSpacing={1.2}
+                textTransform="uppercase"
+                color="$brandNavyLight"
+              >
+                {expanded ? 'Hide ▲' : 'Linescore ▼'}
+              </Text>
+            </XStack>
           )}
         </XStack>
       )}
@@ -365,6 +389,7 @@ export function GameCard({
               web and native — Tamagui's ScrollView is a thin wrapper around
               RN's ScrollView so the same component works on both platforms. */}
           <ScrollView
+            id={linescoreId}
             horizontal
             showsHorizontalScrollIndicator={false}
             backgroundColor="$surfacePanel"
