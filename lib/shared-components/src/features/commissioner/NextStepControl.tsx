@@ -216,6 +216,12 @@ export function NextStepControl({
     currentMatchup?.statsLoadingStatus === StatsLoadingStatus.Queued ||
     currentMatchup?.statsLoadingStatus === StatsLoadingStatus.Loading;
 
+  // A Failed selection must not read as success: the week would score 0, so
+  // advancing becomes an explicit, warned override (LS-10510).
+  const isGameSelectionFailed =
+    currentMatchup?.statsLoadingStatus === StatsLoadingStatus.Failed;
+  const isFailedAdvance = isGameSelectionFailed && actionType === 'advance';
+
   const handleButtonClick = () => {
     // Prevent clicking while game selection is in progress
     if (isGameSelectionInProgress) {
@@ -345,6 +351,8 @@ export function NextStepControl({
       return 'Create Week 1 Matchups';
     } else if (actionType === 'selectGame') {
       return `Select Game ${nextGameNumber} of ${effectiveGamesPerMatchup}`;
+    } else if (isFailedAdvance) {
+      return 'Advance Anyway';
     } else {
       return 'Advance League Week';
     }
@@ -380,6 +388,10 @@ export function NextStepControl({
       return `This will automatically select game ${nextGameNumber} for all matchups in the current week. The system will choose games based on the configured rules and selected season.`;
     }
 
+    if (isFailedAdvance) {
+      return `Game selection failed for Week ${currentWeek}, so its player stats never loaded and the week will score 0. Advance only if you intend to override this. Otherwise cancel and retry game selection later.`;
+    }
+
     if (hasCurrentMatchup) {
       return `This will complete all Week ${currentWeek} matchups and create new matchups for Week ${nextWeek} with all teams paired up. Players will be automatically assigned random historical seasons.`;
     }
@@ -398,7 +410,12 @@ export function NextStepControl({
       const draftPrefix = isDraftCompleted
         ? 'Draft complete! All season matchups were created automatically. '
         : '';
+      if (isGameSelectionFailed) {
+        return `Game selection failed for this week. Select game ${nextGameNumber} of ${effectiveGamesPerMatchup} again to retry.`;
+      }
       return `${draftPrefix}Next: Select game ${nextGameNumber} of ${effectiveGamesPerMatchup} for all matchups in the current week.`;
+    } else if (isFailedAdvance) {
+      return 'Game selection failed, so player stats did not load and this week will score 0. You can still advance as an override, but you will be asked to confirm.';
     } else {
       return 'All games selected! Next: Advance to the next league week.';
     }

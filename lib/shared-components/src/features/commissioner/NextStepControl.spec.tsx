@@ -21,6 +21,7 @@ jest.mock('@legacy-sports/graphql', () => ({
     Queued: 'QUEUED',
     Loading: 'LOADING',
     Completed: 'COMPLETED',
+    Failed: 'FAILED',
   },
   useAutoAdvanceMatchupsMutation: () => [
     mockAutoAdvanceMatchups,
@@ -403,5 +404,66 @@ describe('NextStepControl — Season Complete panel (LS-10801)', () => {
     renderControl(null);
 
     expect(screen.getByText('Start New Season')).toBeInTheDocument();
+  });
+});
+
+describe('NextStepControl — Failed game selection never reads as success (LS-10510)', () => {
+  const matchupWithStatus = (statsLoadingStatus: string) =>
+    ({
+      id: 42,
+      weekNumber: 2,
+      status: 'IN_PROGRESS',
+      selectedGamesCount: 1,
+      statsLoadingStatus,
+    }) as unknown as React.ComponentProps<
+      typeof NextStepControl
+    >['currentMatchup'];
+
+  const renderControl = (statsLoadingStatus: string) =>
+    render(
+      <NextStepControl
+        {...defaultProps}
+        draftStatus="completed"
+        totalMatchups={1}
+        currentMatchup={matchupWithStatus(statsLoadingStatus)}
+      />,
+    );
+
+  beforeEach(() => {
+    mockDraftMode = 'automated';
+    mockMatchups = [{ weekNumber: 2, gamesPerMatchup: 1 }];
+    mockAutoAdvanceMatchups.mockReset();
+  });
+
+  afterEach(() => {
+    mockMatchups = [];
+  });
+
+  it('shows failure copy and an explicit override label instead of success copy', () => {
+    renderControl('FAILED');
+
+    expect(screen.queryByText(/All games selected!/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Game selection failed/)).toBeInTheDocument();
+    expect(screen.getByTestId('start-draft-button')).toHaveTextContent(
+      'Advance Anyway',
+    );
+  });
+
+  it('requires a confirmation that warns the week will score 0 before advancing', () => {
+    renderControl('FAILED');
+
+    fireEvent.click(screen.getByTestId('start-draft-button'));
+
+    expect(screen.getByRole('dialog')).toHaveTextContent(/will score 0/);
+    expect(mockAutoAdvanceMatchups).not.toHaveBeenCalled();
+  });
+
+  it('keeps the success copy for a completed selection', () => {
+    renderControl('COMPLETED');
+
+    expect(screen.getByText(/All games selected!/)).toBeInTheDocument();
+    expect(screen.getByTestId('start-draft-button')).toHaveTextContent(
+      'Advance League Week',
+    );
   });
 });
