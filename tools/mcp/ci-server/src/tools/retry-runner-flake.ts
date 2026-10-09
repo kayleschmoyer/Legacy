@@ -21,12 +21,16 @@ interface GitHubComment {
 
 interface GitHubPull {
   head: { sha: string };
+  base?: { ref: string };
 }
 
 interface GitHubWorkflowRun {
   id: number;
   status: string;
   head_sha: string;
+  event?: string;
+  created_at?: string;
+  run_started_at?: string;
 }
 
 interface GitHubRunsResponse {
@@ -55,6 +59,14 @@ const FLAKE_COMMENT_SIGNATURE = 'CI cancelled due to a runner restart';
  * torn down mid-job.
  */
 const SHUTDOWN_LOG_SIGNATURE = 'runner has received a shutdown signal';
+
+/**
+ * The shortest `retention-days` the CI workflows use for the build artifacts
+ * later jobs download. A run older than this has had its artifacts expire, so
+ * a rerun's downstream shards fail on infrastructure rather than on the code.
+ */
+const ARTIFACT_RETENTION_DAYS = 3;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 const RUN_ID_PATTERN = /\/actions\/runs\/(\d+)/;
 const ORCHESTRATOR_WORKFLOW = 'ci-orchestrator.yml';
@@ -92,6 +104,75 @@ function staleRunResult(
       },
     ],
   };
+}
+
+function staleSnapshotResult(
+  prNumber: number,
+  runId: number,
+  reason: string,
+): ToolResult {
+  return {
+    content: [
+      {
+        type: 'text',
+        text:
+          `Run ${runId} for PR #${prNumber} cannot be safely rerun: ${reason} ` +
+          'Rerunning would replay an out-of-date snapshot, and its result (including any ' +
+          '"CI: ... Failure" label the orchestrator applies) would not reflect the PR\'s live state. ' +
+          'Update the branch (merge/rebase the base into it and push) or dispatch a fresh run ' +
+          'with ci_dispatch_workflow, then investigate that run instead.',
+      },
+    ],
+  };
+}
+
+/**
+ * Refuse reruns of a run whose `refs/pull/N/merge` snapshot is out of date
+ * (LS-10269). GitHub's rerun endpoints reuse the original checked-out merge
+ * ref and the original run's artifacts, so a rerun is only meaningful while
+ * (a) the run's artifacts have not expired and (b) the base branch has not
+ * advanced since the run started. Returns a refusal, or undefined when the
+ * rerun is safe. The base-movement lookup fails open — an API hiccup must not
+ * block a legitimate flake retry — but the age check uses data already in hand.
+ */
+async function checkSnapshotFresh(
+  prNumber: number,
+  runId: number,
+): Promise<ToolResult | undefined> {
+  const run = await githubGet<GitHubWorkflowRun>(`/actions/runs/${runId}`);
+  const startedAt = run.run_started_at ?? run.created_at;
+  if (!startedAt) return undefined;
+
+  const ageMs = Date.now() - new Date(startedAt).getTime();
+  if (ageMs > ARTIFACT_RETENTION_DAYS * MS_PER_DAY) {
+    return staleSnapshotResult(
+      prNumber,
+      runId,
+      `it started ${startedAt}, longer ago than the ${ARTIFACT_RETENTION_DAYS}-day build-artifact retention window, so the artifacts its jobs need have expired.`,
+    );
+  }
+
+  if (run.event !== 'pull_request') return undefined;
+  try {
+    const pull = await githubGet<GitHubPull>(`/pulls/${prNumber}`);
+    const baseRef = pull.base?.ref;
+    if (!baseRef) return undefined;
+    const newer = await githubGet<unknown[]>('/commits', {
+      sha: baseRef,
+      since: startedAt,
+      per_page: '1',
+    });
+    if (Array.isArray(newer) && newer.length > 0) {
+      return staleSnapshotResult(
+        prNumber,
+        runId,
+        `the base branch "${baseRef}" has advanced since the run started (${startedAt}), so its refs/pull/${prNumber}/merge snapshot is stale.`,
+      );
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
 }
 
 /**
@@ -256,6 +337,8 @@ export async function retryRunnerFlake(
             "signature was found in the failed/cancelled job logs of the PR's most recent CI run.",
         );
       }
+      const stale = await checkSnapshotFresh(params.prNumber, shutdownRunId);
+      if (stale) return stale;
       return retryFailed({ runId: shutdownRunId });
     }
 
@@ -276,6 +359,9 @@ export async function retryRunnerFlake(
         headCheck.runHeadSha,
       );
     }
+
+    const stale = await checkSnapshotFresh(params.prNumber, runId);
+    if (stale) return stale;
 
     return retryFailed({ runId });
   } catch (error) {

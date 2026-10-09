@@ -210,6 +210,9 @@ describe('retryRunnerFlake', () => {
             jobs: [{ conclusion: 'cancelled' }],
           });
         }
+        if (path === '/actions/runs/31421732904') {
+          return Promise.resolve({ id: 31421732904, status: 'completed' });
+        }
         throw new Error(`unexpected path ${path}`);
       });
       mockFetchRunLogsRing.mockResolvedValue({
@@ -381,6 +384,77 @@ describe('retryRunnerFlake', () => {
         'No runner-shutdown flake signal',
       );
       expect(mockRetryFailed).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('LS-10269: stale merge snapshot guard', () => {
+    function mockPr(opts: {
+      startedAt: string;
+      baseCommits: unknown[] | Error;
+    }) {
+      mockGet.mockImplementation((path: string) => {
+        if (path === '/issues/8076') {
+          return Promise.resolve({ labels: [{ name: 'CI: Runner Flake' }] });
+        }
+        if (path === '/issues/8076/comments') {
+          return Promise.resolve([
+            comment(
+              'CI cancelled due to a runner restart\n[link](https://github.com/acme/repo/actions/runs/999)',
+            ),
+          ]);
+        }
+        if (path === '/pulls/8076') {
+          return Promise.resolve({ head: { sha: 'h' }, base: { ref: 'main' } });
+        }
+        if (path === '/actions/runs/999') {
+          return Promise.resolve({
+            id: 999,
+            status: 'completed',
+            head_sha: 'h',
+            event: 'pull_request',
+            run_started_at: opts.startedAt,
+          });
+        }
+        if (path === '/commits') {
+          return opts.baseCommits instanceof Error
+            ? Promise.reject(opts.baseCommits)
+            : Promise.resolve(opts.baseCommits);
+        }
+        throw new Error(`unexpected path ${path}`);
+      });
+    }
+
+    const recent = () => new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+    it('refuses when the run is older than the artifact retention window', async () => {
+      mockPr({
+        startedAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
+        baseCommits: [],
+      });
+      const result = await retryRunnerFlake({ prNumber: 8076 });
+      expect(mockRetryFailed).not.toHaveBeenCalled();
+      expect(JSON.stringify(result)).toContain('retention window');
+      expect(JSON.stringify(result)).toContain('ci_dispatch_workflow');
+    });
+
+    it('refuses when the base branch advanced since the run started', async () => {
+      mockPr({ startedAt: recent(), baseCommits: [{ sha: 'newer' }] });
+      const result = await retryRunnerFlake({ prNumber: 8076 });
+      expect(mockRetryFailed).not.toHaveBeenCalled();
+      expect(JSON.stringify(result)).toContain('has advanced');
+      expect(JSON.stringify(result)).toContain('Update the branch');
+    });
+
+    it('retries when the run is fresh and the base has not moved', async () => {
+      mockPr({ startedAt: recent(), baseCommits: [] });
+      await retryRunnerFlake({ prNumber: 8076 });
+      expect(mockRetryFailed).toHaveBeenCalledWith({ runId: 999 });
+    });
+
+    it('fails open on the base-movement lookup so an API error does not block a retry', async () => {
+      mockPr({ startedAt: recent(), baseCommits: new Error('boom') });
+      await retryRunnerFlake({ prNumber: 8076 });
+      expect(mockRetryFailed).toHaveBeenCalledWith({ runId: 999 });
     });
   });
 });
