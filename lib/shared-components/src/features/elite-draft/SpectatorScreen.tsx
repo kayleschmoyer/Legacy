@@ -13,7 +13,8 @@ import { preloadYouTubeIframeApi } from './PickSplashHighlightVideo';
 import { SpectatorDepthChart } from './SpectatorDepthChart';
 import { type SplashPick, SplashQueue } from './SplashQueue';
 import { getDraftCommentary } from './draftUtils';
-import { getPositionColor } from './utils';
+import { resolveDraftedPlayers } from './draftCompletion';
+import { getPositionColor, normalizeTeamId } from './utils';
 import { useSpectatorScreenState } from './hooks';
 import { useScreenWakeLock } from '../../hooks/useScreenWakeLock';
 import type { SportKind } from '../../config/sports';
@@ -175,6 +176,13 @@ export function SpectatorScreen({
     data.leagueDraft?.draftCompletedAt ||
     data.currentPickInfo?.isComplete
   ) {
+    // A league member watching defaults to their own team; a non-member has
+    // no team and is asked to pick one (LS-10519).
+    const myTeamId = normalizeTeamId(data.league?.userMembership?.teamId);
+    const myTeamPicks =
+      myTeamId === null
+        ? []
+        : data.pickHistory.filter((p) => p.teamId === myTeamId);
     return (
       <DraftCompleteView
         draftSummary={
@@ -183,9 +191,9 @@ export function SpectatorScreen({
         leagueId={leagueId}
         sport={sport}
         pickHistory={data.pickHistory}
-        myTeamId={null}
-        myTeam={[]}
-        myTeamPicks={[]}
+        myTeamId={myTeamId}
+        myTeam={resolveDraftedPlayers(myTeamPicks, data.statsLookup)}
+        myTeamPicks={myTeamPicks}
         leagueTeams={data.leagueTeams}
         statsLookup={data.statsLookup}
         onNavigate={onNavigate}

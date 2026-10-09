@@ -270,6 +270,63 @@ describe('DraftCompleteView', () => {
 
   // LS-10997: the wide view grades whichever team is selected, and must agree
   // with the compact recap for the same team.
+  describe('default team selection (LS-10519)', () => {
+    const { picks, players, statsLookup } = buildLargeRoster(3);
+    const twoTeamPicks = picks.map((p, i) => ({ ...p, teamId: (i % 2) + 1 }));
+    const leagueTeams = [
+      { id: 1, name: 'Aces' },
+      { id: 2, name: 'Bombers' },
+    ] as React.ComponentProps<typeof DraftCompleteView>['leagueTeams'];
+    const base = {
+      ...defaultProps,
+      pickHistory: twoTeamPicks,
+      statsLookup,
+      leagueTeams,
+    };
+
+    it('shows a league member their own picks by default', () => {
+      const mine = twoTeamPicks.filter((p) => p.teamId === 1);
+      const view = render(
+        <DraftCompleteView
+          {...base}
+          myTeamId={1}
+          myTeam={players.filter((_, i) => i % 2 === 0)}
+          myTeamPicks={mine}
+        />,
+      );
+      expect(view.getByText(/Your Roster \(2 players\)/)).toBeTruthy();
+      expect(view.getByText(/Your roster is set!/)).toBeTruthy();
+    });
+
+    it('asks a non-member to select a team, with no "Your" copy', () => {
+      const view = render(<DraftCompleteView {...base} myTeamId={null} />);
+      expect(view.getByText('Select a team to view its roster')).toBeTruthy();
+      expect(view.queryByText(/Your Roster/)).toBeNull();
+      expect(view.queryByText(/Your roster is set!/)).toBeNull();
+      expect(view.queryByText(/No picks found/)).toBeNull();
+      expect(view.queryByTestId('draft-complete-grade')).toBeNull();
+    });
+
+    it('shows the picked team once a non-member selects one', () => {
+      const view = render(<DraftCompleteView {...base} myTeamId={null} />);
+      fireEvent.click(view.getByText('Bombers'));
+      expect(view.getByText(/Bombers \(1 players\)/)).toBeTruthy();
+    });
+
+    it('respects a myTeamId that arrives after the first render', () => {
+      const view = render(<DraftCompleteView {...base} myTeamId={null} />);
+      expect(view.queryByText(/Your Roster/)).toBeNull();
+      view.rerender(
+        <DraftCompleteView
+          {...base}
+          myTeamId={2}
+          myTeamPicks={twoTeamPicks.filter((p) => p.teamId === 2)}
+        />,
+      );
+      expect(view.getByText(/Your Roster \(1 players\)/)).toBeTruthy();
+    });
+  });
+
   describe('draft grades (LS-10997)', () => {
     const roster = buildLargeRoster(6);
     const players = roster.players.map((p, i) => ({

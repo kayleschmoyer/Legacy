@@ -150,9 +150,12 @@ export function DraftCompleteView({
   statsLookup,
   onNavigate,
 }: DraftCompleteViewProps): React.JSX.Element {
-  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(
-    myTeamId !== null ? String(myTeamId) : null,
-  );
+  // Only an explicit tab press is stored; otherwise the selection follows
+  // `myTeamId`, so a membership that resolves after mount is still respected
+  // (LS-10519). A viewer with no team (a spectator) starts with none selected.
+  const [pickedTeamId, setPickedTeamId] = useState<string | null>(null);
+  const selectedTeamId =
+    pickedTeamId ?? (myTeamId !== null ? String(myTeamId) : null);
 
   const selectedTeamPicks = useMemo(
     () =>
@@ -185,7 +188,7 @@ export function DraftCompleteView({
   });
 
   const selectedTeamName = useMemo(() => {
-    if (!selectedTeamId) return 'Your Roster';
+    if (!selectedTeamId) return 'Select a team';
     const team = leagueTeams.find((t) => String(t.id) === selectedTeamId);
     return team?.name ?? 'Unknown Team';
   }, [selectedTeamId, leagueTeams]);
@@ -254,7 +257,9 @@ export function DraftCompleteView({
         >
           {draftSummary?.isMock
             ? `All ${pickHistory.length} picks have been made. No rosters were saved — this was a practice draft.`
-            : `All ${pickHistory.length} picks have been made. Your roster is set!`}
+            : myTeamId !== null
+              ? `All ${pickHistory.length} picks have been made. Your roster is set!`
+              : `All ${pickHistory.length} picks have been made.`}
         </Text>
 
         {/* Next-step CTAs — mock: Practice Again / My Leagues; league:
@@ -304,7 +309,7 @@ export function DraftCompleteView({
                 return (
                   <Button
                     key={team.id}
-                    onPress={() => setSelectedTeamId(String(team.id))}
+                    onPress={() => setPickedTeamId(String(team.id))}
                     height="auto"
                     paddingHorizontal={14}
                     paddingVertical={6}
@@ -332,31 +337,33 @@ export function DraftCompleteView({
 
             {/* Selected team's grade — same helper as DraftRoomRecap so both
                 views grade a team identically (LS-10997). */}
-            <XStack
-              testID="draft-complete-grade"
-              gap={10}
-              marginBottom="$4"
-              justifyContent="center"
-            >
-              <GradeStat
-                testID="draft-complete-grade-letter"
-                label="Draft Grade"
-                value={grade}
-                color="$brandGold"
-              />
-              <GradeStat
-                testID="draft-complete-proj-pts"
-                label="Proj Pts"
-                value={projPts.toFixed(1)}
-                color="$color"
-              />
-              <GradeStat
-                testID="draft-complete-adp-value"
-                label="ADP Value"
-                value={`${totalValue >= 0 ? '+' : ''}${totalValue}`}
-                color="$statusSuccessFg"
-              />
-            </XStack>
+            {selectedTeamId !== null && (
+              <XStack
+                testID="draft-complete-grade"
+                gap={10}
+                marginBottom="$4"
+                justifyContent="center"
+              >
+                <GradeStat
+                  testID="draft-complete-grade-letter"
+                  label="Draft Grade"
+                  value={grade}
+                  color="$brandGold"
+                />
+                <GradeStat
+                  testID="draft-complete-proj-pts"
+                  label="Proj Pts"
+                  value={projPts.toFixed(1)}
+                  color="$color"
+                />
+                <GradeStat
+                  testID="draft-complete-adp-value"
+                  label="ADP Value"
+                  value={`${totalValue >= 0 ? '+' : ''}${totalValue}`}
+                  color="$statusSuccessFg"
+                />
+              </XStack>
+            )}
 
             {/* Roster header */}
             <Text
@@ -367,18 +374,22 @@ export function DraftCompleteView({
               letterSpacing={1}
               textTransform="uppercase"
             >
-              {isViewingOwnTeam
-                ? `Your Roster (${selectedTeamPlayers.length} players)`
-                : `${selectedTeamName} (${selectedTeamPlayers.length} players)`}
+              {selectedTeamId === null
+                ? 'Select a team to view its roster'
+                : isViewingOwnTeam
+                  ? `Your Roster (${selectedTeamPlayers.length} players)`
+                  : `${selectedTeamName} (${selectedTeamPlayers.length} players)`}
             </Text>
 
             {/* Roster cards */}
-            <RosterCardGrid
-              picks={selectedTeamPicks}
-              players={selectedTeamPlayers}
-              sport={sport}
-              emptyMessage="No picks found for this team."
-            />
+            {selectedTeamId !== null && (
+              <RosterCardGrid
+                picks={selectedTeamPicks}
+                players={selectedTeamPlayers}
+                sport={sport}
+                emptyMessage="No picks found for this team."
+              />
+            )}
           </YStack>
         )}
 
