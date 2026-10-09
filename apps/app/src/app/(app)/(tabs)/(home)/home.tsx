@@ -15,6 +15,9 @@ import {
   type HomeLeagueSummary,
   HomeScreen,
   mergeLeagueStandings,
+  type OnboardingStorage,
+  OnboardingTutorial,
+  useOnboardingCompletion,
 } from '@legacy-sports/shared-components';
 import {
   OnThisDayFeed,
@@ -32,10 +35,18 @@ import { useThemeContext } from '../../../../context/ThemeContext';
 import { useAuthorizedUserInfo } from '../../../../common/auth/AuthorizedUserContext';
 import { usePullToRefresh } from '../../../../common/hooks/usePullToRefresh';
 import { useSystemBackAction } from '../../../../common/hooks/useSystemBackAction';
+import { useOnboardingStorage } from '../../../../common/utilities/onboardingStorage';
 import { toPlayerDetailIdParam } from '../../../../common/utilities/RouteUtils';
 import { useDefaultSport } from '../../../../common/utilities/useDefaultSport';
 import BaseballHomeScreen from '../../../../screens/BaseballHomeScreen';
 import FootballHomeScreen from '../../../../screens/FootballHomeScreen';
+
+// Stand-in while AsyncStorage hydrates; the completion query is skipped then.
+const NOOP_STORAGE: OnboardingStorage = {
+  getItem: () => null,
+  setItem: () => undefined,
+  removeItem: () => undefined,
+};
 
 type ActiveSport = 'baseball' | 'football';
 
@@ -157,6 +168,46 @@ export default function HomeTab() {
     [archivedData?.getArchivedUserLeagueSummaries],
   );
   const primarySport = useMemo(() => computePrimarySport(leagues), [leagues]);
+
+  // Onboarding tutorial (LS-10383): auto-shows once for a first-time user with
+  // no leagues; the "How It Works" button replays it. The server flag is the
+  // source of truth (a web completion is honored); AsyncStorage is the
+  // same-device cache. Only a successful, empty summaries response proves the
+  // user is new — a failed query also leaves the list empty (LS-10716).
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  const autoShownRef = useRef(false);
+  const onboardingStorage = useOnboardingStorage(userInfo.id);
+  const { shouldAutoShow, markComplete } = useOnboardingCompletion({
+    userId: userInfo.id,
+    storage: onboardingStorage ?? NOOP_STORAGE,
+    skip: onboardingStorage === null,
+  });
+  const confirmedNoLeagues =
+    !loading &&
+    !error &&
+    data?.getUserLeagueSummaries != null &&
+    data.getUserLeagueSummaries.length === 0;
+
+  useEffect(() => {
+    if (!confirmedNoLeagues || !shouldAutoShow || autoShownRef.current) return;
+    autoShownRef.current = true;
+    setTutorialOpen(true);
+  }, [confirmedNoLeagues, shouldAutoShow]);
+
+  // Completion is recorded only when the tutorial was auto-shown; a manual
+  // "How It Works" replay never alters it.
+  const handleTutorialClose = useCallback(() => {
+    setTutorialOpen(false);
+    if (autoShownRef.current) markComplete();
+  }, [markComplete]);
+
+  const handleTutorialNavigate = useCallback(
+    (href: string) => {
+      handleTutorialClose();
+      router.push(href);
+    },
+    [handleTutorialClose, router],
+  );
 
   const handleShowArchived = useCallback(() => {
     setShowArchived(true);
@@ -301,6 +352,12 @@ export default function HomeTab() {
 
   return (
     <>
+      {tutorialOpen && (
+        <OnboardingTutorial
+          onClose={handleTutorialClose}
+          onNavigate={handleTutorialNavigate}
+        />
+      )}
       {/* Main sports dashboard — hidden while a sport view is active */}
       <View
         style={{ display: activeSport !== null ? 'none' : 'flex', flex: 1 }}
@@ -323,6 +380,7 @@ export default function HomeTab() {
           onThisDayCondensed={onThisDayCondensed}
           onShowArchived={handleShowArchived}
           onHideArchived={handleHideArchived}
+          onHowItWorks={() => setTutorialOpen(true)}
           onRetry={() => void refetch()}
           onViewLeague={viewLeague}
           onViewMatchup={viewMatchup}

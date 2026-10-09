@@ -1,10 +1,11 @@
 import React from 'react';
 import { BackHandler } from 'react-native';
-import { act, render, screen } from '@testing-library/react-native';
+import { act, render, screen, waitFor } from '@testing-library/react-native';
 import type { Text as RNText, View as RNView } from 'react-native';
 
 // ── Subject ───────────────────────────────────────────────────────────────────
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import HomeTab from './home';
 import type { PullToRefreshControlElement } from '../../../../common/hooks/usePullToRefresh';
 
@@ -106,10 +107,18 @@ let capturedOnSetLineup: ((summary: Record<string, unknown>) => void) | null =
 let capturedOnJoinDraft: ((summary: Record<string, unknown>) => void) | null =
   null;
 
+// Capture the "How It Works" button callback and the tutorial's handlers (LS-10383)
+let capturedOnHowItWorks: (() => void) | null = null;
+let capturedTutorial: {
+  onClose: () => void;
+  onNavigate?: (href: string) => void;
+} | null = null;
+
 /** Minimal stand-in for the ScrollView handle `scrollRef` receives (LS-9248). */
 type ScrollHandleStub = { scrollTo: jest.Mock };
 
 type HomeScreenMockProps = {
+  onHowItWorks?: () => void;
   onViewSport: (sport: 'baseball' | 'football') => void;
   scrollRef?: React.RefObject<ScrollHandleStub | null>;
   testID?: string;
@@ -176,7 +185,33 @@ jest.mock('@legacy-sports/shared-components', () => ({
       ) => unknown[];
     }
   ).mergeLeagueStandings,
+  // The real completion hook runs against the mocked preferences query so the
+  // server and local gating paths are both exercised (LS-10383).
+  useOnboardingCompletion: (
+    jest.requireActual(
+      '../../../../../../../lib/shared-components/src/features/onboarding/useOnboardingCompletion',
+    ) as unknown as { useOnboardingCompletion: unknown }
+  ).useOnboardingCompletion,
+  getOnboardingKey: (
+    jest.requireActual(
+      '../../../../../../../lib/shared-components/src/features/onboarding/onboardingCompletion',
+    ) as unknown as { getOnboardingKey: (id: number) => string }
+  ).getOnboardingKey,
+  LEGACY_ONBOARDING_KEY: 'ls_onboarding_complete',
+  OnboardingTutorial: ({
+    onClose,
+    onNavigate,
+  }: {
+    onClose: () => void;
+    onNavigate?: (href: string) => void;
+  }) => {
+    capturedTutorial = { onClose, onNavigate };
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { View } = require('react-native') as RNComponents;
+    return <View testID="onboarding-tutorial" />;
+  },
   HomeScreen: ({
+    onHowItWorks,
     onViewSport,
     scrollRef,
     testID,
@@ -195,6 +230,7 @@ jest.mock('@legacy-sports/shared-components', () => ({
     primarySport,
     defaultSport,
   }: HomeScreenMockProps) => {
+    capturedOnHowItWorks = onHowItWorks ?? null;
     capturedOnViewSport = onViewSport;
     capturedTopInset = topInset;
     capturedOnShowArchived = onShowArchived ?? null;
@@ -239,6 +275,16 @@ const mockGetUserLeagueSummaries = jest.fn(() => ({
   error: null,
   refetch: mockRefetch,
 }));
+// Server-side completion flag; the real hook reads it via this query (LS-10383).
+const mockGetUserPreferences = jest.fn<
+  {
+    data?: { getUserPreferences: { onboardingCompletedAt: string | null } };
+    loading: boolean;
+    error?: Error | null;
+  },
+  [unknown]
+>();
+const mockUpdatePreferences = jest.fn(() => Promise.resolve({}));
 const mockGetArchivedLazy = jest.fn(() => [
   jest.fn(),
   { data: null, loading: false },
@@ -254,6 +300,13 @@ const mockGetUserLeagueStandings = jest.fn(() => ({
 jest.mock('@legacy-sports/graphql', () => ({
   useGetUserLeagueSummariesQuery: (...args: unknown[]) =>
     mockGetUserLeagueSummaries(...args),
+  // Like Apollo, a skipped query yields no data — the tab skips it until
+  // AsyncStorage has hydrated.
+  useGetUserPreferencesQuery: (options?: { skip?: boolean }) =>
+    options?.skip
+      ? { data: undefined, loading: false, error: undefined }
+      : mockGetUserPreferences(options),
+  useUpdateUserPreferencesMutation: () => [mockUpdatePreferences],
   useGetUserLeagueStandingsQuery: (...args: unknown[]) =>
     mockGetUserLeagueStandings(...args),
   useGetArchivedUserLeagueSummariesLazyQuery: (...args: unknown[]) =>
@@ -310,6 +363,14 @@ describe('HomeTab sport switching (LS-5814)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSearchParams = {};
+    capturedOnHowItWorks = null;
+    capturedTutorial = null;
+    // Default: server says onboarding is done, so only the tutorial tests opt in.
+    mockGetUserPreferences.mockReturnValue({
+      data: { getUserPreferences: { onboardingCompletedAt: '2026-01-01' } },
+      loading: false,
+      error: null,
+    });
     capturedOnSwitchSport = null;
     backHandlerHandlers.length = 0;
     capturedOnViewSport = null;
@@ -331,6 +392,8 @@ describe('HomeTab sport switching (LS-5814)', () => {
       { data: null, loading: false },
     ]);
     mockGetArchivedCached.mockReturnValue({ data: null });
+
+    void AsyncStorage.clear();
 
     jest
       .spyOn(BackHandler, 'addEventListener')
@@ -966,5 +1029,140 @@ describe('HomeTab scroll reset on tab focus (LS-9248)', () => {
       expect.any(Error),
       expect.objectContaining({ tag: 'home-dashboard-scroll-reset-failed' }),
     );
+  });
+});
+
+describe('HomeTab onboarding tutorial (LS-10383)', () => {
+  const ONBOARDING_KEY = 'ls_onboarding_complete_1';
+  const incompleteOnServer = {
+    data: { getUserPreferences: { onboardingCompletedAt: null } },
+    loading: false,
+    error: null,
+  };
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    mockSearchParams = {};
+    capturedOnHowItWorks = null;
+    capturedTutorial = null;
+    await AsyncStorage.clear();
+    mockGetUserPreferences.mockReturnValue(incompleteOnServer);
+    mockGetUserLeagueSummaries.mockReturnValue({
+      data: { getUserLeagueSummaries: [] },
+      loading: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+  });
+
+  it('opens the tutorial from the How It Works button', async () => {
+    mockGetUserPreferences.mockReturnValue({
+      data: { getUserPreferences: { onboardingCompletedAt: '2026-01-01' } },
+      loading: false,
+      error: null,
+    });
+    render(<HomeTab />);
+    expect(screen.queryByTestId('onboarding-tutorial')).toBeNull();
+
+    await waitFor(() => expect(capturedOnHowItWorks).not.toBeNull());
+    void act(() => {
+      capturedOnHowItWorks?.();
+    });
+
+    expect(screen.getByTestId('onboarding-tutorial')).toBeTruthy();
+    void act(() => {
+      capturedTutorial?.onClose();
+    });
+    expect(screen.queryByTestId('onboarding-tutorial')).toBeNull();
+    // A manual replay never writes the completion flag.
+    expect(mockUpdatePreferences).not.toHaveBeenCalled();
+  });
+
+  it('auto-shows once for a first-time user with no leagues, then marks complete on close', async () => {
+    render(<HomeTab />);
+    await waitFor(() =>
+      expect(screen.getByTestId('onboarding-tutorial')).toBeTruthy(),
+    );
+
+    void act(() => {
+      capturedTutorial?.onClose();
+    });
+
+    expect(screen.queryByTestId('onboarding-tutorial')).toBeNull();
+    expect(mockUpdatePreferences).toHaveBeenCalledWith({
+      variables: { input: { markOnboardingComplete: true } },
+    });
+    expect(await AsyncStorage.getItem(ONBOARDING_KEY)).toBe('true');
+  });
+
+  it('routes a final-step CTA through expo-router and completes onboarding', async () => {
+    render(<HomeTab />);
+    await waitFor(() =>
+      expect(screen.getByTestId('onboarding-tutorial')).toBeTruthy(),
+    );
+
+    void act(() => {
+      capturedTutorial?.onNavigate?.('/baseball/league/create');
+    });
+
+    expect(mockPush).toHaveBeenCalledWith('/baseball/league/create');
+    expect(screen.queryByTestId('onboarding-tutorial')).toBeNull();
+    expect(mockUpdatePreferences).toHaveBeenCalled();
+  });
+
+  it('does not re-show when the server flag says the user completed (e.g. on web)', async () => {
+    mockGetUserPreferences.mockReturnValue({
+      data: { getUserPreferences: { onboardingCompletedAt: '2026-01-01' } },
+      loading: false,
+      error: null,
+    });
+    render(<HomeTab />);
+    await waitFor(async () =>
+      expect(await AsyncStorage.getItem(ONBOARDING_KEY)).toBe('true'),
+    );
+    expect(screen.queryByTestId('onboarding-tutorial')).toBeNull();
+  });
+
+  it('does not re-show when only the local flag is set and the server query fails', async () => {
+    await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+    mockGetUserPreferences.mockReturnValue({
+      data: undefined,
+      loading: false,
+      error: new Error('offline'),
+    });
+    render(<HomeTab />);
+    await waitFor(() => expect(AsyncStorage.getItem).toHaveBeenCalled());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByTestId('onboarding-tutorial')).toBeNull();
+  });
+
+  it('does not auto-show for a user who already has leagues', async () => {
+    mockGetUserLeagueSummaries.mockReturnValue({
+      data: { getUserLeagueSummaries: [{ leagueId: 7, sport: 'baseball' }] },
+      loading: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+    render(<HomeTab />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByTestId('onboarding-tutorial')).toBeNull();
+  });
+
+  it('does not auto-show when the league summaries query failed', async () => {
+    mockGetUserLeagueSummaries.mockReturnValue({
+      data: undefined,
+      loading: false,
+      error: new Error('offline'),
+      refetch: mockRefetch,
+    });
+    render(<HomeTab />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByTestId('onboarding-tutorial')).toBeNull();
   });
 });
