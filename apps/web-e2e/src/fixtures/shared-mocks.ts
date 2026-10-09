@@ -341,6 +341,8 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<
 
   // ── Subscription ──────────────────────────────────────────────────
   getmysubscription: { data: { mySubscription: null } },
+  // LS-10401: SubscriptionPage's Billing History card; empty hides the card.
+  getmyinvoices: { data: { myInvoices: [] } },
   // LS-7171: PricingPage asks for the billing interval of Premium users; null
   // means "unknown", which keeps the default Monthly/Annual toggle.
   getmybillinginterval: {

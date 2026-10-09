@@ -24,6 +24,7 @@ import {
 import {
   useCreateBillingPortalSessionMutation,
   useCreateCheckoutSessionMutation,
+  useGetMyInvoicesQuery,
   useGetMySubscriptionQuery,
 } from '@legacy-sports/graphql';
 import {
@@ -189,6 +190,26 @@ function formatDate(isoString: string): string {
     month: 'long',
     day: 'numeric',
   });
+}
+
+// LS-10401: Stripe reports amounts in minor units and lowercase ISO currency
+// codes; fall back to a plain figure if Intl rejects an unknown code.
+export function formatInvoiceAmount(
+  amountCents: number,
+  currency: string,
+): string {
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency.toUpperCase(),
+    }).format(amountCents / 100);
+  } catch {
+    return `${(amountCents / 100).toFixed(2)} ${currency.toUpperCase()}`;
+  }
+}
+
+function getInvoiceStatusLabel(status: string): string {
+  return status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ');
 }
 
 function getStatusLabel(status: string): string {
@@ -701,6 +722,11 @@ const SubscriptionPage: React.FC = () => {
 
   const { data, loading, refetch } = useGetMySubscriptionQuery();
   const subscription = data?.mySubscription ?? null;
+
+  // LS-10401: a failed invoices query leaves `data` undefined, which hides the
+  // Billing History card rather than breaking the rest of the page.
+  const { data: invoicesData } = useGetMyInvoicesQuery();
+  const invoices = invoicesData?.myInvoices ?? [];
 
   const { user, token } = useAuth();
 
@@ -1433,6 +1459,61 @@ const SubscriptionPage: React.FC = () => {
                 <Paragraph size="$2" color="$colorPress" textAlign="center">
                   Secure payment via Stripe. Cancel anytime.
                 </Paragraph>
+              </SectionBody>
+            </SectionCard>
+          )}
+          {/* ── Billing History (any user with invoices, free or premium;
+              hidden when empty or when the query fails) ── */}
+          {invoices.length > 0 && (
+            <SectionCard style={cardPanelStyle} data-testid="billing-history">
+              <SectionHeader>
+                <SectionIconBox>
+                  <CreditCard size={18} color={BRAND_GOLD} />
+                </SectionIconBox>
+                <Paragraph size="$4" color="$color" fontWeight="600">
+                  Billing History
+                </Paragraph>
+              </SectionHeader>
+              <SectionBody gap="$3">
+                {invoices.map((invoice) => {
+                  const receiptUrl =
+                    invoice.hostedInvoiceUrl ?? invoice.invoicePdf;
+                  return (
+                    <XStack
+                      key={invoice.id}
+                      alignItems="center"
+                      justifyContent="space-between"
+                      gap="$3"
+                    >
+                      <YStack flex={1}>
+                        <Paragraph size="$3" color="$color">
+                          {formatDate(invoice.created)}
+                        </Paragraph>
+                        {invoice.status ? (
+                          <Paragraph size="$2" color="$colorPress">
+                            {getInvoiceStatusLabel(invoice.status)}
+                          </Paragraph>
+                        ) : null}
+                      </YStack>
+                      <Paragraph size="$3" color="$color" fontWeight="600">
+                        {formatInvoiceAmount(
+                          invoice.amountPaidCents,
+                          invoice.currency,
+                        )}
+                      </Paragraph>
+                      {receiptUrl ? (
+                        <a
+                          href={receiptUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: BRAND_GOLD_LIGHT }}
+                        >
+                          Receipt
+                        </a>
+                      ) : null}
+                    </XStack>
+                  );
+                })}
               </SectionBody>
             </SectionCard>
           )}

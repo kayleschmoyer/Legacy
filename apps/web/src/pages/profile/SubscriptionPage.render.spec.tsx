@@ -148,9 +148,23 @@ jest.mock('../../utils/analytics', () => ({
 const mockCreateCheckoutSession = jest.fn();
 const mockCreateBillingPortalSession = jest.fn();
 const mockUseGetMySubscriptionQuery = jest.fn<MySubscriptionQueryMock, []>();
+type InvoiceMock = {
+  id: string;
+  amountPaidCents: number;
+  currency: string;
+  status?: string | null;
+  created: string;
+  hostedInvoiceUrl?: string | null;
+  invoicePdf?: string | null;
+};
+const mockUseGetMyInvoicesQuery = jest.fn<
+  { data?: { myInvoices: InvoiceMock[] }; error?: Error },
+  []
+>(() => ({ data: { myInvoices: [] } }));
 jest.mock('@legacy-sports/graphql', () => ({
   useGetMySubscriptionQuery: (): MySubscriptionQueryMock =>
     mockUseGetMySubscriptionQuery(),
+  useGetMyInvoicesQuery: () => mockUseGetMyInvoicesQuery(),
   useCreateCheckoutSessionMutation: () => [
     mockCreateCheckoutSession,
     { loading: false },
@@ -1047,5 +1061,105 @@ describe('SubscriptionPage — billing portal failure banner (LS-10398)', () => 
     await flushPromises();
 
     expect(screen.queryByText(PORTAL_ERROR)).not.toBeInTheDocument();
+  });
+});
+
+describe('SubscriptionPage — Billing History (LS-10401)', () => {
+  const INVOICES: InvoiceMock[] = [
+    {
+      id: 'in_1',
+      amountPaidCents: 999,
+      currency: 'usd',
+      status: 'paid',
+      created: '2026-06-01T12:00:00.000Z',
+      hostedInvoiceUrl: 'https://invoice.stripe.com/i/in_1',
+      invoicePdf: 'https://pay.stripe.com/in_1/pdf',
+    },
+    {
+      id: 'in_2',
+      amountPaidCents: 0,
+      currency: 'usd',
+      status: 'paid',
+      created: '2026-05-01T12:00:00.000Z',
+      hostedInvoiceUrl: null,
+      invoicePdf: 'https://pay.stripe.com/in_2/pdf',
+    },
+  ];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseLeagueWebSocket.mockReturnValue({ connected: false });
+    mockUseLeagueWebSocketClient.mockReturnValue({
+      client: null,
+      connected: false,
+    });
+    mockUseStripePrices.mockReturnValue(LOADED_STRIPE_PRICES);
+    mockUseGetMyInvoicesQuery.mockReturnValue({ data: { myInvoices: [] } });
+  });
+
+  function mockSubscriptionData(mySubscription: SubscriptionMock | null) {
+    mockUseGetMySubscriptionQuery.mockReturnValue({
+      data: { mySubscription },
+      loading: false,
+      refetch: jest.fn(),
+    });
+  }
+
+  it('lists date, amount, status and a receipt link for each invoice', () => {
+    mockSubscriptionData({
+      status: 'active',
+      tier: 'premium',
+      currentPeriodEnd: '2026-07-01T00:00:00.000Z',
+      cancelAtPeriodEnd: false,
+    });
+    mockUseGetMyInvoicesQuery.mockReturnValue({
+      data: { myInvoices: INVOICES },
+    });
+
+    renderPage();
+
+    expect(screen.getByText('Billing History')).toBeInTheDocument();
+    expect(screen.getByText('June 1, 2026')).toBeInTheDocument();
+    expect(screen.getByText('$9.99')).toBeInTheDocument();
+    expect(screen.getByText('$0.00')).toBeInTheDocument();
+    const links = screen.getAllByRole('link', { name: 'Receipt' });
+    expect(links).toHaveLength(2);
+    // hostedInvoiceUrl wins; invoicePdf is the fallback.
+    expect(links[0]).toHaveAttribute(
+      'href',
+      'https://invoice.stripe.com/i/in_1',
+    );
+    expect(links[1]).toHaveAttribute('href', 'https://pay.stripe.com/in_2/pdf');
+  });
+
+  it('hides the section entirely when there are no invoices', () => {
+    mockSubscriptionData(null);
+
+    renderPage();
+
+    expect(screen.queryByText('Billing History')).not.toBeInTheDocument();
+  });
+
+  it('does not break the page when the invoices query errors', () => {
+    mockSubscriptionData(null);
+    mockUseGetMyInvoicesQuery.mockReturnValue({ error: new Error('boom') });
+
+    renderPage();
+
+    expect(screen.getByText('Free Plan')).toBeInTheDocument();
+    expect(screen.queryByText('Billing History')).not.toBeInTheDocument();
+  });
+
+  it('shows the section to a free user with a past trial invoice', () => {
+    mockSubscriptionData(null);
+    mockUseGetMyInvoicesQuery.mockReturnValue({
+      data: { myInvoices: [INVOICES[1]] },
+    });
+
+    renderPage();
+
+    expect(screen.getByText('Free Plan')).toBeInTheDocument();
+    expect(screen.getByText('Billing History')).toBeInTheDocument();
+    expect(screen.getByText('May 1, 2026')).toBeInTheDocument();
   });
 });
