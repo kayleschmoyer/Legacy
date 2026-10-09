@@ -5,6 +5,7 @@ import {
   mapNflversePosition,
   mapNflverseTeam,
   nflverseName,
+  selectNameRepairs,
   selectSeedCandidates,
 } from './seedFootballPlayers';
 
@@ -76,19 +77,82 @@ describe('mapNflverseTeam', () => {
   });
 });
 
+// Real players.csv shape: first_name is the legal given name, display_name
+// the name the player is known by (LS-9968).
+const legalMontana = row({
+  ...montana,
+  first_name: 'Joseph',
+});
+
 describe('nflverseName', () => {
-  it('prefers first_name/last_name', () => {
-    expect(nflverseName(montana)).toEqual({
-      firstName: 'Joe',
-      lastName: 'Montana',
-    });
+  it.each([
+    ['Joe Montana', 'Joseph', 'Montana', 'Joe', 'Montana'],
+    ['Warren Moon', 'Harold', 'Moon', 'Warren', 'Moon'],
+    ['O.J. Simpson', 'Orenthal', 'Simpson', 'O.J.', 'Simpson'],
+    ['Billy Dee Smith', 'William', 'Smith', 'Billy Dee', 'Smith'],
+  ])(
+    'uses display_name %p over the legal first_name %p',
+    (display_name, first_name, last_name, firstName, lastName) => {
+      expect(
+        nflverseName(row({ display_name, first_name, last_name })),
+      ).toEqual({ firstName, lastName });
+    },
+  );
+
+  it('splits display_name on the first space when last_name does not end it', () => {
+    expect(
+      nflverseName(
+        row({
+          display_name: 'Odell Beckham Jr.',
+          first_name: 'Odell',
+          last_name: 'Beckham',
+        }),
+      ),
+    ).toEqual({ firstName: 'Odell', lastName: 'Beckham Jr.' });
   });
 
-  it('falls back to splitting display_name on the first space', () => {
-    expect(nflverseName(row({ display_name: 'O.J. Simpson' }))).toEqual({
-      firstName: 'O.J.',
-      lastName: 'Simpson',
-    });
+  it('falls back to first_name/last_name when display_name is empty', () => {
+    expect(
+      nflverseName(row({ first_name: 'Joseph', last_name: 'Montana' })),
+    ).toEqual({ firstName: 'Joseph', lastName: 'Montana' });
+  });
+});
+
+describe('selectNameRepairs', () => {
+  it('renames a row that carries the legal name to the display name', () => {
+    const existing = new Map([
+      ['MontJo01', { firstName: 'Joseph', lastName: 'Montana' }],
+    ]);
+    expect(selectNameRepairs([legalMontana], existing)).toEqual([
+      {
+        pfrId: 'MontJo01',
+        from: { firstName: 'Joseph', lastName: 'Montana' },
+        to: { firstName: 'Joe', lastName: 'Montana' },
+      },
+    ]);
+  });
+
+  it('leaves rows whose name is not exactly the legal name', () => {
+    const existing = new Map([
+      ['MontJo01', { firstName: 'Joe', lastName: 'Montana' }],
+    ]);
+    expect(selectNameRepairs([legalMontana], existing)).toEqual([]);
+  });
+
+  it('skips players absent from players and rows with no pfr_id', () => {
+    expect(
+      selectNameRepairs(
+        [legalMontana, row({ first_name: 'A', last_name: 'B' })],
+        new Map(),
+      ),
+    ).toEqual([]);
+  });
+
+  it('skips rows whose legal and display names already agree', () => {
+    const existing = new Map([
+      ['MontJo01', { firstName: 'Joe', lastName: 'Montana' }],
+    ]);
+    expect(selectNameRepairs([montana], existing)).toEqual([]);
   });
 });
 

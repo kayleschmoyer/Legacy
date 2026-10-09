@@ -210,7 +210,7 @@ export function resolvePfaIngestIdentities(
 async function buildResolvedCrosswalk(
   rateLimiter: PfaRateLimiter,
 ): Promise<Map<string, ResolvedPfaIdentity>> {
-  LOGGER.info('PFA ingest: crawling player index (78 pages) for crosswalk...');
+  LOGGER.info('PFA ingest: crawling player index for crosswalk...');
   const sourceTable = await crawlPlayerIndex({ rateLimiter });
   if (sourceTable.errors.length > 0) {
     LOGGER.warn(

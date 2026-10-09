@@ -6,13 +6,22 @@ import {
 import { PfaRateLimiter } from './RateLimiter';
 
 describe('buildPlayerIndexUrls', () => {
-  it('builds all 78 player-index page URLs (3 leagues x 26 letters)', () => {
+  it('builds 26 NFL letter pages plus the single AFL and AAFC pages', () => {
     const urls = buildPlayerIndexUrls();
-    expect(urls).toHaveLength(78);
+    expect(urls).toHaveLength(28);
     expect(urls[0]).toBe(`${PFA_BASE_URL}/nflplayers-a.html`);
-    expect(urls).toContain(`${PFA_BASE_URL}/aflplayers-z.html`);
-    expect(urls).toContain(`${PFA_BASE_URL}/aafcplayers-m.html`);
-    expect(new Set(urls).size).toBe(78);
+    expect(urls).toContain(`${PFA_BASE_URL}/nflplayers-z.html`);
+    expect(urls).toContain(`${PFA_BASE_URL}/aflplayers.html`);
+    expect(urls).toContain(`${PFA_BASE_URL}/aafcplayers.html`);
+    expect(new Set(urls).size).toBe(28);
+  });
+
+  // LS-9968: the per-letter AFL/AAFC pages 404 on the live site, which made
+  // every crawl refuse to seed from a partial index.
+  it('never requests per-letter AFL or AAFC pages', () => {
+    expect(
+      buildPlayerIndexUrls().filter((u) => /\/(afl|aafc)players-/.test(u)),
+    ).toEqual([]);
   });
 });
 

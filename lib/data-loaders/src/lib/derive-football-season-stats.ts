@@ -506,7 +506,9 @@ export async function loadDerivationCandidates(
 ): Promise<DerivationCandidate[]> {
   const idFilter =
     playerIds && playerIds.length > 0
-      ? sql`AND p.id = ANY(${playerIds})`
+      ? // sql.param binds one array; a bare ${playerIds} expands to a
+        // ($1, $2, ...) row, which ANY() rejects.
+        sql`AND p.id = ANY(${sql.param(playerIds)}::integer[])`
       : sql``;
   const result = await db.execute<{
     id: number;

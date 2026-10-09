@@ -11,7 +11,8 @@ import {
   parseNflverseCsv,
 } from '@legacy-sports/data-loaders';
 import { type IdpPosition, mapPfrPosition } from '@legacy-sports/pfr-client';
-import { eq, sql } from 'drizzle-orm';
+import { InvalidArgumentError } from 'commander';
+import { and, eq, sql } from 'drizzle-orm';
 import {
   currentNflSeason,
   fetchWeeklyStatsCsv,
@@ -114,24 +115,82 @@ function parseYear(value: string | undefined): number | null {
   return Number.isInteger(n) && n > 0 ? n : null;
 }
 
-/** First/last name from players.csv, falling back to splitting
- * display_name on its first space (the same rule queue-players used for
- * PFR's index names). */
+/**
+ * First/last name from players.csv's display_name — the name the player is
+ * known and searched by ("Joe Montana", "Warren Moon"), matching the PFR
+ * index names every other football row carries. players.csv's first_name is
+ * the legal given name ("Joseph", "Harold"), so it is only a fallback when
+ * display_name is empty (LS-9968).
+ *
+ * The first name is display_name minus a trailing last_name when the two
+ * agree; otherwise display_name is split on its first space (the rule
+ * queue-players used for PFR's index names, e.g. "Beckham Jr.").
+ */
 export function nflverseName(row: NflverseRow): {
   firstName: string;
   lastName: string;
 } {
   const first = row.first_name?.trim();
   const last = row.last_name?.trim();
-  if (first && last) return { firstName: first, lastName: last };
-
   const display = (row.display_name ?? '').trim();
+
+  if (!display) {
+    return { firstName: first ?? '', lastName: last ?? first ?? '' };
+  }
+  if (last && display.endsWith(` ${last}`)) {
+    return {
+      firstName: display.slice(0, -(last.length + 1)).trim(),
+      lastName: last,
+    };
+  }
   const spaceIdx = display.indexOf(' ');
   if (spaceIdx === -1) return { firstName: display, lastName: display };
   return {
     firstName: display.slice(0, spaceIdx),
     lastName: display.slice(spaceIdx + 1),
   };
+}
+
+export interface NameRepair {
+  pfrId: string;
+  from: { firstName: string; lastName: string };
+  to: { firstName: string; lastName: string };
+}
+
+/**
+ * Rows an earlier run of this command inserted with players.csv's legal
+ * first_name/last_name ("Joseph Montana") instead of the display name
+ * (LS-9968). A row is repaired only when its current name is exactly that
+ * legal name and differs from nflverseName's, so anything renamed since is
+ * left alone. `existingNames` maps football pfr_id to the row's current name
+ * and must hold only rows this command inserted — PFR-discovered rows can
+ * legitimately carry the legal name.
+ */
+export function selectNameRepairs(
+  playersCsvRows: readonly NflverseRow[],
+  existingNames: ReadonlyMap<string, { firstName: string; lastName: string }>,
+): NameRepair[] {
+  const repairs: NameRepair[] = [];
+  for (const row of playersCsvRows) {
+    const pfrId = row.pfr_id?.trim();
+    const current = pfrId ? existingNames.get(pfrId) : undefined;
+    if (!pfrId || !current) continue;
+
+    const legalFirst = row.first_name?.trim();
+    const legalLast = row.last_name?.trim();
+    if (current.firstName !== legalFirst || current.lastName !== legalLast) {
+      continue;
+    }
+    const to = nflverseName(row);
+    if (
+      to.firstName === current.firstName &&
+      to.lastName === current.lastName
+    ) {
+      continue;
+    }
+    repairs.push({ pfrId, from: current, to });
+  }
+  return repairs;
 }
 
 /**
@@ -280,8 +339,92 @@ async function insertCandidate(
   return (result.rowCount ?? 0) > 0;
 }
 
+async function loadNamesCreatedSince(
+  db: PublicDb,
+  since: Date,
+): Promise<Map<string, { firstName: string; lastName: string }>> {
+  const rows = await db
+    .select({
+      pfrId: PublicSchema.players.pfrId,
+      firstName: PublicSchema.players.firstName,
+      lastName: PublicSchema.players.lastName,
+    })
+    .from(PublicSchema.players)
+    .where(
+      and(
+        eq(PublicSchema.players.sport, 'football'),
+        // created_at is not mapped on the Drizzle players model.
+        sql`${PublicSchema.players}.created_at >= ${since.toISOString()}`,
+      ),
+    );
+  return new Map(
+    rows.flatMap((r) =>
+      r.pfrId
+        ? [[r.pfrId, { firstName: r.firstName, lastName: r.lastName }]]
+        : [],
+    ),
+  );
+}
+
+async function repairNames(
+  db: PublicDb,
+  playersCsv: readonly NflverseRow[],
+  since: Date,
+  dryRun: boolean,
+): Promise<void> {
+  // Bounded by created_at: PFR-discovered rows can legitimately carry a name
+  // that equals players.csv's legal one ("Derrick Alexander"), and must not
+  // be renamed. Only rows this command inserted are candidates.
+  const repairs = selectNameRepairs(
+    playersCsv,
+    await loadNamesCreatedSince(db, since),
+  );
+  LOGGER.info(
+    `Name repair: ${repairs.length} row(s) carry players.csv's legal name instead of the display name. ` +
+      `Sample: ${repairs
+        .slice(0, 25)
+        .map(
+          (r) =>
+            `${r.from.firstName} ${r.from.lastName} -> ${r.to.firstName} ${r.to.lastName} (${r.pfrId})`,
+        )
+        .join('; ')}`,
+  );
+  if (dryRun) {
+    LOGGER.info(
+      `[dry-run] would rename ${repairs.length} player(s); pass --apply to write`,
+    );
+    return;
+  }
+
+  let renamed = 0;
+  for (const r of repairs) {
+    // Re-check the old name in the WHERE so a row renamed since the read
+    // is left alone.
+    const result = await db.execute(sql`
+      UPDATE public.players
+      SET first_name = ${r.to.firstName}, last_name = ${r.to.lastName}
+      WHERE sport = 'football' AND pfr_id = ${r.pfrId}
+        AND first_name = ${r.from.firstName} AND last_name = ${r.from.lastName}
+    `);
+    renamed += result.rowCount ?? 0;
+  }
+  LOGGER.info(`Renamed ${renamed} player(s)`);
+}
+
+/** Commander parser for `--repair-names-since`: an ISO-8601 timestamp. */
+export function parseIsoDate(value: string): Date {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new InvalidArgumentError(`Not an ISO-8601 timestamp: '${value}'`);
+  }
+  return date;
+}
+
 export interface SeedFootballPlayersArgs {
   dryRun?: boolean;
+  /** Instead of seeding, fix names an earlier run (rows created at or after
+   * this time) wrote from players.csv's legal first_name (LS-9968). */
+  repairNamesSince?: Date;
 }
 
 export async function handleSeedFootballPlayers(
@@ -289,12 +432,22 @@ export async function handleSeedFootballPlayers(
 ): Promise<void> {
   const dryRun = args.dryRun ?? true;
   LOGGER.info(
-    `seed-football-players: nflverse players.csv -> players (dryRun=${dryRun}). ` +
+    `seed-football-players: nflverse players.csv -> players (dryRun=${dryRun}` +
+      `${args.repairNamesSince ? `, repairNamesSince=${args.repairNamesSince.toISOString()}` : ''}). ` +
       'Data source: nflverse-data (CC-BY 4.0, https://github.com/nflverse/nflverse-data)',
   );
 
   const playersCsv = parseNflverseCsv(await fetchText(PLAYERS_URL));
   LOGGER.info(`players.csv: ${playersCsv.length} rows`);
+
+  const since = args.repairNamesSince;
+  if (since) {
+    await runWithPublicClient(getDbOptions(), (db: PublicDb) =>
+      repairNames(db, playersCsv, since, dryRun),
+    );
+    return;
+  }
+
   const activeGsisIds = await fetchActiveGsisIds();
 
   await runWithPublicClient(getDbOptions(), async (db: PublicDb) => {

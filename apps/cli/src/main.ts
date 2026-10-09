@@ -33,7 +33,10 @@ import { handleIngestRetrosheet } from './commands/ingestRetrosheet';
 import { handleIngestNflverseFootball } from './commands/ingestNflverseFootball';
 import { handleIngestPfaFootball } from './commands/ingestPfaFootball';
 import { handleBackfillNflverseMultiTeamSeasons } from './commands/backfillNflverseMultiTeamSeasons';
-import { handleSeedFootballPlayers } from './commands/seedFootballPlayers';
+import {
+  handleSeedFootballPlayers,
+  parseIsoDate,
+} from './commands/seedFootballPlayers';
 import { handleSeedPfaFootballPlayers } from './commands/seedPfaFootballPlayers';
 import {
   handleDeriveFootballSeasonStats,
@@ -311,8 +314,16 @@ export function buildProgram(): Command {
       '--apply',
       'Insert the selected players (default: dry-run report only)',
     )
-    .action((options: { apply?: boolean }) =>
-      handleSeedFootballPlayers({ dryRun: !options.apply }),
+    .option(
+      '--repair-names-since <iso>',
+      "Instead of seeding, rename rows created at/after <iso> that an earlier run wrote with players.csv's legal first name (LS-9968)",
+      parseIsoDate,
+    )
+    .action((options: { apply?: boolean; repairNamesSince?: Date }) =>
+      handleSeedFootballPlayers({
+        dryRun: !options.apply,
+        repairNamesSince: options.repairNamesSince,
+      }),
     );
 
   program

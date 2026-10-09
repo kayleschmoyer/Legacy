@@ -2,17 +2,18 @@ import { LOGGER } from '@legacy-sports/logging';
 import { parseHtml } from './HtmlParser';
 import type { PfaLeague, PfaPlayerIndexEntry } from './types';
 
-// /nflplayers-<a..z>.html, /aflplayers-<a..z>.html, /aafcplayers-<a..z>.html
-const PLAYER_INDEX_URL_REGEX = /\/(nfl|afl|aafc)players-([a-z])\.html$/i;
+// /nflplayers-<a..z>.html, plus the single-page /aflplayers.html and
+// /aafcplayers.html (letter null).
+const PLAYER_INDEX_URL_REGEX = /\/(nfl|afl|aafc)players(?:-([a-z]))?\.html$/i;
 
 export function parseLeagueAndLetterFromUrl(
   url: string,
-): { league: PfaLeague; letter: string } | null {
+): { league: PfaLeague; letter: string | null } | null {
   const match = url.match(PLAYER_INDEX_URL_REGEX);
   if (!match) return null;
   return {
     league: match[1].toLowerCase() as PfaLeague,
-    letter: match[2].toLowerCase(),
+    letter: match[2]?.toLowerCase() ?? null,
   };
 }
 
@@ -27,7 +28,7 @@ const PFA_PLAYER_ID_REGEX = /\/players\/[a-z]\/([a-z0-9]+)\.html$/i;
  * name — this has not been validated against live PFA HTML because network
  * egress to profootballarchives.com is blocked in this environment (see
  * package README). Validate against a captured real page before relying on
- * this for the full 78-page crawl in the crosswalk-resolver ticket.
+ * this for the full crawl in the crosswalk-resolver ticket.
  */
 export function parsePlayerIndexPage(
   html: string,

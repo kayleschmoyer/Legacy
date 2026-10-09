@@ -9,21 +9,23 @@ import type {
 
 export const PFA_BASE_URL = 'https://www.profootballarchives.com';
 
-const PLAYER_INDEX_LEAGUES: PfaLeague[] = ['nfl', 'afl', 'aafc'];
 const PLAYER_INDEX_LETTERS = 'abcdefghijklmnopqrstuvwxyz'.split('');
+// The AFL (1960-69) and AAFC (1946-49) indexes are one page each —
+// /aflplayers.html, /aafcplayers.html. Per-letter pages only exist for the
+// NFL; /aflplayers-a.html etc. return 404 (LS-9968).
+const SINGLE_PAGE_LEAGUES: PfaLeague[] = ['afl', 'aafc'];
 
 /**
- * Every PFA player-index page URL: 3 leagues x 26 letters = 78 pages, per
- * LS-9993 AC #1.
+ * Every PFA player-index page URL: 26 NFL letter pages plus one page each
+ * for the AFL and AAFC = 28 pages.
  */
 export function buildPlayerIndexUrls(baseUrl: string = PFA_BASE_URL): string[] {
-  const urls: string[] = [];
-  for (const league of PLAYER_INDEX_LEAGUES) {
-    for (const letter of PLAYER_INDEX_LETTERS) {
-      urls.push(`${baseUrl}/${league}players-${letter}.html`);
-    }
-  }
-  return urls;
+  return [
+    ...PLAYER_INDEX_LETTERS.map(
+      (letter) => `${baseUrl}/nflplayers-${letter}.html`,
+    ),
+    ...SINGLE_PAGE_LEAGUES.map((league) => `${baseUrl}/${league}players.html`),
+  ];
 }
 
 export interface CrawlPlayerIndexDeps {
@@ -36,7 +38,7 @@ export interface CrawlPlayerIndexDeps {
  * Crawls every PFA player-index page into a single source table (LS-9993 AC
  * #1). Never throws on a single page's failure — a bad page (network error,
  * non-200 response, or zero parsed entries) is recorded in `errors` and the
- * crawl continues, so one flaky page can't silently truncate the other 77.
+ * crawl continues, so one flaky page can't silently truncate the others.
  *
  * NOTE: requires outbound network access to profootballarchives.com. See
  * lib/pfa-client/README.md — this has been confirmed blocked by the network

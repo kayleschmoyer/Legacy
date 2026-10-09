@@ -8,8 +8,9 @@ LS-9997 (S3 ingest command) for the full slice.
 
 ## Crawl script + crosswalk resolver (LS-9993)
 
-- `crawlPlayerIndex()` (`src/lib/crawl-player-index.ts`) — crawls all 78 PFA
-  player-index pages (nfl/afl/aafc x a-z) into a source table of
+- `crawlPlayerIndex()` (`src/lib/crawl-player-index.ts`) — crawls all 28 PFA
+  player-index pages (NFL a-z, plus the single-page AFL and AAFC indexes —
+  PFA has no per-letter pages for those two leagues) into a source table of
   `PfaPlayerIndexEntry` rows, recording per-page errors rather than
   aborting the whole crawl on one bad page.
 - `resolvePfaCrosswalk()` (`src/lib/crosswalk-resolver.ts`) — joins those

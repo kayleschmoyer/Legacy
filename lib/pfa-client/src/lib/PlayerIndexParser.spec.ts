@@ -18,14 +18,14 @@ describe('parseLeagueAndLetterFromUrl', () => {
     ).toEqual({ league: 'nfl', letter: 'm' });
     expect(
       parseLeagueAndLetterFromUrl(
-        'https://www.profootballarchives.com/aflplayers-a.html',
+        'https://www.profootballarchives.com/aflplayers.html',
       ),
-    ).toEqual({ league: 'afl', letter: 'a' });
+    ).toEqual({ league: 'afl', letter: null });
     expect(
       parseLeagueAndLetterFromUrl(
-        'https://www.profootballarchives.com/aafcplayers-z.html',
+        'https://www.profootballarchives.com/aafcplayers.html',
       ),
-    ).toEqual({ league: 'aafc', letter: 'z' });
+    ).toEqual({ league: 'aafc', letter: null });
   });
 
   it('returns null for a non-index URL', () => {
@@ -70,6 +70,35 @@ describe('parsePlayerIndexPage', () => {
       college: 'Notre Dame; Maryland',
       league: 'nfl',
     });
+  });
+
+  // Rows excerpted from the live single-page /aflplayers.html (2026-10-09),
+  // including its stray unclosed <tr> after the header row.
+  it('parses the single-page AFL index with league afl', () => {
+    const aflHtml =
+      '<div class="stats"><table><tr><th style="text-align:left">Player</th><th style="text-align:left">College</th></tr><tr>' +
+      '<tr><td style="text-align:left"><a href="/players/a/abel00250.html">Bud Abell</a></td><td style="text-align:left">Missouri</td></tr>' +
+      '<tr><td style="text-align:left"><a href="/players/a/adam06600.html">Ken Adamson</a></td><td style="text-align:left">Notre Dame</td></tr>' +
+      '</table></div>';
+    expect(
+      parsePlayerIndexPage(
+        aflHtml,
+        'https://www.profootballarchives.com/aflplayers.html',
+      ),
+    ).toEqual([
+      {
+        pfaId: 'abel00250',
+        name: 'Bud Abell',
+        college: 'Missouri',
+        league: 'afl',
+      },
+      {
+        pfaId: 'adam06600',
+        name: 'Ken Adamson',
+        college: 'Notre Dame',
+        league: 'afl',
+      },
+    ]);
   });
 
   it('throws for a URL that is not a player-index page', () => {
