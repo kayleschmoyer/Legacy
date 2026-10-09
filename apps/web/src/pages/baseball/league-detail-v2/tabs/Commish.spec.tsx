@@ -95,6 +95,7 @@ jest.mock('../../../../components/commissioner/LeagueSettingsControl', () => ({
     <div
       data-testid="league-settings-control"
       data-ispremium={String(props.isPremium)}
+      data-sport={props.sport}
     />
   ),
 }));
@@ -190,6 +191,18 @@ describe('CommishTab — football-awareness', () => {
       'baseball',
     );
   });
+
+  it.each(['football', 'baseball'])(
+    'passes sport="%s" to LeagueSettingsControl (LS-10507)',
+    (sport) => {
+      renderCommish({ sport });
+      fireEvent.click(screen.getByText('League Settings'));
+      expect(screen.getByTestId('league-settings-control')).toHaveAttribute(
+        'data-sport',
+        sport,
+      );
+    },
+  );
 
   it('passes sport="football" to SeasonAwardsControl for a football league (LS-10694)', () => {
     renderCommish({ sport: 'football' });

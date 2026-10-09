@@ -334,6 +334,7 @@ export const CommishTab: React.FC<CommishTabProps> = ({
       content: leagueId ? (
         <LeagueSettingsControl
           leagueId={leagueId}
+          sport={isFootball ? 'football' : 'baseball'}
           draftStatus={league.draftStatus}
           currentGamesPerMatchup={league.gamesPerMatchup ?? 1}
           currentSpStartsPerMatchup={league.pitcherStartsPerMatchup ?? 1}

@@ -264,6 +264,8 @@ export function LeagueSettingsControl({
   const sportBounds =
     GAMES_PER_MATCHUP_BY_SPORT[resolvedSport] ??
     GAMES_PER_MATCHUP_BY_SPORT.baseball;
+  // Pitcher starts and MLB career minimums are baseball-only (LS-10507).
+  const isBaseball = resolvedSport === 'baseball';
 
   useEffect(() => {
     setGamesPerMatchupText(String(gamesPerMatchup));
@@ -638,13 +640,15 @@ export function LeagueSettingsControl({
   const validationError =
     gamesPerMatchup < sportBounds.min || gamesPerMatchup > sportBounds.max
       ? `Games per matchup must be between ${sportBounds.min} and ${sportBounds.max}`
-      : !WHOLE_NUMBER_PATTERN.test(spStartsText)
-        ? 'SP starts must be a whole number'
-        : spStarts < 1
-          ? 'SP starts must be at least 1'
-          : spStarts > gamesPerMatchup
-            ? `SP starts (${spStarts}) cannot exceed games per matchup (${gamesPerMatchup})`
-            : null;
+      : !isBaseball
+        ? null
+        : !WHOLE_NUMBER_PATTERN.test(spStartsText)
+          ? 'SP starts must be a whole number'
+          : spStarts < 1
+            ? 'SP starts must be at least 1'
+            : spStarts > gamesPerMatchup
+              ? `SP starts (${spStarts}) cannot exceed games per matchup (${gamesPerMatchup})`
+              : null;
 
   const isDirty = hasChanges || pitcherMinimumsChanged;
 
@@ -761,8 +765,11 @@ export function LeagueSettingsControl({
               </Text>
               <Text fontSize="$2" color="$gray10">
                 Total number of games in each matchup week ({sportBounds.min}–
-                {sportBounds.max}). All non-pitcher and RP players play every
-                game. Changes apply to scheduled matchups only.
+                {sportBounds.max}).
+                {isBaseball
+                  ? ' All non-pitcher and RP players play every game.'
+                  : ''}{' '}
+                Changes apply to scheduled matchups only.
               </Text>
             </YStack>
             <Input
@@ -783,110 +790,116 @@ export function LeagueSettingsControl({
 
           <Separator />
 
-          {/* SP Starts Per Matchup */}
-          <YStack gap="$2">
-            <YStack gap="$1">
-              <Text fontSize="$3" fontWeight="600" color="$color">
-                SP Starts Per Matchup
-              </Text>
-              <Text fontSize="$2" color="$gray10">
-                How many games starting pitchers play each matchup (cannot
-                exceed games per matchup). Relief pitchers always play every
-                game.
-              </Text>
-            </YStack>
-            <Input
-              value={spStartsText}
-              onChangeText={(text: string) => {
-                setSpStartsText(text);
-                // Only commit whole numbers; anything else ("abc", "3.9",
-                // blank) stays in the text buffer and blocks Save via
-                // validationError instead of being truncated (LS-10692).
-                if (WHOLE_NUMBER_PATTERN.test(text)) {
-                  handleSpStartsChange(parseInt(text, 10));
-                }
-              }}
-              placeholder="e.g. 1"
-              keyboardType="numeric"
-              disabled={saving}
-              aria-label="SP starts per matchup"
-            />
-          </YStack>
+          {isBaseball ? (
+            <>
+              {/* SP Starts Per Matchup */}
+              <YStack gap="$2">
+                <YStack gap="$1">
+                  <Text fontSize="$3" fontWeight="600" color="$color">
+                    SP Starts Per Matchup
+                  </Text>
+                  <Text fontSize="$2" color="$gray10">
+                    How many games starting pitchers play each matchup (cannot
+                    exceed games per matchup). Relief pitchers always play every
+                    game.
+                  </Text>
+                </YStack>
+                <Input
+                  value={spStartsText}
+                  onChangeText={(text: string) => {
+                    setSpStartsText(text);
+                    // Only commit whole numbers; anything else ("abc", "3.9",
+                    // blank) stays in the text buffer and blocks Save via
+                    // validationError instead of being truncated (LS-10692).
+                    if (WHOLE_NUMBER_PATTERN.test(text)) {
+                      handleSpStartsChange(parseInt(text, 10));
+                    }
+                  }}
+                  placeholder="e.g. 1"
+                  keyboardType="numeric"
+                  disabled={saving}
+                  aria-label="SP starts per matchup"
+                />
+              </YStack>
 
-          <Separator />
+              <Separator />
 
-          {/* Min Career Games — separate batter / pitcher thresholds (LS-10807) */}
-          <YStack gap="$2">
-            <YStack gap="$1">
-              <Text fontSize="$3" fontWeight="600" color="$color">
-                Minimum Career Games
-              </Text>
-              <Text fontSize="$2" color="$gray10">
-                Players below their threshold are excluded from the draft pool
-                and free agent pool, and cannot hold a starting roster spot.
-                Batters are measured by career MLB games played; pitchers by
-                career MLB games pitched. A two-way player qualifies by meeting
-                either the batter or the pitcher minimums.
-              </Text>
-            </YStack>
-            <CareerMinimumRow
-              label="Batters — games played"
-              ariaPrefix="Minimum career games"
-              options={MIN_CAREER_GAMES_OPTIONS}
-              selected={minCareerGames}
-              onSelect={handleMinCareerGamesChange}
-              disabled={saving}
-            />
-            <CareerMinimumRow
-              label="Pitchers — games pitched"
-              ariaPrefix="Minimum career games pitched"
-              options={MIN_CAREER_GAMES_OPTIONS}
-              selected={minCareerPitcherGames}
-              onSelect={setMinCareerPitcherGames}
-              disabled={saving}
-            />
-          </YStack>
+              {/* Min Career Games — separate batter / pitcher thresholds (LS-10807) */}
+              <YStack gap="$2">
+                <YStack gap="$1">
+                  <Text fontSize="$3" fontWeight="600" color="$color">
+                    Minimum Career Games
+                  </Text>
+                  <Text fontSize="$2" color="$gray10">
+                    Players below their threshold are excluded from the draft
+                    pool and free agent pool, and cannot hold a starting roster
+                    spot. Batters are measured by career MLB games played;
+                    pitchers by career MLB games pitched. A two-way player
+                    qualifies by meeting either the batter or the pitcher
+                    minimums.
+                  </Text>
+                </YStack>
+                <CareerMinimumRow
+                  label="Batters — games played"
+                  ariaPrefix="Minimum career games"
+                  options={MIN_CAREER_GAMES_OPTIONS}
+                  selected={minCareerGames}
+                  onSelect={handleMinCareerGamesChange}
+                  disabled={saving}
+                />
+                <CareerMinimumRow
+                  label="Pitchers — games pitched"
+                  ariaPrefix="Minimum career games pitched"
+                  options={MIN_CAREER_GAMES_OPTIONS}
+                  selected={minCareerPitcherGames}
+                  onSelect={setMinCareerPitcherGames}
+                  disabled={saving}
+                />
+              </YStack>
 
-          <Separator />
+              <Separator />
 
-          {/* Min Career Seasons — separate batter / pitcher thresholds (LS-10807) */}
-          <YStack gap="$2">
-            <YStack gap="$1">
-              <Text fontSize="$3" fontWeight="600" color="$color">
-                Minimum Career Seasons
-              </Text>
-              <Text fontSize="$2" color="$gray10">
-                Batters are measured by distinct MLB seasons (AL/NL) with a
-                batting appearance; pitchers by distinct MLB seasons with a
-                pitching appearance.
-              </Text>
-            </YStack>
-            <CareerMinimumRow
-              label="Batters — seasons batted"
-              ariaPrefix="Minimum career seasons"
-              options={MIN_CAREER_SEASONS_OPTIONS}
-              selected={minCareerSeasons}
-              onSelect={handleMinCareerSeasonsChange}
-              disabled={saving}
-            />
-            <CareerMinimumRow
-              label="Pitchers — seasons pitched"
-              ariaPrefix="Minimum career seasons pitched"
-              options={MIN_CAREER_SEASONS_OPTIONS}
-              selected={minCareerPitcherSeasons}
-              onSelect={setMinCareerPitcherSeasons}
-              disabled={saving}
-            />
-            {minCareerPitcherGames === 0 && minCareerPitcherSeasons === 0 ? (
-              <Text fontSize="$2" color="$gray10">
-                With both pitcher minimums Off, pitchers follow the batter
-                minimums on their batting record, so a pitcher with no MLB
-                batting record is exempt.
-              </Text>
-            ) : null}
-          </YStack>
+              {/* Min Career Seasons — separate batter / pitcher thresholds (LS-10807) */}
+              <YStack gap="$2">
+                <YStack gap="$1">
+                  <Text fontSize="$3" fontWeight="600" color="$color">
+                    Minimum Career Seasons
+                  </Text>
+                  <Text fontSize="$2" color="$gray10">
+                    Batters are measured by distinct MLB seasons (AL/NL) with a
+                    batting appearance; pitchers by distinct MLB seasons with a
+                    pitching appearance.
+                  </Text>
+                </YStack>
+                <CareerMinimumRow
+                  label="Batters — seasons batted"
+                  ariaPrefix="Minimum career seasons"
+                  options={MIN_CAREER_SEASONS_OPTIONS}
+                  selected={minCareerSeasons}
+                  onSelect={handleMinCareerSeasonsChange}
+                  disabled={saving}
+                />
+                <CareerMinimumRow
+                  label="Pitchers — seasons pitched"
+                  ariaPrefix="Minimum career seasons pitched"
+                  options={MIN_CAREER_SEASONS_OPTIONS}
+                  selected={minCareerPitcherSeasons}
+                  onSelect={setMinCareerPitcherSeasons}
+                  disabled={saving}
+                />
+                {minCareerPitcherGames === 0 &&
+                minCareerPitcherSeasons === 0 ? (
+                  <Text fontSize="$2" color="$gray10">
+                    With both pitcher minimums Off, pitchers follow the batter
+                    minimums on their batting record, so a pitcher with no MLB
+                    batting record is exempt.
+                  </Text>
+                ) : null}
+              </YStack>
 
-          <Separator />
+              <Separator />
+            </>
+          ) : null}
 
           {/* Total Matchups */}
           <YStack gap="$2">

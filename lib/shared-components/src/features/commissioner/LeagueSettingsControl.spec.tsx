@@ -387,7 +387,8 @@ describe('LeagueSettingsControl — renders for a football league with every oth
     ).not.toThrow();
 
     expect(screen.getByLabelText('Games per matchup')).toHaveValue('1');
-    expect(screen.getByLabelText('SP starts per matchup')).toHaveValue('1');
+    // SP starts is baseball-only (LS-10507).
+    expect(screen.queryByLabelText('SP starts per matchup')).toBeNull();
   });
 });
 
@@ -561,5 +562,43 @@ describe('LeagueSettingsControl — pitcher career minimums (LS-10807)', () => {
     expect(
       screen.getByRole('button', { name: 'Save Settings' }),
     ).toBeDisabled();
+  });
+});
+
+describe('LeagueSettingsControl — football (LS-10507)', () => {
+  it('bounds games per matchup to 1–17 and rejects 18', () => {
+    render(
+      <LeagueSettingsControl
+        {...defaultProps}
+        sport="football"
+        currentGamesPerMatchup={1}
+      />,
+    );
+
+    expect(screen.getByText(/\(1–17\)/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Games per matchup'), {
+      target: { value: '18' },
+    });
+    expect(
+      screen.getByText('Games per matchup must be between 1 and 17'),
+    ).toBeInTheDocument();
+  });
+
+  it('hides pitcher and MLB career controls and copy', () => {
+    render(<LeagueSettingsControl {...defaultProps} sport="football" />);
+
+    expect(screen.queryByLabelText('SP starts per matchup')).toBeNull();
+    expect(screen.queryByText(/pitcher/i)).toBeNull();
+    expect(screen.queryByText(/MLB/)).toBeNull();
+    expect(screen.queryByText('Minimum Career Games')).toBeNull();
+    expect(screen.queryByText('Minimum Career Seasons')).toBeNull();
+    expect(screen.getByLabelText('Games per matchup')).toBeInTheDocument();
+  });
+
+  it('keeps the baseball controls for baseball', () => {
+    render(<LeagueSettingsControl {...defaultProps} sport="baseball" />);
+
+    expect(screen.getByLabelText('SP starts per matchup')).toBeInTheDocument();
+    expect(screen.getByText('Minimum Career Games')).toBeInTheDocument();
   });
 });
