@@ -376,3 +376,28 @@ export const googleEvents = appInternal.table('google_events', {
     .notNull()
     .defaultNow(),
 });
+
+/**
+ * Audit trail of username changes (LS-7242 / PRS-041). One row per successful
+ * change, written in the same transaction as the users.username update.
+ */
+export const usernameHistory = appInternal.table(
+  'username_history',
+  {
+    id: serial('id').primaryKey().notNull(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => usersInAppInternal.id, { onDelete: 'cascade' }),
+    oldUsername: varchar('old_username', { length: 50 }),
+    newUsername: varchar('new_username', { length: 50 }).notNull(),
+    changedAt: timestamp('changed_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('username_history_user_id_idx').on(
+      table.userId,
+      table.changedAt,
+    ),
+  }),
+);

@@ -24,6 +24,7 @@ import {
   useUpdateUsernameMutation,
 } from '@legacy-sports/graphql';
 import {
+  evictStaleUsernames,
   getAccessLevelLabel,
   USERNAME_MAX_LENGTH,
   validateUsername,
@@ -427,6 +428,10 @@ const ProfileSettingsPage: React.FC = () => {
     setUsernameError(null);
     void updateUsername({
       variables: { username: trimmed },
+      update: (cache, result) => {
+        const changedId = result.data?.updateUsername?.id;
+        if (changedId != null) evictStaleUsernames(cache, Number(changedId));
+      },
       onCompleted: (data) => {
         // Mirror the server-confirmed username (not the locally typed value)
         // into the auth context, which the header/home read from the JWT.

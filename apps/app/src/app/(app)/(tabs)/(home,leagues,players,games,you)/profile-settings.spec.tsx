@@ -623,9 +623,9 @@ describe('ProfileSettingsScreen', () => {
       fireEvent.changeText(screen.getByDisplayValue('testuser'), value);
       fireEvent.press(screen.getByText('Save'));
       await waitFor(() => {
-        expect(mockUpdateUsername).toHaveBeenCalledWith({
-          variables: { username: value },
-        });
+        expect(mockUpdateUsername).toHaveBeenCalledWith(
+          expect.objectContaining({ variables: { username: value } }),
+        );
       });
     });
 
@@ -638,9 +638,9 @@ describe('ProfileSettingsScreen', () => {
       );
       fireEvent.press(screen.getByText('Save'));
       await waitFor(() => {
-        expect(mockUpdateUsername).toHaveBeenCalledWith({
-          variables: { username: 'newusername' },
-        });
+        expect(mockUpdateUsername).toHaveBeenCalledWith(
+          expect.objectContaining({ variables: { username: 'newusername' } }),
+        );
       });
     });
 

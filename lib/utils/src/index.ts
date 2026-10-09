@@ -30,6 +30,7 @@ export * from './lib/season-draft-name';
 export * from './lib/season-constants';
 export * from './lib/mock-draft-limits';
 export * from './lib/username-validation';
+export * from './lib/username-cache';
 export * from './lib/access-level';
 export * from './lib/stats-sort-fields';
 export * from './lib/waiver-schedule';

@@ -241,14 +241,34 @@ export class UserService {
 
   /**
    * Update a user's username in the internal schema.
+   * Also appends a row to app_internal.username_history (LS-7242).
    * Returns the updated user record from the public view, or null if not found.
    */
   async updateUsername(userId: number, username: string): Promise<User | null> {
     await runWithInternalClient(this.options, async (db) => {
-      await db
-        .update(InternalSchema.usersInAppInternal)
-        .set({ username })
-        .where(eq(InternalSchema.usersInAppInternal.id, userId));
+      await db.transaction(async (tx) => {
+        const [current] = await tx
+          .select({ username: InternalSchema.usersInAppInternal.username })
+          .from(InternalSchema.usersInAppInternal)
+          .where(eq(InternalSchema.usersInAppInternal.id, userId))
+          .for('update');
+        if (!current) return;
+
+        await tx
+          .update(InternalSchema.usersInAppInternal)
+          .set({ username })
+          .where(eq(InternalSchema.usersInAppInternal.id, userId));
+
+        // Audit trail (LS-7242): record the change atomically with the
+        // update. A no-op rename (same name) is not a change.
+        if (current.username !== username) {
+          await tx.insert(InternalSchema.usernameHistory).values({
+            userId,
+            oldUsername: current.username,
+            newUsername: username,
+          });
+        }
+      });
     });
 
     return this.getUserById(userId);

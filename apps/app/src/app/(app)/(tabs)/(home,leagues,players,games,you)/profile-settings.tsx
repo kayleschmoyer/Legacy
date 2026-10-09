@@ -32,7 +32,11 @@ import {
   useUpdateUsernameMutation,
 } from '@legacy-sports/graphql';
 import { brand } from '@legacy-sports/design-tokens';
-import { getAccessLevelLabel, validateUsername } from '@legacy-sports/utils';
+import {
+  evictStaleUsernames,
+  getAccessLevelLabel,
+  validateUsername,
+} from '@legacy-sports/utils';
 import {
   unlinkDiscordAccount,
   useAuthHandlers,
@@ -176,7 +180,13 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
       return;
     }
     try {
-      await updateUsername({ variables: { username: validation.username } });
+      await updateUsername({
+        variables: { username: validation.username },
+        update: (cache, result) => {
+          const changedId = result.data?.updateUsername?.id;
+          if (changedId != null) evictStaleUsernames(cache, Number(changedId));
+        },
+      });
       await refetchUser();
       setEditingUsername(false);
       setUsernameError(null);
