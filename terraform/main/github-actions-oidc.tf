@@ -1008,6 +1008,11 @@ resource "aws_iam_policy" "github_actions_supplemental_2" {
       #   - ${var.environment}/youtube-api-key — created only when
       #     TF_VAR_youtube_api_key is non-empty (secrets.tf), so the missing grant
       #     stayed latent until the YOUTUBE_API_KEY GitHub secret was set (LS-10604).
+      #   - ${var.environment}/discord-mcp-bot-token (LS-10640) — the
+      #     aws_secretsmanager_secret resource needs CreateSecret + TagResource.
+      #     Missing it failed every Apply Lambda Infrastructure run after #8457.
+      # .github/checks/ci-role-secret-coverage.sh fails CI when a new
+      # ${var.environment}/ secret is added without a grant here.
       # Update/Delete/Untag round out the lifecycle Terraform manages for these
       # resources. Secrets Manager appends a random 6-char suffix to every
       # secret ARN, hence the trailing wildcard — CreateSecret is authorized
@@ -1026,7 +1031,8 @@ resource "aws_iam_policy" "github_actions_supplemental_2" {
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/vapid-public-key*",
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/vapid-private-key*",
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/mcp-preview-app-token*",
-          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/youtube-api-key*"
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/youtube-api-key*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/discord-mcp-bot-token*"
         ]
       },
       # Glue Data Catalog permissions for the CloudTrail Athena forensics setup
