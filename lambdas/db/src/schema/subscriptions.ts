@@ -1785,24 +1785,31 @@ builder.mutationField('restoreApplePurchases', (t) =>
 
 // ─── Apple IAP Helpers ────────────────────────────────────────────────────────
 
+/**
+ * Exact-match allowlist of premium product IDs, shared by Apple (App Store
+ * Connect) and Google (Play Console). Single source of truth for tier mapping —
+ * never match product IDs by substring.
+ */
+const PREMIUM_PRODUCT_IDS: readonly string[] = [
+  'com.legacysports.app.premium.monthly',
+  'com.legacysports.app.premium.annual',
+];
+
+function isPremiumProductId(productId: string): boolean {
+  return PREMIUM_PRODUCT_IDS.some((id) => id === productId);
+}
+
 type AppleTransactionPayload = VerifiedAppleTransactionPayload;
 
 function getExpectedAppleBundleId(): string {
   return process.env['APPLE_BUNDLE_ID'] ?? 'com.legacysports.app';
 }
 
-function tierFromAppleProductId(productId: string): 'free' | 'premium' {
+export function tierFromAppleProductId(productId: string): 'free' | 'premium' {
   // Product IDs configured in App Store Connect:
   // - com.legacysports.app.premium.monthly
   // - com.legacysports.app.premium.annual
-  if (
-    productId.includes('premium') ||
-    productId.includes('monthly') ||
-    productId.includes('annual')
-  ) {
-    return 'premium';
-  }
-  return 'free';
+  return isPremiumProductId(productId) ? 'premium' : 'free';
 }
 
 /**
@@ -1851,12 +1858,6 @@ async function getPreviousTierForAppleSubscription(
 }
 
 // ─── Google Play Billing ──────────────────────────────────────────────────────
-
-// Google Play product IDs as configured in Google Play Console
-const GOOGLE_PLAY_PRODUCT_IDS = [
-  'com.legacysports.app.premium.monthly',
-  'com.legacysports.app.premium.annual',
-] as const;
 
 const GoogleVerifyResultRef = builder.objectRef<{
   success: boolean;
@@ -1910,10 +1911,7 @@ builder.mutationField('verifyGooglePurchase', (t) =>
       const { purchaseToken, productId } = args;
 
       // Validate the product ID is a known Google Play subscription
-      const knownProductId = GOOGLE_PLAY_PRODUCT_IDS.find(
-        (id) => id === productId,
-      );
-      if (!knownProductId) {
+      if (!isPremiumProductId(productId)) {
         LOGGER.warn('verifyGooglePurchase — unknown productId', {
           userId,
           productId,
@@ -1955,7 +1953,7 @@ builder.mutationField('verifyGooglePurchase', (t) =>
       // product from Google's response so a real token for one SKU cannot be
       // claimed as another.
       const verifiedLineItem = googleSub.lineItems?.find((item) =>
-        GOOGLE_PLAY_PRODUCT_IDS.some((id) => id === item.productId),
+        isPremiumProductId(item.productId),
       );
       if (!verifiedLineItem) {
         LOGGER.warn('verifyGooglePurchase — no known product in line items', {
@@ -2100,6 +2098,24 @@ builder.mutationField('restoreGooglePurchases', (t) =>
       const userId = context.user.id;
       const { purchaseToken, productId } = args;
 
+      // Validate the product ID is a known Google Play subscription before
+      // it is used or persisted (mirrors verifyGooglePurchase).
+      if (!isPremiumProductId(productId)) {
+        LOGGER.warn('restoreGooglePurchases — unknown productId', {
+          userId,
+          productId,
+        });
+        captureWarning(
+          new Error('restoreGooglePurchases — unknown productId'),
+          {
+            userId,
+            productId,
+            operation: 'restoreGooglePurchases',
+          },
+        );
+        return false;
+      }
+
       // Validate the purchase token against the Google Play Developer API.
       let googleSub;
       try {
@@ -2186,18 +2202,11 @@ builder.mutationField('restoreGooglePurchases', (t) =>
 
 // ─── Google Play Helpers ──────────────────────────────────────────────────────
 
-function tierFromGoogleProductId(productId: string): 'free' | 'premium' {
+export function tierFromGoogleProductId(productId: string): 'free' | 'premium' {
   // Product IDs configured in Google Play Console:
   // - com.legacysports.app.premium.monthly
   // - com.legacysports.app.premium.annual
-  if (
-    productId.includes('premium') ||
-    productId.includes('monthly') ||
-    productId.includes('annual')
-  ) {
-    return 'premium';
-  }
-  return 'free';
+  return isPremiumProductId(productId) ? 'premium' : 'free';
 }
 
 /**

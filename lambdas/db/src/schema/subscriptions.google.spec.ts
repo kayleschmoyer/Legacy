@@ -52,7 +52,11 @@ jest.mock('../apple-jws', () => ({
   decodeAndVerifyJwsTransaction: jest.fn(),
 }));
 
-import { tierAndStatusFromGoogleSubscription } from './subscriptions';
+import {
+  tierAndStatusFromGoogleSubscription,
+  tierFromAppleProductId,
+  tierFromGoogleProductId,
+} from './subscriptions';
 import type { SubscriptionPurchaseV2 } from '../server/google-play';
 
 const PRODUCT_ID = 'com.legacysports.app.premium.monthly';
@@ -168,5 +172,32 @@ describe('tierAndStatusFromGoogleSubscription', () => {
       expect.stringContaining('unknown subscriptionState'),
       expect.objectContaining({ subscriptionState: unknownState }),
     );
+  });
+});
+
+// LS-7416: tier mapping is an exact match against the product-ID allowlist,
+// never a substring test.
+describe.each([
+  ['tierFromAppleProductId', tierFromAppleProductId],
+  ['tierFromGoogleProductId', tierFromGoogleProductId],
+])('%s', (_name, tierFromProductId) => {
+  it.each([
+    'com.legacysports.app.premium.monthly',
+    'com.legacysports.app.premium.annual',
+  ])('maps allowlisted productId %s to premium', (productId) => {
+    expect(tierFromProductId(productId)).toBe('premium');
+  });
+
+  it.each([
+    'com.test.monthly-cheap',
+    'xxxpremiumxxx',
+    'premium',
+    'monthly',
+    'annual',
+    'com.legacysports.app.premium.monthly.extra',
+    'COM.LEGACYSPORTS.APP.PREMIUM.MONTHLY',
+    '',
+  ])('maps non-allowlisted productId %j to free', (productId) => {
+    expect(tierFromProductId(productId)).toBe('free');
   });
 });

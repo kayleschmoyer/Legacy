@@ -512,6 +512,36 @@ describe('Google Play mutation validation (LS-5121)', () => {
   });
 
   describe('restoreGooglePurchases', () => {
+    // LS-7416: client-supplied productId must be allowlisted before use.
+    it.each(['com.test.monthly-cheap', 'xxxpremiumxxx', 'annual', ''])(
+      'returns false, warns, and never calls Google when productId is %j',
+      async (productId) => {
+        const resolve = getResolver('restoreGooglePurchases');
+        const result = await resolve(
+          {},
+          { purchaseToken: 'fake-token', productId },
+          mockContext,
+          undefined as never,
+        );
+
+        expect(result).toBe(false);
+        expect(mockFetchGoogleSubscription).not.toHaveBeenCalled();
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          'restoreGooglePurchases — unknown productId',
+          expect.objectContaining({ productId }),
+        );
+        expect(mockCaptureWarning).toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: 'restoreGooglePurchases — unknown productId',
+          }),
+          expect.objectContaining({
+            productId,
+            operation: 'restoreGooglePurchases',
+          }),
+        );
+      },
+    );
+
     it('returns false when subscription is not active', async () => {
       mockFetchGoogleSubscription.mockResolvedValue({
         subscriptionState: 'SUBSCRIPTION_STATE_CANCELED',
