@@ -41,6 +41,7 @@ import {
   useThemeContext,
 } from './context/ThemeContext';
 import { GrowthBookProvider } from './context/GrowthBookProvider';
+import { MotionPreferenceSync } from './context/MotionPreference';
 import { ConsentManager } from './consent/ConsentManager';
 import { LoginPage } from './pages/login/LoginPage';
 import { clearWebPushRegistration } from './hooks/useWebPushRegistration';
@@ -250,6 +251,9 @@ try {
                 landing page, and early in DOM order so keyboard and
                 screen-reader users reach it first. */}
             <ConsentManager />
+            {/* Applies the Preferences "Animations" toggle app-wide via
+                <html data-animations> (LS-10273). */}
+            <MotionPreferenceSync />
             <AuthProvider
               config={authConfig}
               onUserSwitch={async () => {

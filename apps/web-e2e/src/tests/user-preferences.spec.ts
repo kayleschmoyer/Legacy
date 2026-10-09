@@ -99,4 +99,22 @@ test.describe('User Preferences – toggle interaction @regression', () => {
     await settingsPage.preferences.toggleAnimations();
     await settingsPage.preferences.expectAnimationsChecked(!initialState);
   });
+
+  // LS-10273: the toggle drives a global <html data-animations> switch that
+  // the stylesheet uses to collapse motion app-wide, with no reload.
+  test('Animations toggle OFF sets the global motion switch', async ({
+    settingsPage,
+  }) => {
+    await settingsPage.preferences.goto();
+
+    // E2E forces prefers-reduced-motion, so the default may already be OFF.
+    if (!(await settingsPage.preferences.animationsChecked())) {
+      await settingsPage.preferences.toggleAnimations();
+    }
+    await settingsPage.preferences.expectGlobalMotion('on');
+
+    await settingsPage.preferences.toggleAnimations();
+    await settingsPage.preferences.expectAnimationsChecked(false);
+    await settingsPage.preferences.expectGlobalMotion('off');
+  });
 });

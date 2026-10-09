@@ -62,7 +62,7 @@ export class SettingsPage extends BaseScreen {
           'the Page escape hatch (LS-8456).',
       );
     }
-    this.preferences = new PreferencesSurface(driver);
+    this.preferences = new PreferencesSurface(driver, driver.page);
     this.profile = new ProfileSurface(driver, driver.page);
   }
 }
@@ -83,9 +83,13 @@ class PreferencesSurface {
   readonly #saveBanner: UIElement;
   readonly #animationsToggle: UIElement;
   readonly #signInButton: UIElement;
+  readonly #page: Page;
 
-  constructor(driver: AppDriver) {
+  constructor(driver: AppDriver, page: Page) {
     this.#driver = driver;
+    // Web-only escape hatch: the global motion switch lives on <html>, which
+    // has no role/test-id the driver can address (LS-10273).
+    this.#page = page;
     this.#heading = driver.byRole('heading', { name: 'Preferences' });
     this.#saveBanner = driver.byTestId('prefs-save-banner');
     // The animations control is an ARIA switch labelled "Animations".
@@ -155,6 +159,14 @@ class PreferencesSurface {
   }
 
   // ── Assertions ────────────────────────────────────────────────────
+
+  /** Assert the app-wide motion switch (`<html data-animations>`) state (LS-10273). */
+  async expectGlobalMotion(state: 'on' | 'off'): Promise<void> {
+    await expect(this.#page.locator('html')).toHaveAttribute(
+      'data-animations',
+      state,
+    );
+  }
 
   /** Assert the "Preferences" heading is visible. */
   async expectHeading(): Promise<void> {

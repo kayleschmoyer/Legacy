@@ -31,6 +31,17 @@ body {
   }
 }
 
+/* Preferences > Animations OFF (LS-10273): same collapse as the OS rule above,
+   driven by <html data-animations="off"> from MotionPreferenceSync. */
+[data-animations='off'] *,
+[data-animations='off'] *::before,
+[data-animations='off'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
 /* Default focus-visible outline for keyboard users */
 :where(:focus-visible) {
   outline: 3px solid var(--focusRing, #2684ff);
