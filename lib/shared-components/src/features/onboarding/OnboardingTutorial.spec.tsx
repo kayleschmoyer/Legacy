@@ -175,6 +175,27 @@ describe('OnboardingTutorial — step navigation', () => {
   });
 });
 
+describe('OnboardingTutorial — Pro formats preview (LS-6898)', () => {
+  it('previews premium league formats with a link to /pricing on the scoring step', () => {
+    const onNavigate = jest.fn();
+    // Index 3 is the "Scoring from Archived Box Scores" step.
+    render(
+      <OnboardingTutorial
+        onClose={jest.fn()}
+        onNavigate={onNavigate}
+        initialStep={3}
+      />,
+    );
+
+    expect(screen.getByText(/Coming up: Pro league formats/)).toBeVisible();
+    expect(screen.getByText(/FAAB waiver bidding/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Learn more about Pro →'));
+
+    expect(onNavigate).toHaveBeenCalledWith('/pricing');
+  });
+});
+
 describe('OnboardingTutorial — free plan limits (LS-6895)', () => {
   it('states the free-tier caps on the final step, before the Create League CTA', () => {
     render(<OnboardingTutorial onClose={jest.fn()} />);

@@ -46,6 +46,30 @@ function Inline({ inline }: { inline: OnboardingInline }) {
   }
 }
 
+function CalloutLink({
+  link,
+  renderLink,
+  onLinkPress,
+}: {
+  link: { href: string; text: string };
+  renderLink?: OnboardingBlocksProps['renderLink'];
+  onLinkPress: OnboardingBlocksProps['onLinkPress'];
+}) {
+  const label = (
+    <Text color="$brandGoldLight" fontWeight="600" fontSize={13}>
+      {link.text}
+    </Text>
+  );
+  const onPress = () => onLinkPress(link.href);
+  return renderLink ? (
+    renderLink({ href: link.href, onPress, children: label })
+  ) : (
+    <Text role="link" cursor="pointer" onPress={onPress}>
+      {label}
+    </Text>
+  );
+}
+
 function ChecklistRow({
   item,
   renderLink,
@@ -138,6 +162,13 @@ function Block({
           <Paragraph color="$colorPress" fontSize="$3" lineHeight={22}>
             {block.body}
           </Paragraph>
+          {block.link ? (
+            <CalloutLink
+              link={block.link}
+              renderLink={renderLink}
+              onLinkPress={onLinkPress}
+            />
+          ) : null}
         </YStack>
       );
     case 'bullets':

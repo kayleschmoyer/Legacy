@@ -34,6 +34,8 @@ export type OnboardingBlock =
       iconLabel: string;
       title: string;
       body: string;
+      /** Optional CTA rendered under the body via the host's `renderLink`. */
+      link?: { href: string; text: string };
     }
   | { type: 'bullets'; items: { icon: string; text: string }[] }
   | {
@@ -245,6 +247,14 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
           'League commissioners can customize scoring weights in league settings.',
         ),
       ),
+      {
+        type: 'callout',
+        icon: '⭐',
+        iconLabel: 'star',
+        title: 'Coming up: Pro league formats',
+        body: 'When you set up a league you’ll also see Pro options: FAAB waiver bidding, keeper and dynasty leagues, and advanced scheduling.',
+        link: { href: '/pricing', text: 'Learn more about Pro →' },
+      },
     ],
   },
   {
