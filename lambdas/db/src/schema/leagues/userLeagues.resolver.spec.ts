@@ -333,6 +333,7 @@ describe('userLeagueCount query (LS-9101)', () => {
             isPublic: 'isPublic',
             createdAt: 'createdAt',
             tierFrozenAt: 'tierFrozenAt',
+            frozenAt: 'frozenAt',
           },
           leagueMembers: {
             leagueId: 'leagueId',
@@ -455,5 +456,13 @@ describe('userLeagueCount query (LS-9101)', () => {
     const result = await getResolver()({}, {}, mockContext, undefined as never);
 
     expect(result).toBe(0);
+  });
+
+  it('excludes frozen leagues from the count, matching requireJoinLeagueCapacity (LS-10171)', async () => {
+    await getResolver()({}, {}, mockContext, undefined as never);
+
+    const whereClause = JSON.stringify(mockDb.where.mock.calls[0][0]);
+    expect(whereClause).toContain('frozenAt');
+    expect(whereClause).toContain(' is null');
   });
 });

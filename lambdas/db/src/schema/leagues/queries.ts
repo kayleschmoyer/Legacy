@@ -20,6 +20,7 @@ import {
   eq,
   ilike,
   inArray,
+  isNull,
   ne,
   or,
   sql,
@@ -457,8 +458,8 @@ builder.queryField('userLeagues', (t) =>
   }),
 );
 
-// Query field for the authoritative total count of a user's non-mock leagues
-// across every sport (LS-9101). userLeagues is now paginated (default page
+// Query field for the authoritative total count of a user's non-frozen leagues
+// across every sport (LS-9101, LS-10171). userLeagues is now paginated (default page
 // size 50), so `userLeagues.length` can no longer be trusted as the free-tier
 // league-cap gate's input for users at/above the page size — this field
 // exists specifically so FootballHubPage/FootballHomeScreen/BaseballScreen/
@@ -485,7 +486,14 @@ builder.queryField('userLeagueCount', (t) =>
             PublicSchema.leagueMembers,
             eq(PublicSchema.leagues.id, PublicSchema.leagueMembers.leagueId),
           )
-          .where(and(eq(PublicSchema.leagueMembers.userId, userId)));
+          .where(
+            and(
+              eq(PublicSchema.leagueMembers.userId, userId),
+              // Mirror requireJoinLeagueCapacity: frozen leagues do not count
+              // toward the free-tier cap (LS-10171).
+              isNull(PublicSchema.leagues.frozenAt),
+            ),
+          );
 
         return Number(result[0]?.total ?? 0);
       } catch (error) {
