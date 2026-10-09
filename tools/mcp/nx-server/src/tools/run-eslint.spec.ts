@@ -407,6 +407,69 @@ describe('runESLint', () => {
     expect(mockRunJob).not.toHaveBeenCalled();
   });
 
+  it('lints the whole project from its own config root when files is omitted (LS-10355)', async () => {
+    setConfigRoots([ROOT, DB]);
+    setProjectRoot('lambdas/db');
+    setupDoneJob('');
+
+    const result = await runESLint({ project: 'db' });
+
+    expect(result.isError).toBeUndefined();
+    expect(jobCallArgs()).toEqual(['.']);
+    expect(jobCallOpts().cwd).toBe(DB);
+    expect(JSON.parse(result.content[0].text)).toMatchObject({
+      files: 0,
+      projectRoot: 'lambdas/db',
+      passed: true,
+    });
+  });
+
+  it('targets the project root relative to an ancestor config when the project has none (LS-10355)', async () => {
+    setConfigRoots([ROOT]);
+    setProjectRoot('apps/web-e2e');
+    setupDoneJob('');
+
+    await runESLint({ project: 'web-e2e', mode: 'fix' });
+
+    expect(jobCallArgs()).toEqual(['--fix', 'apps/web-e2e']);
+    expect(jobCallOpts().cwd).toBe(ROOT);
+  });
+
+  it('returns structured counts for a failing whole-project run (LS-10355)', async () => {
+    setConfigRoots([ROOT, DB]);
+    setProjectRoot('lambdas/db');
+    mockRunJob.mockImplementation((jobOpts: StartJobOptions) =>
+      Promise.resolve({
+        jobId: 'j',
+        status: 'failed',
+        label: jobOpts.label,
+        cwd: jobOpts.cwd,
+        elapsedSec: 1,
+        exitCode: 1,
+        error: 'exit 1',
+        meta: jobOpts.meta,
+        log: '✖ 3 problems (2 errors, 1 warning)',
+      } as JobSnapshot),
+    );
+
+    const result = await runESLint({ project: 'db' });
+
+    expect(result.isError).toBe(true);
+    expect(JSON.parse(result.content[0].text)).toMatchObject({
+      passed: false,
+      errorCount: 2,
+      warningCount: 1,
+    });
+  });
+
+  it('rejects an omitted files list without a project (LS-10355)', async () => {
+    const result = await runESLint({});
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/pass `project` alone/);
+    expect(mockRunJob).not.toHaveBeenCalled();
+  });
+
   it('accepts a directory named "..foo" rather than treating it as an escape', async () => {
     setConfigRoots([ROOT]);
     setupDoneJob('');

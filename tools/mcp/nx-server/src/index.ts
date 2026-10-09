@@ -447,30 +447,30 @@ server.tool(
 // --- nx_run_eslint ---
 server.tool(
   'nx_run_eslint',
-  'Prefer this over raw `pnpm exec eslint <files>` via shell when you need to lint a small, ' +
-    'explicit file list. Runs eslint against exactly the given files, and from the nearest ' +
-    "directory owning an eslint.config.* so the project's flat config actually applies " +
-    '(ESLint 9 resolves flat config from its cwd, not per file). A file list spanning two ' +
-    `config roots is rejected — split it into one call per root. Capped at ${ESLINT_MAX_FILES} ` +
-    "files. Verdict agrees with pc-lint by default: errors fail, warnings alone don't; pass " +
-    'maxWarnings to opt into a stricter threshold. Result has errorCount/warningCount fields. ' +
-    'IMPORTANT — NOT a fast path here: type-aware rules force a full TypeScript program build ' +
-    'per run (~280s in lambdas/db), regardless of file count. Use for a narrow report; use ' +
-    'nx_run({ project, target: "lint" }) for a whole (cached) project, nx_run_pc_chunk({ chunk: ' +
-    '"pc-lint" }) for the repo. A run still going after ~45s returns { status: "running", jobId } ' +
-    '— call nx_job_wait to continue; do NOT re-run.',
+  'Prefer this over raw `pnpm exec eslint` via shell. Lints a small explicit file list, or the ' +
+    'whole project when `files` is omitted and `project` set. Runs from the nearest directory ' +
+    "owning an eslint.config.* so the project's flat config applies; a file list spanning two " +
+    `config roots is rejected (split per root). Capped at ${ESLINT_MAX_FILES} files. Verdict ` +
+    "matches pc-lint: errors fail, warnings don't (maxWarnings opts into stricter). Result has " +
+    'errorCount/warningCount. NOT a fast path: type-aware rules build a full TS program per run ' +
+    '(~280s in lambdas/db). A run still going after ~45s returns { status: "running", jobId } ' +
+    '— call nx_job_wait; do NOT re-run.',
   {
     files: z
       .array(z.string())
       .min(1)
+      .optional()
       .describe(
         'Paths to lint: relative to `project` root if given (falling back to repo-root), else ' +
-          'repo-root/worktreePath-relative or absolute. Must share one eslint.config.* root.',
+          'repo-root/worktreePath-relative or absolute. Must share one eslint.config.* root. ' +
+          'Omit with `project` set to lint the whole project.',
       ),
     project: z
       .string()
       .optional()
-      .describe('Nx project name to resolve `files` against.'),
+      .describe(
+        'Nx project name; resolves `files`, or lints the whole project if `files` omitted.',
+      ),
     mode: z
       .enum(['check', 'fix'])
       .default('check')

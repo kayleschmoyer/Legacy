@@ -11,7 +11,7 @@ Nx build system intelligence for AI agents — project discovery, affected analy
 - **nx_run_test** — Run one spec/test by pattern; `report: "summary" | "json"` returns Jest's parsed failure list instead of the raw log (see [Structured test failures](#structured-test-failures))
 - **nx_run_affected** — Run a target on all affected projects
 - **nx_run_prettier** — Run `prettier --check`/`--write` against an explicit, small file list (capped at 50 files) without the whole-repo side effects of `nx_run_pc_chunk({ chunk: 'pc-format' })`
-- **nx_run_eslint** — Run `eslint` (optionally `--fix`, and against an nx `project`-relative or repo-relative file list) against an explicit, small file list (capped at 50 files) instead of linting a whole project or the whole repo. Pass/fail agrees with `pc-lint` by default (errors fail, warnings don't); pass `maxWarnings` to opt into a stricter threshold. See [Scoped lint and typecheck](#scoped-lint-and-typecheck)
+- **nx_run_eslint** — Run `eslint` (optionally `--fix`, and against an nx `project`-relative or repo-relative file list) against an explicit, small file list (capped at 50 files), or — with `files` omitted and `project` set — the whole project (`eslint .` from its root, LS-10355). Pass/fail agrees with `pc-lint` by default (errors fail, warnings don't); pass `maxWarnings` to opt into a stricter threshold. See [Scoped lint and typecheck](#scoped-lint-and-typecheck)
 - **nx_dep_graph** — Query dependency relationships between projects
 - **nx_install_package** — Symlink-aware package installation with lock file, duplicate detection, and @types/ companion check
 - **nx_check_package_health** — Scan workspace for nested node_modules, wildcard ranges, missing overrides, and missing @types/ companions
@@ -22,7 +22,7 @@ Wraps Nx CLI commands (`nx show projects`, `nx show project`, `nx affected`, `nx
 
 ### Scoped lint and typecheck
 
-`nx_run_eslint` lints an explicit, small file list instead of a whole project (`eslint .`) or the whole repo (`pc-lint`) — useful when you want a report narrowed to the files you just touched (LS-8735). By default it omits `--max-warnings` (unlimited), so `passed` agrees with `pc-lint`'s own verdict — errors fail, warnings alone don't; pass `maxWarnings: 0` to opt into `pc-lint`'s stricter `eslint . --max-warnings=0` threshold deliberately (LS-10143). The result's `errorCount`/`warningCount` fields carry the error/warning split without parsing the rendered `output` text.
+`nx_run_eslint` lints an explicit, small file list, or a whole project when `files` is omitted and `project` is passed (e.g. `nx_run_eslint({ project: "db" })` after `pc-lint` reports `db:lint` red, LS-10355), instead of the whole repo (`pc-lint`) — useful when you want a report narrowed to the files you just touched (LS-8735). By default it omits `--max-warnings` (unlimited), so `passed` agrees with `pc-lint`'s own verdict — errors fail, warnings alone don't; pass `maxWarnings: 0` to opt into `pc-lint`'s stricter `eslint . --max-warnings=0` threshold deliberately (LS-10143). The result's `errorCount`/`warningCount` fields carry the error/warning split without parsing the rendered `output` text.
 
 `files` entries are tried relative to the named `project`'s root first (when `project` is given), falling back to repo-root/`worktreePath`-relative — so `nx_run_eslint({ project: "db", files: ["src/queries.ts"] })` works without spelling out `lambdas/db/src/queries.ts` (LS-10143).
 

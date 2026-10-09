@@ -13,9 +13,9 @@ import { getRepoRoot, runNx } from '../run-command.js';
 import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';
 
-// This tool is for surgical lint feedback on a handful of files, not
-// whole-project or whole-repo linting — nx_run({ target: 'lint' }) and
-// nx_run_pc_chunk({ chunk: 'pc-lint' }) already cover those paths.
+// An explicit file list is for surgical lint feedback on a handful of files.
+// Whole-project linting is reached by omitting `files` and passing `project`
+// (LS-10355); whole-repo linting stays with nx_run_pc_chunk({ chunk: 'pc-lint' }).
 export const MAX_FILES = 50;
 
 /**
@@ -54,7 +54,8 @@ const ESLINT_CONFIG_FILENAMES = [
 ];
 
 export interface RunESLintParams {
-  files: string[];
+  /** Omit with `project` set to lint the whole project (`eslint .` from its root). */
+  files?: string[];
   project?: string;
   mode?: 'check' | 'fix';
   maxWarnings?: number;
@@ -265,21 +266,31 @@ export async function runESLint(params: RunESLintParams): Promise<ToolResult> {
   const cwd = resolve(params.worktreePath || getRepoRoot());
   const mode = params.mode ?? 'check';
 
-  // The MCP schema enforces a non-empty list, but runESLint is also called
-  // directly (tests, future callers) — fail with a message rather than
-  // destructuring an empty group map below.
-  if (params.files.length === 0) {
-    return errorResult('No files given — pass at least one file to lint.');
-  }
+  // Whole-project mode (LS-10355): `files` omitted, `project` set.
+  const wholeProject = params.files === undefined;
+  const requestedFiles = params.files ?? [];
 
-  if (params.files.length > MAX_FILES) {
+  if (wholeProject && !params.project) {
     return errorResult(
-      `Too many files (${params.files.length}) — nx_run_eslint is scoped to surgical fixes, capped at ${MAX_FILES}. ` +
-        `For broader linting use nx_run({ project, target: "lint" }) or nx_run_pc_chunk({ chunk: "pc-lint" }) instead.`,
+      'Nothing to lint — pass `files`, or pass `project` alone to lint the whole project.',
     );
   }
 
-  for (const file of params.files) {
+  // The MCP schema enforces a non-empty list, but runESLint is also called
+  // directly (tests, future callers) — fail with a message rather than
+  // destructuring an empty group map below.
+  if (!wholeProject && requestedFiles.length === 0) {
+    return errorResult('No files given — pass at least one file to lint.');
+  }
+
+  if (requestedFiles.length > MAX_FILES) {
+    return errorResult(
+      `Too many files (${requestedFiles.length}) — an explicit file list is capped at ${MAX_FILES}. ` +
+        `To lint a whole project omit \`files\` and pass \`project\`; for the repo use nx_run_pc_chunk({ chunk: "pc-lint" }).`,
+    );
+  }
+
+  for (const file of requestedFiles) {
     if (file.startsWith('-')) {
       return errorResult(
         `Invalid file "${file}": must not start with "-" (would be interpreted as an eslint flag).`,
@@ -306,7 +317,7 @@ export async function runESLint(params: RunESLintParams): Promise<ToolResult> {
   // config per invocation (resolved from cwd), so a list spanning two projects
   // cannot be linted correctly in a single run.
   const byConfigDir = new Map<string, string[]>();
-  for (const file of params.files) {
+  for (const file of requestedFiles) {
     let absFile: string;
     if (projectRootAbs) {
       const projectRelative = resolve(projectRootAbs, file);
@@ -354,6 +365,19 @@ export async function runESLint(params: RunESLintParams): Promise<ToolResult> {
     } else {
       byConfigDir.set(configDir, [relFile]);
     }
+  }
+
+  if (wholeProject && projectRootAbs) {
+    // Lint from the nearest dir owning a flat config (the project's own, else
+    // an ancestor's), targeting the project root relative to it — `.` when the
+    // project owns the config, i.e. what `nx run <project>:lint` does.
+    const configDir = resolveConfigDir(
+      resolve(projectRootAbs, '__project__'),
+      cwd,
+    );
+    byConfigDir.set(configDir, [
+      toPosix(relative(configDir, projectRootAbs)) || '.',
+    ]);
   }
 
   if (byConfigDir.size > 1) {
@@ -405,7 +429,9 @@ export async function runESLint(params: RunESLintParams): Promise<ToolResult> {
       args: jobSpec.args,
       shell: jobSpec.shell,
       cwd: configDir,
-      label: `eslint (${params.files.length} file${params.files.length === 1 ? '' : 's'})`,
+      label: wholeProject
+        ? `eslint (project ${params.project})`
+        : `eslint (${requestedFiles.length} file${requestedFiles.length === 1 ? '' : 's'})`,
       timeoutMs: ESLINT_TIMEOUT_MS,
       // Blind retries (e.g. after a lost transport) join the in-flight run
       // instead of spawning a duplicate eslint process.
@@ -413,7 +439,7 @@ export async function runESLint(params: RunESLintParams): Promise<ToolResult> {
       meta: {
         kind: 'eslint',
         mode,
-        filesCount: params.files.length,
+        filesCount: requestedFiles.length,
         projectRoot,
       },
     },
@@ -427,7 +453,7 @@ export async function runESLint(params: RunESLintParams): Promise<ToolResult> {
           type: 'text',
           text: minifiedJson({
             mode,
-            files: params.files.length,
+            files: requestedFiles.length,
             projectRoot,
             status: snapshot.status,
             jobId: snapshot.jobId,
