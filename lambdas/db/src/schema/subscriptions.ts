@@ -1515,8 +1515,6 @@ builder.mutationField('expireSubscriptionGracePeriods', (t) =>
 
 // ─── Apple IAP ───────────────────────────────────────────────────────────────
 
-const GRACE_PERIOD_DAYS = 7;
-
 // App Store Server API base URL (production; sandbox uses sandbox.itunes.apple.com)
 const APPLE_ENVIRONMENT = process.env['APPLE_ENVIRONMENT'] ?? 'production';
 
@@ -1668,6 +1666,11 @@ builder.mutationField('verifyApplePurchase', (t) =>
  * Called when the user taps "Restore Purchases" in the app settings.
  * The caller should first call `getAvailablePurchases()` via react-native-iap
  * and pass the most recent transaction's JWS string here.
+ *
+ * Restore reflects Apple's current entitlement read-only: tier/status derive
+ * solely from the signed `expiresDate`, and no grace period is applied or
+ * written (grace belongs only to the Stripe payment-failure flow). Any stale
+ * `gracePeriodEndsAt` on the row is cleared.
  */
 builder.mutationField('restoreApplePurchases', (t) =>
   t.field({
@@ -1732,20 +1735,9 @@ builder.mutationField('restoreApplePurchases', (t) =>
       const expiry = expiresDate ? new Date(expiresDate) : null;
       const isExpired = expiry ? expiry < now : false;
 
-      // Add grace period for recently expired subscriptions when restoring
-      const gracePeriodEnd =
-        isExpired && expiry
-          ? new Date(expiry.getTime() + GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000)
-          : null;
-      const withinGrace = gracePeriodEnd ? gracePeriodEnd > now : false;
-
-      const tier: 'free' | 'premium' =
-        !isExpired || withinGrace ? 'premium' : 'free';
-      const status = isExpired
-        ? withinGrace
-          ? 'past_due'
-          : 'canceled'
-        : 'active';
+      // Restore reflects Apple's signed entitlement read-only: no grace period.
+      const tier: 'free' | 'premium' = isExpired ? 'free' : 'premium';
+      const status = isExpired ? 'canceled' : 'active';
 
       await runWithInternalClient(getDbOptions(), async (db) => {
         await db
@@ -1758,7 +1750,7 @@ builder.mutationField('restoreApplePurchases', (t) =>
             tier,
             currentPeriodEnd: expiry,
             cancelAtPeriodEnd: false,
-            gracePeriodEndsAt: gracePeriodEnd,
+            gracePeriodEndsAt: null,
           })
           .onConflictDoUpdate({
             target: InternalSchema.subscriptions.appleOriginalTransactionId,
@@ -1767,7 +1759,8 @@ builder.mutationField('restoreApplePurchases', (t) =>
               status,
               tier,
               currentPeriodEnd: expiry,
-              gracePeriodEndsAt: gracePeriodEnd,
+              // Clear any grace window left by the former restore grace bug.
+              gracePeriodEndsAt: null,
               updatedAt: new Date(),
             },
           });

@@ -652,6 +652,113 @@ describe('Google Play mutation validation (LS-5121)', () => {
     });
   });
 
+  // LS-7411: restore reflects Apple's signed expiry read-only — no grace period.
+  describe('restoreApplePurchases (LS-7411)', () => {
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const productId = 'com.legacysports.app.premium.monthly';
+
+    function installCapture(): {
+      inserts: Record<string, unknown>[];
+      updateSets: Record<string, unknown>[];
+    } {
+      const inserts: Record<string, unknown>[] = [];
+      const updateSets: Record<string, unknown>[] = [];
+      const mockDb = {
+        insert: () => ({
+          values: (v: Record<string, unknown>) => {
+            inserts.push(v);
+            return {
+              onConflictDoUpdate: (arg: { set: Record<string, unknown> }) => {
+                updateSets.push(arg.set);
+                return Promise.resolve();
+              },
+            };
+          },
+        }),
+        update: () => ({
+          set: () => ({ where: async () => undefined }),
+        }),
+      };
+      const dbClient = jest.requireMock('@legacy-sports/db-client');
+      dbClient.runWithInternalClient.mockImplementation(
+        async (_opts: unknown, cb: (db: typeof mockDb) => unknown) =>
+          cb(mockDb),
+      );
+      return { inserts, updateSets };
+    }
+
+    function mockTransaction(expiresDate: number): void {
+      const appleJws = jest.requireMock('../apple-jws');
+      appleJws.decodeAndVerifyJwsTransaction.mockResolvedValue({
+        originalTransactionId: 'orig-1',
+        productId,
+        expiresDate,
+      });
+    }
+
+    async function restore(): Promise<unknown> {
+      const resolve = getResolver('restoreApplePurchases');
+      return resolve(
+        {},
+        { jwsTransaction: 'fake-jws' },
+        mockContext,
+        undefined as never,
+      );
+    }
+
+    it('grants free/canceled with no grace for a transaction expired 6 days ago', async () => {
+      const capture = installCapture();
+      mockTransaction(Date.now() - 6 * DAY_MS);
+
+      await expect(restore()).resolves.toBe(true);
+
+      expect(capture.inserts[0]).toMatchObject({
+        tier: 'free',
+        status: 'canceled',
+        gracePeriodEndsAt: null,
+      });
+      expect(capture.updateSets[0]).toMatchObject({
+        tier: 'free',
+        status: 'canceled',
+        gracePeriodEndsAt: null,
+      });
+    });
+
+    it('stays free on repeated restores of the same expired transaction', async () => {
+      const capture = installCapture();
+      mockTransaction(Date.now() - 6 * DAY_MS);
+
+      await restore();
+      await restore();
+
+      expect(capture.inserts).toHaveLength(2);
+      for (const written of [...capture.inserts, ...capture.updateSets]) {
+        expect(written).toMatchObject({
+          tier: 'free',
+          status: 'canceled',
+          gracePeriodEndsAt: null,
+        });
+      }
+    });
+
+    it('keeps premium/active for a currently active transaction', async () => {
+      const capture = installCapture();
+      mockTransaction(Date.now() + 10 * DAY_MS);
+
+      await expect(restore()).resolves.toBe(true);
+
+      expect(capture.inserts[0]).toMatchObject({
+        tier: 'premium',
+        status: 'active',
+        gracePeriodEndsAt: null,
+      });
+      expect(capture.updateSets[0]).toMatchObject({
+        tier: 'premium',
+        status: 'active',
+      });
+    });
+  });
+
   // LS-5191: the active path must record currentPeriodEnd from the Google Play
   // lineItems[0].expiryTime so Android subscribers have a renewal date.
   describe('currentPeriodEnd recording (LS-5191)', () => {
