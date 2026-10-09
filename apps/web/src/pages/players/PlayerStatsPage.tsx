@@ -498,7 +498,11 @@ export function parseStatsSearchParams(searchParams: URLSearchParams): {
   const team = sanitizeSearchParam(params.get('team'));
   const playerType: PlayerStatsFilters['playerType'] =
     sanitizeSearchParam(params.get('playerType')) ?? undefined;
-  const searchTerm = sanitizeSearchParam(params.get('searchTerm'));
+  // `searchTerm` is what the applied page writes; the Share link historically
+  // wrote `search` (LS-10492). Accept both so shared and old links keep working.
+  const searchTerm = sanitizeSearchParam(
+    params.get('searchTerm') ?? params.get('search'),
+  );
 
   // Apply batting filters
   if (minHR) filters.minHomeRuns = parseClampedInt(minHR, 'minHomeRuns');

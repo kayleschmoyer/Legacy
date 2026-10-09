@@ -582,6 +582,29 @@ describe('parseStatsSearchParams ↔ buildStatsSearchParams roundtrip', () => {
   });
 });
 
+describe('parseStatsSearchParams search alias (LS-10492)', () => {
+  it('reads the name search from searchTerm=', () => {
+    const parsed = parseStatsSearchParams(
+      new URLSearchParams('view=hitters&searchTerm=Bonds&sport=mlb&v=1'),
+    );
+    expect(parsed.filters.searchTerm).toBe('Bonds');
+  });
+
+  it('reads the name search from the Share link search= param', () => {
+    const parsed = parseStatsSearchParams(
+      new URLSearchParams('view=hitters&pageSize=25&search=Bonds&sport=mlb'),
+    );
+    expect(parsed.filters.searchTerm).toBe('Bonds');
+  });
+
+  it('prefers searchTerm= when both are present', () => {
+    const parsed = parseStatsSearchParams(
+      new URLSearchParams('searchTerm=Bonds&search=Aaron'),
+    );
+    expect(parsed.filters.searchTerm).toBe('Bonds');
+  });
+});
+
 describe('utf8ByteLength', () => {
   it('counts ASCII as one byte per char', () => {
     expect(utf8ByteLength('abc')).toBe(3);
