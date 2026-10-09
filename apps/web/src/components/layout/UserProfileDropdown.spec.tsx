@@ -9,10 +9,16 @@ import { MemoryRouter } from 'react-router-dom';
 
 import { UserProfileDropdown } from './UserProfileDropdown';
 
+let mockPicture: string | null = null;
+
 jest.mock('@legacy-sports/shared-components/auth', () => ({
   useAuth: () => ({
     isAuthenticated: true,
-    user: { username: 'tester', email: 'tester@example.com', picture: null },
+    user: {
+      username: 'tester',
+      email: 'tester@example.com',
+      picture: mockPicture,
+    },
     logout: jest.fn(),
   }),
 }));
@@ -97,5 +103,27 @@ describe('UserProfileDropdown keyboard — LS-10706', () => {
       key: 'ArrowUp',
     });
     expect(document.activeElement).toBe(items[items.length - 1]);
+  });
+});
+
+describe('UserProfileDropdown avatar — LS-10276', () => {
+  afterEach(() => {
+    mockPicture = null;
+  });
+
+  it('renders the avatar without crossorigin so non-CORS Google photos load', () => {
+    mockPicture = 'https://lh3.googleusercontent.com/a/photo=s96-c';
+    renderDropdown();
+    const img = screen.getByRole('img', { name: 'tester' });
+    expect(img.hasAttribute('crossorigin')).toBe(false);
+    expect(img.getAttribute('referrerpolicy')).toBe('no-referrer');
+  });
+
+  it('falls back to the initial letter when the avatar fails to load', () => {
+    mockPicture = 'https://lh3.googleusercontent.com/a/photo=s96-c';
+    renderDropdown();
+    fireEvent.error(screen.getByRole('img', { name: 'tester' }));
+    expect(screen.queryByRole('img', { name: 'tester' })).toBeNull();
+    expect(screen.getByText('T')).toBeTruthy();
   });
 });
