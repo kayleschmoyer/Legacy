@@ -1,4 +1,5 @@
 import React from 'react';
+import { AccessibilityInfo } from 'react-native';
 import {
   act,
   fireEvent,
@@ -157,6 +158,7 @@ jest.mock('tamagui', () => {
       }) =>
         React.createElement(Pressable, {
           testID: testID ?? 'switch',
+          accessibilityState: { checked },
           onPress: () => onCheckedChange?.(!checked),
         }),
       { Thumb: (): null => null },
@@ -215,6 +217,89 @@ describe('PreferencesScreen', () => {
     mockEnableDeviceLogging.mockResolvedValue(undefined);
     mockShareCurrentLogFile.mockResolvedValue(undefined);
     mockServerPreferences = null;
+    jest
+      .spyOn(AccessibilityInfo, 'isReduceMotionEnabled')
+      .mockResolvedValue(false);
+  });
+
+  describe('animations default from OS Reduce Motion (LS-10274)', () => {
+    const reduceMotion = (enabled: boolean): void => {
+      jest
+        .spyOn(AccessibilityInfo, 'isReduceMotionEnabled')
+        .mockResolvedValue(enabled);
+    };
+    const isOn = (): boolean | undefined => {
+      const props = screen.getByTestId('enable-animations-toggle').props as {
+        accessibilityState?: { checked?: boolean };
+      };
+      return props.accessibilityState?.checked;
+    };
+
+    it('renders OFF when Reduce Motion is on and nothing is saved', async () => {
+      reduceMotion(true);
+      renderWithUser(false);
+      await waitFor(() => expect(isOn()).toBe(false));
+    });
+
+    it('stays ON when Reduce Motion is off', async () => {
+      reduceMotion(false);
+      renderWithUser(false);
+      await waitFor(() => {
+        expect(AccessibilityInfo.isReduceMotionEnabled).toHaveBeenCalled();
+      });
+      expect(isOn()).toBe(true);
+    });
+
+    it('stays ON when the lookup is unavailable (rejects)', async () => {
+      jest
+        .spyOn(AccessibilityInfo, 'isReduceMotionEnabled')
+        .mockRejectedValue(new Error('unavailable'));
+      renderWithUser(false);
+      await waitFor(() => {
+        expect(AccessibilityInfo.isReduceMotionEnabled).toHaveBeenCalled();
+      });
+      expect(isOn()).toBe(true);
+    });
+
+    it('lets a saved value win over Reduce Motion', async () => {
+      reduceMotion(true);
+      mockAsyncStorageGetItem.mockImplementation((key: string) =>
+        Promise.resolve(
+          key === 'ls_user_preferences'
+            ? JSON.stringify({ enableAnimations: true })
+            : null,
+        ),
+      );
+      renderWithUser(false);
+      await waitFor(() => {
+        expect(mockAsyncStorageGetItem).toHaveBeenCalledWith(
+          'ls_user_preferences',
+        );
+      });
+      expect(AccessibilityInfo.isReduceMotionEnabled).not.toHaveBeenCalled();
+      expect(isOn()).toBe(true);
+    });
+
+    it('does not overwrite a toggle the user flipped before the lookup resolved', async () => {
+      let resolveLookup: (v: boolean) => void = () => undefined;
+      jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockReturnValue(
+        new Promise<boolean>((resolve) => {
+          resolveLookup = resolve;
+        }),
+      );
+      renderWithUser(false);
+      await waitFor(() => {
+        expect(AccessibilityInfo.isReduceMotionEnabled).toHaveBeenCalled();
+      });
+
+      // User turns animations OFF then back ON while the lookup is pending.
+      fireEvent.press(screen.getByTestId('enable-animations-toggle'));
+      fireEvent.press(screen.getByTestId('enable-animations-toggle'));
+      resolveLookup(true);
+
+      await new Promise((r) => setTimeout(r, 0));
+      expect(isOn()).toBe(true);
+    });
   });
 
   describe('sound effects preference (LS-10111)', () => {

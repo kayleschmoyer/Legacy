@@ -7,7 +7,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Platform, ScrollView } from 'react-native';
+import { AccessibilityInfo, Platform, ScrollView } from 'react-native';
 import {
   Button,
   H1,
@@ -82,21 +82,37 @@ function saveWebPrefs(prefs: UserPreferences): void {
   sessionStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
 }
 
-async function loadPrefsAsync(): Promise<UserPreferences> {
+interface LoadedPrefs {
+  prefs: UserPreferences;
+  /** True when a saved `enableAnimations` value exists (it always wins). */
+  hasSavedAnimations: boolean;
+}
+
+async function loadPrefsAsync(): Promise<LoadedPrefs> {
   try {
     const raw =
       Platform.OS === 'web'
         ? loadWebPrefs()
         : await AsyncStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_PREFS;
+    if (!raw) return { prefs: DEFAULT_PREFS, hasSavedAnimations: false };
+    const stored = JSON.parse(raw) as Partial<UserPreferences>;
     return {
-      ...DEFAULT_PREFS,
-      ...(JSON.parse(raw) as Partial<UserPreferences>),
+      prefs: { ...DEFAULT_PREFS, ...stored },
+      hasSavedAnimations: typeof stored.enableAnimations === 'boolean',
     };
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
     LOGGER.error('Failed to load user preferences', err);
-    return DEFAULT_PREFS;
+    return { prefs: DEFAULT_PREFS, hasSavedAnimations: false };
+  }
+}
+
+/** OS "Reduce Motion" setting; `false` when the platform can't report it. */
+async function isOsReduceMotionEnabled(): Promise<boolean> {
+  try {
+    return await AccessibilityInfo.isReduceMotionEnabled();
+  } catch {
+    return false;
   }
 }
 
@@ -407,6 +423,9 @@ export default function PreferencesScreen(): React.JSX.Element {
   // Set by update() only: auto-save runs for user edits, never for load,
   // theme-context sync, or server hydration (LS-7663).
   const userEditedRef = useRef(false);
+  // Set once the user touches the animations toggle, so the async OS
+  // Reduce Motion lookup never overwrites their choice (LS-10274).
+  const animationsEditedRef = useRef(false);
   // The audio opt-in is persisted server-side so it syncs across devices
   // (LS-10111), the same basis as web's stats-format sync (LS-7138). Every
   // other preference on this screen remains device-local.
@@ -423,13 +442,25 @@ export default function PreferencesScreen(): React.JSX.Element {
 
   // Load persisted preferences on mount
   useEffect(() => {
-    void loadPrefsAsync().then((loaded) => {
-      setPrefs((prev) => ({
-        ...loaded,
-        theme: prev.theme,
-        audioEnabled: serverAudioRef.current ?? loaded.audioEnabled,
-      }));
-    });
+    void loadPrefsAsync().then(
+      async ({ prefs: loaded, hasSavedAnimations }) => {
+        setPrefs((prev) => ({
+          ...loaded,
+          theme: prev.theme,
+          audioEnabled: serverAudioRef.current ?? loaded.audioEnabled,
+        }));
+        // No saved value: default animations OFF when the OS asks to reduce
+        // motion (LS-10274, mirrors web LS-7072).
+        if (hasSavedAnimations) return;
+        if (await isOsReduceMotionEnabled()) {
+          setPrefs((prev) =>
+            animationsEditedRef.current
+              ? prev
+              : { ...prev, enableAnimations: false },
+          );
+        }
+      },
+    );
   }, []);
 
   const { collapsed, toggle } = useCollapsedSections();
@@ -465,6 +496,7 @@ export default function PreferencesScreen(): React.JSX.Element {
           variables: { input: { audioEnabled: value as boolean } },
         });
       }
+      if (key === 'enableAnimations') animationsEditedRef.current = true;
       userEditedRef.current = true;
       setPrefs((prev) => ({ ...prev, [key]: value }));
       setSaved(false);
@@ -570,6 +602,7 @@ export default function PreferencesScreen(): React.JSX.Element {
             onChange={(v) => update('enableAnimations', v)}
             label="Enable animations"
             description="Show transition animations throughout the app"
+            testID="enable-animations-toggle"
           />
 
           <Separator />
