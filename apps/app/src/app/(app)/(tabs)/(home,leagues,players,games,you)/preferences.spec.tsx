@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -206,10 +207,6 @@ jest.mock('tamagui', () => {
 describe('PreferencesScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    global.requestAnimationFrame = (callback: FrameRequestCallback): number => {
-      callback(0);
-      return 0;
-    };
     mockSecureHasItem.mockResolvedValue(false);
     mockSecureGetItem.mockResolvedValue(null);
     mockSecureSetItem.mockResolvedValue(undefined);
@@ -312,6 +309,80 @@ describe('PreferencesScreen', () => {
       renderWithUser(false);
       fireEvent.press(screen.getByText('System'));
       expect(mockSetThemePreference).toHaveBeenCalledWith('system');
+    });
+  });
+
+  describe('auto-save banner (LS-7663)', () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    async function flushLoad(): Promise<void> {
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+    }
+
+    it('shows no banner and writes nothing after the initial load', async () => {
+      renderWithUser(false);
+      await flushLoad();
+
+      expect(mockAsyncStorageGetItem).toHaveBeenCalled();
+      expect(screen.queryByText('Preferences saved')).toBeNull();
+      expect(mockAsyncStorageSetItem).not.toHaveBeenCalled();
+    });
+
+    it('shows no banner when persisted prefs differ from the defaults', async () => {
+      mockAsyncStorageGetItem.mockResolvedValue(
+        JSON.stringify({ defaultSport: 'football', statsFormat: 'expanded' }),
+      );
+      renderWithUser(false);
+      await flushLoad();
+
+      expect(screen.queryByText('Preferences saved')).toBeNull();
+      expect(mockAsyncStorageSetItem).not.toHaveBeenCalled();
+    });
+
+    it('shows no banner when server preferences hydrate after load', async () => {
+      mockServerPreferences = { audioEnabled: true };
+      renderWithUser(false);
+      await flushLoad();
+
+      expect(screen.queryByText('Preferences saved')).toBeNull();
+      expect(mockAsyncStorageSetItem).not.toHaveBeenCalled();
+    });
+
+    it('shows the banner and saves after a user edit, then hides it after 2s', async () => {
+      jest.useFakeTimers();
+      renderWithUser(false);
+      await flushLoad();
+
+      fireEvent.press(screen.getByText('Expanded'));
+      await flushLoad();
+
+      expect(screen.getByText('Preferences saved')).toBeTruthy();
+      expect(mockAsyncStorageSetItem).toHaveBeenCalled();
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(2000);
+      });
+      expect(screen.queryByText('Preferences saved')).toBeNull();
+    });
+
+    it('keeps the banner for 2s after a theme edit despite the context sync', async () => {
+      jest.useFakeTimers();
+      renderWithUser(false);
+      await flushLoad();
+
+      fireEvent.press(screen.getByText('Light'));
+      await flushLoad();
+      expect(screen.getByText('Preferences saved')).toBeTruthy();
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(2000);
+      });
+      expect(screen.queryByText('Preferences saved')).toBeNull();
     });
   });
 

@@ -404,7 +404,9 @@ export default function PreferencesScreen(): React.JSX.Element {
     theme: themePreference,
   });
   const [saved, setSaved] = useState(false);
-  const initialLoadDone = useRef(false);
+  // Set by update() only: auto-save runs for user edits, never for load,
+  // theme-context sync, or server hydration (LS-7663).
+  const userEditedRef = useRef(false);
   // The audio opt-in is persisted server-side so it syncs across devices
   // (LS-10111), the same basis as web's stats-format sync (LS-7138). Every
   // other preference on this screen remains device-local.
@@ -427,10 +429,6 @@ export default function PreferencesScreen(): React.JSX.Element {
         theme: prev.theme,
         audioEnabled: serverAudioRef.current ?? loaded.audioEnabled,
       }));
-      // Delay flag so the save effect skips the initial render cycle
-      requestAnimationFrame(() => {
-        initialLoadDone.current = true;
-      });
     });
   }, []);
 
@@ -467,6 +465,7 @@ export default function PreferencesScreen(): React.JSX.Element {
           variables: { input: { audioEnabled: value as boolean } },
         });
       }
+      userEditedRef.current = true;
       setPrefs((prev) => ({ ...prev, [key]: value }));
       setSaved(false);
     },
@@ -474,12 +473,19 @@ export default function PreferencesScreen(): React.JSX.Element {
   );
 
   useEffect(() => {
-    if (!initialLoadDone.current) return;
+    if (!userEditedRef.current) return;
+    userEditedRef.current = false;
     savePrefsAsync(prefs);
     setSaved(true);
+  }, [prefs]);
+
+  // Dismiss timer is separate from the save effect so a non-user prefs change
+  // (e.g. the theme-context sync after a theme edit) can't cancel it.
+  useEffect(() => {
+    if (!saved) return;
     const timer = setTimeout(() => setSaved(false), 2000);
     return () => clearTimeout(timer);
-  }, [prefs]);
+  }, [saved]);
 
   return (
     <ScrollView>
