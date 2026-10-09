@@ -274,3 +274,79 @@ describe('getCheckRuns batch mode', () => {
     expect(body).not.toHaveProperty('sha');
   });
 });
+
+describe('getCheckRuns status/onlyFailing filters (LS-10285)', () => {
+  const runs = () =>
+    pageOnce([
+      makeRun('queued-job', { id: 1, status: 'queued', conclusion: null }),
+      makeRun('running-job', {
+        id: 2,
+        status: 'in_progress',
+        conclusion: null,
+      }),
+      makeRun('ok-job', { id: 3 }),
+      makeRun('bad-job', { id: 4, conclusion: 'failure' }),
+      makeRun('cancelled-job', { id: 5, conclusion: 'cancelled' }),
+      makeRun('timeout-job', { id: 6, conclusion: 'timed_out' }),
+      makeRun('skipped-job', { id: 7, conclusion: 'skipped' }),
+    ]);
+
+  it('status: incomplete returns only queued/in_progress runs', async () => {
+    mockGithubRest.mockResolvedValueOnce(runs());
+    const text = (await getCheckRuns({ sha: 'abc', status: 'incomplete' }))
+      .content[0].text;
+    expect(text).toContain('total: 2');
+    expect(text).toContain('queued-job');
+    expect(text).toContain('running-job');
+    expect(text).not.toContain('ok-job');
+    expect(text).not.toContain('bad-job');
+  });
+
+  it('status: completed excludes unfinished runs', async () => {
+    mockGithubRest.mockResolvedValueOnce(runs());
+    const text = (await getCheckRuns({ sha: 'abc', status: 'completed' }))
+      .content[0].text;
+    expect(text).toContain('total: 5');
+    expect(text).not.toContain('queued-job');
+  });
+
+  it('status: queued matches exactly', async () => {
+    mockGithubRest.mockResolvedValueOnce(runs());
+    const text = (await getCheckRuns({ sha: 'abc', status: 'queued' }))
+      .content[0].text;
+    expect(text).toContain('total: 1');
+    expect(text).not.toContain('running-job');
+  });
+
+  it('onlyFailing returns failure, cancelled and timed_out runs only', async () => {
+    mockGithubRest.mockResolvedValueOnce(runs());
+    const text = (await getCheckRuns({ sha: 'abc', onlyFailing: true }))
+      .content[0].text;
+    expect(text).toContain('total: 3');
+    expect(text).toContain('bad-job');
+    expect(text).toContain('cancelled-job');
+    expect(text).toContain('timeout-job');
+    expect(text).not.toContain('ok-job');
+    expect(text).not.toContain('skipped-job');
+    expect(text).not.toContain('queued-job');
+  });
+
+  it('explains an empty result caused by the state filter', async () => {
+    mockGithubRest.mockResolvedValueOnce(pageOnce([makeRun('ok-job')]));
+    const text = (await getCheckRuns({ sha: 'abc', onlyFailing: true }))
+      .content[0].text;
+    expect(text).toContain('No check runs match the status/onlyFailing filter');
+    expect(text).toContain('1 run(s) before filtering');
+  });
+
+  it('applies filters per sha in batch mode', async () => {
+    mockGithubRest.mockResolvedValueOnce(runs());
+    const body = parse(
+      (await getCheckRuns({ shas: ['a'], onlyFailing: true })).content[0].text,
+    );
+    const names = (
+      (body.checkRuns as Record<string, { name: string }[]>).a ?? []
+    ).map((r) => r.name);
+    expect(names).toEqual(['bad-job', 'cancelled-job', 'timeout-job']);
+  });
+});

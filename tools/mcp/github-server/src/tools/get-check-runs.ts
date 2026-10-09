@@ -16,7 +16,15 @@ interface GetCheckRunsParams {
   checkName?: string;
   resolveRunId?: boolean;
   latestPerName?: boolean;
+  status?: CheckRunStatusFilter;
+  onlyFailing?: boolean;
 }
+
+export type CheckRunStatusFilter =
+  | 'incomplete'
+  | 'completed'
+  | 'queued'
+  | 'in_progress';
 
 interface CheckRunOutput {
   title: string | null;
@@ -168,6 +176,58 @@ export function filterRunsByName<T extends { name: string }>(
   return runs.filter((run) => run.name.toLowerCase().includes(needle));
 }
 
+// "Failing" = a completed run that did not pass: failure, cancelled, timed_out
+// (plus action_required/startup_failure, which block a PR the same way).
+const FAILING_CONCLUSIONS = new Set([
+  'failure',
+  'cancelled',
+  'timed_out',
+  'action_required',
+  'startup_failure',
+]);
+
+// Applies the status/onlyFailing filters (LS-10285). `incomplete`
+// means not yet finished (queued, in_progress, waiting, pending, requested).
+// Exported for unit tests.
+export function filterRunsByState<
+  T extends { status: string; conclusion: string | null },
+>(
+  runs: T[],
+  opts: {
+    status?: CheckRunStatusFilter;
+    onlyFailing?: boolean;
+  },
+): T[] {
+  return runs.filter((run) => {
+    if (opts.status === 'incomplete' && run.status === 'completed') {
+      return false;
+    }
+    if (
+      opts.status &&
+      opts.status !== 'incomplete' &&
+      run.status !== opts.status
+    ) {
+      return false;
+    }
+    if (
+      opts.onlyFailing &&
+      !(run.conclusion !== null && FAILING_CONCLUSIONS.has(run.conclusion))
+    ) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function applyFilters<
+  T extends { name: string; status: string; conclusion: string | null },
+>(runs: T[], params: GetCheckRunsParams): T[] {
+  const byName = params.checkName
+    ? filterRunsByName(runs, params.checkName)
+    : runs;
+  return filterRunsByState(byName, params);
+}
+
 async function fetchCheckRunsForSha(
   owner: string,
   repo: string,
@@ -245,6 +305,7 @@ export async function getCheckRuns(
       params.checkName,
       params.resolveRunId,
       params.latestPerName,
+      params,
     );
   }
 
@@ -284,9 +345,9 @@ export async function getCheckRuns(
       params.resolveRunId,
       params.latestPerName,
     );
-    const filtered = params.checkName
-      ? filterRunsByName(allRuns, params.checkName)
-      : allRuns;
+    const filtered = applyFilters(allRuns, params);
+    const stateFiltered =
+      params.status !== undefined || params.onlyFailing === true;
 
     const header = `_sha: ${sha.slice(0, 7)}${params.prNumber !== undefined ? `, PR #${params.prNumber}` : ''}, total: ${filtered.length}_`;
     const columns = params.resolveRunId
@@ -294,9 +355,11 @@ export async function getCheckRuns(
       : CHECK_RUN_COLUMNS;
     const text =
       filtered.length === 0
-        ? params.checkName && allRuns.length > 0
-          ? `No check runs matching "${params.checkName}" for ${sha.slice(0, 7)}. Available check names: ${allRuns.map((r) => r.name).join(', ')}`
-          : `No check runs found for ${sha.slice(0, 7)}.`
+        ? stateFiltered && allRuns.length > 0
+          ? `No check runs match the status/onlyFailing filter for ${sha.slice(0, 7)} (${allRuns.length} run(s) before filtering).`
+          : params.checkName && allRuns.length > 0
+            ? `No check runs matching "${params.checkName}" for ${sha.slice(0, 7)}. Available check names: ${allRuns.map((r) => r.name).join(', ')}`
+            : `No check runs found for ${sha.slice(0, 7)}.`
         : `${header}\n\n${markdownTable(
             filtered.map((r) => checkRunRow(r, params.resolveRunId)),
             {
@@ -333,6 +396,7 @@ async function getCheckRunsBatch(
   checkName: string | undefined,
   resolveRunId?: boolean,
   latestPerName?: boolean,
+  filters: GetCheckRunsParams = {},
 ): Promise<ToolResult> {
   const checkRuns: Record<string, SerializedCheckRun[]> = {};
   const missing: { sha: string; error: string }[] = [];
@@ -347,11 +411,13 @@ async function getCheckRunsBatch(
         resolveRunId,
         latestPerName,
       );
-      const filtered = checkName
-        ? filterRunsByName(allRuns, checkName)
-        : allRuns;
+      const filtered = applyFilters(allRuns, { ...filters, checkName });
       checkRuns[sha] = filtered;
-      if (checkName && filtered.length === 0 && allRuns.length > 0) {
+      if (
+        checkName &&
+        allRuns.length > 0 &&
+        filterRunsByName(allRuns, checkName).length === 0
+      ) {
         noMatch.push({
           sha,
           checkName,

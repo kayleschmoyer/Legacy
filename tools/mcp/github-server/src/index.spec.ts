@@ -112,6 +112,18 @@ describe('index tool registration — prNumber alias resolution', () => {
     jest.mocked(requestReview).mockResolvedValue(okResult);
   });
 
+  describe('github_get_check_runs', () => {
+    it('rejects unknown parameters instead of silently ignoring them (LS-10285)', async () => {
+      const result = await client.callTool({
+        name: 'github_get_check_runs',
+        arguments: { prNumber: 1, statuss: 'in_progress' },
+      });
+
+      expect(result.isError).toBe(true);
+      expect(JSON.stringify(result.content)).toContain('statuss');
+    });
+  });
+
   describe('github_mark_pr_ready', () => {
     it('accepts "number" and forwards it to the handler', async () => {
       const result = await client.callTool({

@@ -5007,7 +5007,7 @@
         },
         {
           "name": "github_get_check_runs",
-          "description": "List check runs for a PR or commit SHA — includes id, name, status, conclusion, startedAt, completedAt, output (title + summary), and app slug; pass id straight into get_check_run/get_job_logs. Defaults to one row per check name (the latest attempt), same as before; pass latestPerName: false to see every run instead, including superseded re-run attempts under a repeated name (use startedAt to tell them apart). Use instead of `gh api repos/.../commits/$SHA/check-runs` for required status checks (bot-review, Quality Gates, Build Validation, etc.). resolveRunId: true also extracts workflowRunId/jobId from the details URL for ci_get_logs/ci_search_logs.",
+          "description": "List check runs for a PR or commit SHA (id, name, status, conclusion, startedAt, completedAt, output summary); pass id to get_check_run/get_job_logs. Filters: status \"incomplete\" (queued/in_progress only, cheap for polling) | \"completed\" | exact \"queued\"/\"in_progress\"; onlyFailing: true (failed/cancelled/timed_out only). Unknown params error. One row per check name (latest attempt) unless latestPerName: false (startedAt tells attempts apart). resolveRunId: true adds workflowRunId/jobId for ci_get_logs/ci_search_logs.",
           "inputs": {
             "number": {
               "type": "number",
@@ -5017,7 +5017,7 @@
                 "integer",
                 "> 0"
               ],
-              "description": "PR number — auto-resolves to the current HEAD SHA"
+              "description": "PR number (resolves to HEAD SHA)"
             },
             "prNumber": {
               "type": "number",
@@ -5027,7 +5027,7 @@
                 "integer",
                 "> 0"
               ],
-              "description": "Alias for \"number\" — use either, not both"
+              "description": "Alias for \"number\""
             },
             "sha": {
               "type": "string",
@@ -5035,7 +5035,7 @@
               "constraints": [
                 "min 1"
               ],
-              "description": "Commit SHA (full or abbreviated). Takes precedence over prNumber/number if both are given."
+              "description": "Commit SHA; overrides prNumber/number."
             },
             "shas": {
               "type": "array",
@@ -5051,7 +5051,7 @@
                   "min 1"
                 ]
               },
-              "description": "Batch mode: 1-25 commit SHAs to fetch in parallel (concurrency capped at 5). Returns { checkRuns: { [sha]: [...] }, missing: [{ sha, error }] }. Takes precedence over sha/prNumber/number."
+              "description": "Batch: 1-25 SHAs fetched in parallel; returns { checkRuns: { [sha]: [...] }, missing }. Takes precedence over sha/prNumber."
             },
             "checkName": {
               "type": "string",
@@ -5059,17 +5059,33 @@
               "constraints": [
                 "min 1"
               ],
-              "description": "Case-insensitive substring match against check run names (e.g. \"lint\" matches \"🚀 CI Pipeline / lint\"). When no run matches, the response lists the available check names for that sha instead of a bare \"not found\"."
+              "description": "Case-insensitive substring match on check names; on no match, lists available names."
             },
             "resolveRunId": {
               "type": "boolean",
               "optional": true,
-              "description": "When true, extract workflowRunId and jobId from each run's details URL. Included only when resolvable."
+              "description": "Add workflowRunId/jobId (when resolvable)."
             },
             "latestPerName": {
               "type": "boolean",
               "optional": true,
-              "description": "Default true: one row per check name (latest attempt). Pass false to see every run, including superseded attempts."
+              "description": "Default true; false shows every attempt."
+            },
+            "status": {
+              "type": "enum",
+              "optional": true,
+              "enum": [
+                "incomplete",
+                "completed",
+                "queued",
+                "in_progress"
+              ],
+              "description": "incomplete = not yet completed; others match exactly."
+            },
+            "onlyFailing": {
+              "type": "boolean",
+              "optional": true,
+              "description": "Only failed runs (failure/cancelled/timed_out/action_required)."
             }
           },
           "transports": [

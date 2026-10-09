@@ -1944,58 +1944,67 @@ export function createServer(): McpServer {
   );
 
   // --- github_get_check_runs ---
-  server.tool(
+  server.registerTool(
     'github_get_check_runs',
-    'List check runs for a PR or commit SHA — includes id, name, status, conclusion, startedAt, completedAt, output (title + summary), and app slug; pass id straight into get_check_run/get_job_logs. Defaults to one row per check name (the latest attempt), same as before; pass latestPerName: false to see every run instead, including superseded re-run attempts under a repeated name (use startedAt to tell them apart). Use instead of `gh api repos/.../commits/$SHA/check-runs` for required status checks (bot-review, Quality Gates, Build Validation, etc.). resolveRunId: true also extracts workflowRunId/jobId from the details URL for ci_get_logs/ci_search_logs.',
     {
-      number: z.coerce
-        .number()
-        .int()
-        .positive()
-        .optional()
-        .describe('PR number — auto-resolves to the current HEAD SHA'),
-      prNumber: z.coerce
-        .number()
-        .int()
-        .positive()
-        .optional()
-        .describe('Alias for "number" — use either, not both'),
-      sha: z
-        .string()
-        .trim()
-        .min(1)
-        .optional()
-        .describe(
-          'Commit SHA (full or abbreviated). Takes precedence over prNumber/number if both are given.',
-        ),
-      shas: z
-        .array(z.string().trim().min(1))
-        .min(1)
-        .max(25)
-        .optional()
-        .describe(
-          'Batch mode: 1-25 commit SHAs to fetch in parallel (concurrency capped at 5). Returns { checkRuns: { [sha]: [...] }, missing: [{ sha, error }] }. Takes precedence over sha/prNumber/number.',
-        ),
-      checkName: z
-        .string()
-        .trim()
-        .min(1)
-        .optional()
-        .describe(
-          'Case-insensitive substring match against check run names (e.g. "lint" matches "🚀 CI Pipeline / lint"). When no run matches, the response lists the available check names for that sha instead of a bare "not found".',
-        ),
-      resolveRunId: z
-        .boolean()
-        .optional()
-        .describe(
-          "When true, extract workflowRunId and jobId from each run's details URL. Included only when resolvable.",
-        ),
-      latestPerName: z
-        .boolean()
-        .optional()
-        .describe(
-          'Default true: one row per check name (latest attempt). Pass false to see every run, including superseded attempts.',
-        ),
+      description:
+        'List check runs for a PR or commit SHA (id, name, status, conclusion, startedAt, completedAt, output summary); pass id to get_check_run/get_job_logs. Filters: status "incomplete" (queued/in_progress only, cheap for polling) | "completed" | exact "queued"/"in_progress"; onlyFailing: true (failed/cancelled/timed_out only). Unknown params error. One row per check name (latest attempt) unless latestPerName: false (startedAt tells attempts apart). resolveRunId: true adds workflowRunId/jobId for ci_get_logs/ci_search_logs.',
+      inputSchema: z
+        .object({
+          number: z.coerce
+            .number()
+            .int()
+            .positive()
+            .optional()
+            .describe('PR number (resolves to HEAD SHA)'),
+          prNumber: z.coerce
+            .number()
+            .int()
+            .positive()
+            .optional()
+            .describe('Alias for "number"'),
+          sha: z
+            .string()
+            .trim()
+            .min(1)
+            .optional()
+            .describe('Commit SHA; overrides prNumber/number.'),
+          shas: z
+            .array(z.string().trim().min(1))
+            .min(1)
+            .max(25)
+            .optional()
+            .describe(
+              'Batch: 1-25 SHAs fetched in parallel; returns { checkRuns: { [sha]: [...] }, missing }. Takes precedence over sha/prNumber.',
+            ),
+          checkName: z
+            .string()
+            .trim()
+            .min(1)
+            .optional()
+            .describe(
+              'Case-insensitive substring match on check names; on no match, lists available names.',
+            ),
+          resolveRunId: z
+            .boolean()
+            .optional()
+            .describe('Add workflowRunId/jobId (when resolvable).'),
+          latestPerName: z
+            .boolean()
+            .optional()
+            .describe('Default true; false shows every attempt.'),
+          status: z
+            .enum(['incomplete', 'completed', 'queued', 'in_progress'])
+            .optional()
+            .describe('incomplete = not yet completed; others match exactly.'),
+          onlyFailing: z
+            .boolean()
+            .optional()
+            .describe(
+              'Only failed runs (failure/cancelled/timed_out/action_required).',
+            ),
+        })
+        .strict(),
     },
     async (params) => {
       const prNumber = params.number ?? params.prNumber;
@@ -2006,6 +2015,8 @@ export function createServer(): McpServer {
         checkName: params.checkName,
         resolveRunId: params.resolveRunId,
         latestPerName: params.latestPerName,
+        status: params.status,
+        onlyFailing: params.onlyFailing,
       });
     },
   );

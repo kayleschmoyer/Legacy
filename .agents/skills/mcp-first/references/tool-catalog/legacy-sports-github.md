@@ -163,17 +163,19 @@ Read branch protection rules and GitHub rulesets for a branch. Returns required 
 
 ### `github_get_check_runs`
 
-List check runs for a PR or commit SHA — includes id, name, status, conclusion, startedAt, completedAt, output (title + summary), and app slug; pass id straight into get_check_run/get_job_logs. Defaults to one row per check name (the latest attempt), same as before; pass latestPerName: false to see every run instead, including superseded re-run attempts under a repeated name (use startedAt to tell them apart). Use instead of `gh api repos/.../commits/$SHA/check-runs` for required status checks (bot-review, Quality Gates, Build Validation, etc.). resolveRunId: true also extracts workflowRunId/jobId from the details URL for ci_get_logs/ci_search_logs.
+List check runs for a PR or commit SHA (id, name, status, conclusion, startedAt, completedAt, output summary); pass id to get_check_run/get_job_logs. Filters: status "incomplete" (queued/in_progress only, cheap for polling) | "completed" | exact "queued"/"in_progress"; onlyFailing: true (failed/cancelled/timed_out only). Unknown params error. One row per check name (latest attempt) unless latestPerName: false (startedAt tells attempts apart). resolveRunId: true adds workflowRunId/jobId for ci_get_logs/ci_search_logs.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
-| `number` | number |  | coerced, integer, > 0 | PR number — auto-resolves to the current HEAD SHA |
-| `prNumber` | number |  | coerced, integer, > 0 | Alias for "number" — use either, not both |
-| `sha` | string |  | min 1 | Commit SHA (full or abbreviated). Takes precedence over prNumber/number if both are given. |
-| `shas` | string[] |  | min 1, max 25 | Batch mode: 1-25 commit SHAs to fetch in parallel (concurrency capped at 5). Returns { checkRuns: { [sha]: [...] }, missing: [{ sha, error }] }. Takes precedence over sha/prNumber/number. |
-| `checkName` | string |  | min 1 | Case-insensitive substring match against check run names (e.g. "lint" matches "🚀 CI Pipeline / lint"). When no run matches, the response lists the available check names for that sha instead of a bare "not found". |
-| `resolveRunId` | boolean |  | — | When true, extract workflowRunId and jobId from each run's details URL. Included only when resolvable. |
-| `latestPerName` | boolean |  | — | Default true: one row per check name (latest attempt). Pass false to see every run, including superseded attempts. |
+| `number` | number |  | coerced, integer, > 0 | PR number (resolves to HEAD SHA) |
+| `prNumber` | number |  | coerced, integer, > 0 | Alias for "number" |
+| `sha` | string |  | min 1 | Commit SHA; overrides prNumber/number. |
+| `shas` | string[] |  | min 1, max 25 | Batch: 1-25 SHAs fetched in parallel; returns { checkRuns: { [sha]: [...] }, missing }. Takes precedence over sha/prNumber. |
+| `checkName` | string |  | min 1 | Case-insensitive substring match on check names; on no match, lists available names. |
+| `resolveRunId` | boolean |  | — | Add workflowRunId/jobId (when resolvable). |
+| `latestPerName` | boolean |  | — | Default true; false shows every attempt. |
+| `status` | enum |  | — | incomplete = not yet completed; others match exactly. |
+| `onlyFailing` | boolean |  | — | Only failed runs (failure/cancelled/timed_out/action_required). |
 
 ### `github_get_file_content`
 
