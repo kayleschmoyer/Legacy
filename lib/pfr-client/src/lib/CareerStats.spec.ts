@@ -1,6 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { getGameLog, getSeasonTotals } from './CareerStats';
+import {
+  computePasserRating,
+  getGameLog,
+  getSeasonTotals,
+} from './CareerStats';
 import * as PFRSession from './PFRSession';
 
 jest.mock('./PFRSession');
@@ -241,5 +245,28 @@ describe('CareerStats — kicker zeroed passing group guard', () => {
       xpm: 4,
       xpa: 4,
     });
+  });
+});
+
+describe('CareerStats.computePasserRating (LS-10493)', () => {
+  it('returns null with no attempts', () => {
+    expect(computePasserRating(0, 0, 0, 0, 0)).toBeNull();
+    expect(computePasserRating(null, null, null, null, null)).toBeNull();
+  });
+
+  it("matches Tom Brady's official career rating of 97.2", () => {
+    expect(computePasserRating(7753, 12050, 89214, 649, 212)).toBe(97.2);
+  });
+
+  it('matches a mid-range season line', () => {
+    expect(computePasserRating(300, 500, 3500, 25, 10)).toBe(89.6);
+  });
+
+  it('returns the 158.3 perfect rating when every component maxes out', () => {
+    expect(computePasserRating(25, 30, 400, 5, 0)).toBe(158.3);
+  });
+
+  it('floors every component at 0 for a terrible line', () => {
+    expect(computePasserRating(0, 10, 0, 0, 5)).toBe(0);
   });
 });

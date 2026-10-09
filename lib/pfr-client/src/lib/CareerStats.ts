@@ -449,7 +449,7 @@ export async function getSeasonTotals(
 // Multi-team seasons are combined explicitly by season — see the combination
 // helpers below — rather than by relying on PFR's row order.
 
-// NFL passer rating. Lives here rather than in the loader because combining a
+// Official NFL passer rating (each component clamped to 0..2.375). Lives here rather than in the loader because combining a
 // traded player's split seasons has to recompute it from the merged line —
 // rating is not additive, so a multi-team season cannot reuse either team's
 // published value.
@@ -461,10 +461,11 @@ export function computePasserRating(
   int: number | null,
 ): number | null {
   if (att === null || att === 0) return null;
-  const a = Math.max(0, Math.min(((cmp ?? 0) / att - 0.3) / 0.2, 2.375));
-  const b = Math.max(0, Math.min(((yds ?? 0) / att - 3) / 4, 2.375));
-  const c = Math.max(0, Math.min((td ?? 0) / att / 0.05, 2.375));
-  const d = Math.max(0, Math.min(0.095 - (int ?? 0) / att / 0.04, 2.375));
+  const clamp = (v: number) => Math.max(0, Math.min(v, 2.375));
+  const a = clamp(((cmp ?? 0) / att - 0.3) / 0.2);
+  const b = clamp(((yds ?? 0) / att - 3) / 4);
+  const c = clamp((td ?? 0) / att / 0.05);
+  const d = clamp((0.095 - (int ?? 0) / att) / 0.04);
   return Math.round(((a + b + c + d) / 6) * 100 * 10) / 10;
 }
 

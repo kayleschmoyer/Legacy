@@ -5,6 +5,7 @@ import type {
   FootballSeasonReceiving,
   FootballSeasonRushing,
 } from '@legacy-sports/pfr-client';
+import { CareerStats } from '@legacy-sports/pfr-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { PublicDb } from '@legacy-sports/db-client';
 import {
@@ -218,9 +219,8 @@ export function multiTeamLabel(teamCount: number): string {
   return `${teamCount}TM`;
 }
 
-// Same formula as `computePasserRating` in `@legacy-sports/pfr-client`
-// (CareerStats.ts) — duplicated rather than imported because it operates on
-// nflverse's already-summed season totals, not PFR per-team rows.
+// Thin adapter over the shared `CareerStats.computePasserRating` so there is a
+// single passer-rating formula (LS-10493); only the argument order differs.
 export function computePasserRatingFromTotals(
   att: number | null,
   cmp: number | null,
@@ -228,13 +228,7 @@ export function computePasserRatingFromTotals(
   td: number | null,
   int: number | null,
 ): number | null {
-  if (att === null || att === 0) return null;
-  const clamp = (v: number) => Math.max(0, Math.min(v, 2.375));
-  const a = clamp(((cmp ?? 0) / att - 0.3) / 0.2);
-  const b = clamp(((yds ?? 0) / att - 3) / 4);
-  const c = clamp((td ?? 0) / att / 0.05);
-  const d = clamp(0.095 - (int ?? 0) / att / 0.04);
-  return Math.round(((a + b + c + d) / 6) * 100 * 10) / 10;
+  return CareerStats.computePasserRating(cmp, att, yds, td, int);
 }
 
 function round1(n: number | null): number | null {

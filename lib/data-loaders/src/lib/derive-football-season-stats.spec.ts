@@ -274,8 +274,8 @@ describe('buildPfaSeasonRows', () => {
       att: 30,
       sacked: null,
     });
-    // Same formula (and output) as every other football rating in the repo.
-    expect(rows.passing[0].rating).toBe(75);
+    // Official NFL formula (LS-10493); same output as every other football rating in the repo.
+    expect(rows.passing[0].rating).toBe(100.7);
     expect(rows.kicking[0]).toMatchObject({
       fgm: 2,
       fga: 3,

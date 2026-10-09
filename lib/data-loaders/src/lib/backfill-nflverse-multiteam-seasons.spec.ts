@@ -239,11 +239,10 @@ describe('computePasserRatingFromTotals', () => {
     expect(computePasserRatingFromTotals(0, 0, 0, 0, 0)).toBeNull();
   });
 
-  it('matches the passer rating formula used elsewhere in this repo', () => {
-    // Same inputs/output as CareerStats.ts's computePasserRating — this
-    // function duplicates that formula for nflverse's already-summed totals.
+  it('matches the official passer rating formula', () => {
+    // Same inputs/output as CareerStats.ts's computePasserRating (LS-10493).
     const rating = computePasserRatingFromTotals(500, 300, 3500, 25, 10);
-    expect(rating).toBeCloseTo(58.3, 1);
+    expect(rating).toBeCloseTo(89.6, 1);
   });
 });
 
