@@ -156,6 +156,14 @@ jest.mock('./useStripePrices', () => ({
   }),
 }));
 
+let mockInvoicesResult: {
+  data?: { myInvoices: unknown[] };
+  error?: Error;
+};
+jest.mock('@legacy-sports/graphql', () => ({
+  useGetMyInvoicesQuery: () => mockInvoicesResult,
+}));
+
 const mockRestorePurchases = jest.fn();
 const mockPurchase = jest.fn();
 const mockClearError = jest.fn();
@@ -193,6 +201,7 @@ jest.mock('./useGooglePlayBilling', () => ({
 const mockRefetch = jest.fn();
 
 function resetMocks() {
+  mockInvoicesResult = { data: { myInvoices: [] } };
   mockSearchParams = {};
   mockIsStepUpPrompting = false;
   mockRequireStepUp.mockReset();
@@ -1158,6 +1167,124 @@ describe('SubscriptionSettingsScreen — Past Purchases receipts (LS-10399)', ()
     render(<SubscriptionSettingsScreen />);
 
     expect(screen.queryByText('Past Purchases')).toBeNull();
+  });
+});
+
+describe('SubscriptionSettingsScreen — Billing History (LS-10402)', () => {
+  const INVOICES = [
+    {
+      id: 'in_1',
+      amountPaidCents: 4999,
+      currency: 'usd',
+      status: 'paid',
+      created: '2026-08-15T12:00:00.000Z',
+      hostedInvoiceUrl: 'https://invoice.stripe.com/i/1',
+      invoicePdf: 'https://invoice.stripe.com/i/1/pdf',
+    },
+    {
+      id: 'in_2',
+      amountPaidCents: 499,
+      currency: 'usd',
+      status: 'open',
+      created: '2026-07-15T12:00:00.000Z',
+      hostedInvoiceUrl: null,
+      invoicePdf: 'https://invoice.stripe.com/i/2/pdf',
+    },
+  ];
+
+  const mockTier = (isPremium: boolean) => {
+    mockUseSubscription.mockReturnValue({
+      subscription: null,
+      isPremium,
+      tier: isPremium ? 'premium' : 'free',
+      loading: false,
+      refetch: mockRefetch,
+    });
+  };
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetMocks();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('lists date, amount, status and a receipt action for premium users', () => {
+    mockTier(true);
+    mockInvoicesResult = { data: { myInvoices: INVOICES } };
+
+    render(<SubscriptionSettingsScreen />);
+
+    expect(screen.getByText('Billing History')).toBeTruthy();
+    expect(screen.getByText('August 15, 2026')).toBeTruthy();
+    expect(screen.getByText('$49.99')).toBeTruthy();
+    expect(screen.getByText('paid')).toBeTruthy();
+    expect(screen.getByText('$4.99')).toBeTruthy();
+    expect(screen.getAllByText('Receipt')).toHaveLength(2);
+  });
+
+  it('shows the card to free users who have invoices', () => {
+    mockTier(false);
+    mockInvoicesResult = { data: { myInvoices: INVOICES } };
+
+    render(<SubscriptionSettingsScreen />);
+
+    expect(screen.getByText('Billing History')).toBeTruthy();
+  });
+
+  it('is hidden when there are no invoices', () => {
+    mockTier(true);
+
+    render(<SubscriptionSettingsScreen />);
+
+    expect(screen.queryByText('Billing History')).toBeNull();
+  });
+
+  it('stays hidden and does not break the screen when the query errors', () => {
+    mockTier(true);
+    mockInvoicesResult = { error: new Error('network') };
+
+    render(<SubscriptionSettingsScreen />);
+
+    expect(screen.queryByText('Billing History')).toBeNull();
+    expect(screen.getByText('Manage Subscription')).toBeTruthy();
+  });
+
+  it('opens the hosted invoice, falling back to the PDF', () => {
+    mockTier(true);
+    mockInvoicesResult = { data: { myInvoices: INVOICES } };
+    const openURLSpy = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+
+    render(<SubscriptionSettingsScreen />);
+    const [first, second] = screen.getAllByText('Receipt');
+    fireEvent.press(first);
+    fireEvent.press(second);
+
+    expect(openURLSpy).toHaveBeenNthCalledWith(
+      1,
+      'https://invoice.stripe.com/i/1',
+    );
+    expect(openURLSpy).toHaveBeenNthCalledWith(
+      2,
+      'https://invoice.stripe.com/i/2/pdf',
+    );
+  });
+
+  it('omits the receipt action when an invoice has no URL', () => {
+    mockTier(true);
+    mockInvoicesResult = {
+      data: {
+        myInvoices: [
+          { ...INVOICES[0], hostedInvoiceUrl: null, invoicePdf: null },
+        ],
+      },
+    };
+
+    render(<SubscriptionSettingsScreen />);
+
+    expect(screen.getByText('Billing History')).toBeTruthy();
+    expect(screen.queryByText('Receipt')).toBeNull();
   });
 });
 

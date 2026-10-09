@@ -12,6 +12,7 @@ import {
 import { useLocalSearchParams } from 'expo-router';
 import { useStepUpGate } from '@legacy-sports/shared-components/auth';
 import { brand } from '@legacy-sports/design-tokens';
+import { useGetMyInvoicesQuery } from '@legacy-sports/graphql';
 import {
   useBillingPortalSession,
   useCheckoutSession,
@@ -105,6 +106,24 @@ function formatDate(iso: string | null | undefined): string {
   } catch {
     return '';
   }
+}
+
+/** Formats Stripe's minor-unit amount (cents) in the invoice's currency. */
+function formatInvoiceAmount(amountCents: number, currency: string): string {
+  const amount = amountCents / 100;
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency.toUpperCase(),
+    }).format(amount);
+  } catch {
+    return `${amount.toFixed(2)} ${currency.toUpperCase()}`;
+  }
+}
+
+function invoiceStatusLabel(status: string | null | undefined): string {
+  if (!status) return '';
+  return status.replace(/_/g, ' ');
 }
 
 interface BillingToggleProps {
@@ -202,6 +221,11 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
     useBillingPortalSession();
 
   const { data: currentUser } = useCurrentUserInfo();
+
+  // Billing History is non-critical: a failed query leaves `data` undefined, so
+  // the card simply stays hidden and the rest of the screen is unaffected.
+  const { data: invoicesData } = useGetMyInvoicesQuery();
+  const invoices = invoicesData?.myInvoices ?? [];
   const {
     isPrompting: isStepUpPrompting,
     requireStepUp,
@@ -529,6 +553,14 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
         'Unable to Open',
         `Could not open ${isAndroid ? 'Google Play' : 'the App Store'} purchase history.`,
       );
+    }
+  };
+
+  const handleViewInvoice = async (url: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Unable to Open', 'Could not open this receipt.');
     }
   };
 
@@ -927,6 +959,86 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
                     </XStack>
                   </React.Fragment>
                 ))}
+              </YStack>
+            </YStack>
+          ) : null}
+
+          {/* Billing History (any user with Stripe invoices) */}
+          {invoices.length > 0 ? (
+            <YStack
+              borderRadius="$6"
+              borderWidth={1}
+              borderColor="$borderColor"
+              overflow="hidden"
+            >
+              <XStack
+                paddingHorizontal="$5"
+                paddingVertical="$4"
+                alignItems="center"
+                gap="$3"
+                borderBottomWidth={1}
+                borderBottomColor="$borderColor"
+              >
+                <YStack
+                  width={36}
+                  height={36}
+                  borderRadius="$4"
+                  alignItems="center"
+                  justifyContent="center"
+                  backgroundColor="$color2"
+                >
+                  <Text fontSize={16}>📄</Text>
+                </YStack>
+                <YStack flex={1}>
+                  <Paragraph size="$4" color="$color" fontWeight="600">
+                    Billing History
+                  </Paragraph>
+                  <Paragraph size="$2" color="$colorPress">
+                    Your past subscription charges
+                  </Paragraph>
+                </YStack>
+              </XStack>
+
+              <YStack padding="$5" gap="$1">
+                {invoices.map((invoice, i) => {
+                  const receiptUrl =
+                    invoice.hostedInvoiceUrl ?? invoice.invoicePdf;
+                  return (
+                    <React.Fragment key={invoice.id}>
+                      {i > 0 ? <Separator /> : null}
+                      <XStack paddingVertical="$3" alignItems="center" gap="$3">
+                        <YStack flex={1}>
+                          <Text fontSize="$4" color="$color">
+                            {formatDate(invoice.created)}
+                          </Text>
+                          <Text
+                            fontSize="$2"
+                            color="$colorSubtle"
+                            textTransform="capitalize"
+                          >
+                            {invoiceStatusLabel(invoice.status)}
+                          </Text>
+                        </YStack>
+                        <Text fontSize="$4" fontWeight="600" color="$color">
+                          {formatInvoiceAmount(
+                            invoice.amountPaidCents,
+                            invoice.currency,
+                          )}
+                        </Text>
+                        {receiptUrl ? (
+                          <Button
+                            theme="alt1"
+                            size="$3"
+                            onPress={() => void handleViewInvoice(receiptUrl)}
+                            borderRadius="$4"
+                          >
+                            Receipt
+                          </Button>
+                        ) : null}
+                      </XStack>
+                    </React.Fragment>
+                  );
+                })}
               </YStack>
             </YStack>
           ) : null}
