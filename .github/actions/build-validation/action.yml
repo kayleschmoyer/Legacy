@@ -72,6 +72,10 @@ runs:
         # Required at build time so the TeamDetailPage module initialises without
         # throwing. The actual upload endpoint is never called in E2E tests.
         VITE_IMAGE_UPLOAD_URL: "https://e2e-placeholder.test/images"
+        # Placeholder so GameLogsTable has an endpoint in hermetic E2E builds
+        # (LS-10494: no localhost fallback in production-mode builds). The
+        # game-logs requests are always mocked by Playwright route handlers.
+        VITE_STATS_API_URL: "https://e2e-placeholder.test/stats"
         # Placeholder so the conditional "Continue with Discord" CTA on
         # PublicLandingPage renders in hermetic E2E builds (LS-3537, LS-3541).
         # The real secret is never read during E2E — this only needs to be

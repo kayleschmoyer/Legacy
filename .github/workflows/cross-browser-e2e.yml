@@ -234,6 +234,10 @@ jobs:
           # throw before ever calling fetch — the upload endpoint is always
           # mocked by Playwright (LS-8349).
           VITE_IMAGE_UPLOAD_URL: "https://e2e-placeholder.test/images"
+          # Placeholder so GameLogsTable has an endpoint in hermetic E2E builds
+          # (LS-10494: no localhost fallback in production-mode builds). The
+          # game-logs requests are always mocked by Playwright route handlers.
+          VITE_STATS_API_URL: "https://e2e-placeholder.test/stats"
         run: |
           export NX_NO_CLOUD=true
           pnpm exec nx build web

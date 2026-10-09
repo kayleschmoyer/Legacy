@@ -308,9 +308,11 @@ export interface GameLogsTableProps {
   /**
    * API endpoint for fetching game logs.
    *
-   * When omitted, falls back to a localhost dev URL. Production builds wire
-   * this from build-time env (`VITE_STATS_API_URL` on web,
-   * `EXPO_PUBLIC_STATS_API_URL` on native).
+   * When omitted, non-production builds fall back to a sport-specific
+   * localhost dev URL; production builds render an "unavailable" notice
+   * instead of fetching (LS-10494). Production builds wire this from
+   * build-time env (`VITE_STATS_API_URL` on web, `EXPO_PUBLIC_STATS_API_URL`
+   * on native).
    */
   apiEndpoint?: string;
   /**
@@ -362,7 +364,42 @@ export interface GameLogsTableProps {
   pageSize?: number;
 }
 
-const DEFAULT_ENDPOINT = 'http://localhost:5000/baseball-game-logs';
+const DEV_ENDPOINTS: Record<GameLogSport, string> = {
+  mlb: 'http://localhost:5000/baseball-game-logs',
+  nfl: 'http://localhost:5000/nfl-game-logs',
+};
+
+/**
+ * Resolves the game-logs endpoint for a sport. An explicit endpoint always
+ * wins; otherwise only non-production builds get a localhost dev URL (matching
+ * the sport, so NFL never hits the baseball endpoint). Production returns
+ * `undefined` so the caller can render an unavailable state (LS-10494).
+ */
+export function resolveGameLogsEndpoint(
+  apiEndpoint: string | undefined,
+  sport: GameLogSport,
+): string | undefined {
+  if (apiEndpoint) return apiEndpoint;
+  return process.env.NODE_ENV === 'production'
+    ? undefined
+    : DEV_ENDPOINTS[sport];
+}
+
+class HttpStatusError extends Error {
+  constructor(public readonly status: number) {
+    super(`HTTP error! status: ${status}`);
+    this.name = 'HttpStatusError';
+  }
+}
+
+/** Visible copy for a failed fetch; network and server errors differ. */
+export function describeFetchError(error: unknown): string {
+  const status = error instanceof HttpStatusError ? error.status : null;
+  if (status !== null) {
+    return `The stats server returned an error (${status}). Please try again.`;
+  }
+  return 'Could not reach the stats server. Check your connection and try again.';
+}
 
 interface DateRangeValidation {
   error: string | null;
@@ -840,8 +877,8 @@ const VirtualBody: React.FC<VirtualBodyProps> = (props) =>
     <VirtualBodyNative {...props} />
   );
 
-function GameLogsTable({
-  apiEndpoint = DEFAULT_ENDPOINT,
+function GameLogsTableContent({
+  apiEndpoint,
   sport = 'mlb',
   isPremium = false,
   initialPlayerId = '',
@@ -849,7 +886,7 @@ function GameLogsTable({
   initialEndDate = '',
   playerName,
   pageSize = DEFAULT_PAGE_SIZE,
-}: GameLogsTableProps) {
+}: GameLogsTableProps & { apiEndpoint: string }) {
   const playerPinned = playerName !== undefined && initialPlayerId !== '';
   const [filters, dispatch] = useReducer(filterReducer, {
     ...INITIAL_FILTERS,
@@ -870,6 +907,11 @@ function GameLogsTable({
   const [loadingMore, setLoadingMore] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [inputError, setInputError] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const lastFetchRef = useRef<{ offset: number; append: boolean }>({
+    offset: 0,
+    append: false,
+  });
 
   // LS-7457 — single-column sort. `column: null` is API insertion order.
   const [sort, setSort] = useState<SortState>({
@@ -1006,6 +1048,8 @@ function GameLogsTable({
       const controller = new AbortController();
       abortControllerRef.current = controller;
 
+      lastFetchRef.current = { offset: nextOffset, append };
+      setFetchError(null);
       if (append) setLoadingMore(true);
       else setLoading(true);
       try {
@@ -1033,7 +1077,7 @@ function GameLogsTable({
           }),
         });
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          throw new HttpStatusError(response.status);
         }
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- response.json() is any
         const payload: ServerLegacy | ServerPaginated = await response.json();
@@ -1043,6 +1087,7 @@ function GameLogsTable({
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') return;
         handleError(error);
+        setFetchError(describeFetchError(error));
         if (append) setLoadingMore(false);
         else setLoading(false);
       }
@@ -1338,6 +1383,26 @@ function GameLogsTable({
         </Text>
       ) : null}
 
+      {fetchError ? (
+        <YStack marginBottom="$4" gap="$2" data-testid="game-logs-fetch-error">
+          <Text color="$red10" fontSize="$3" role="alert">
+            {fetchError}
+          </Text>
+          <Button
+            alignSelf="flex-start"
+            onPress={() =>
+              void fetchPage(
+                lastFetchRef.current.offset,
+                lastFetchRef.current.append,
+              )
+            }
+            data-testid="game-logs-fetch-retry"
+          >
+            <Text>Retry</Text>
+          </Button>
+        </YStack>
+      ) : null}
+
       {rows.length > 0 && columns.length > 0 ? (
         <YStack flex={1} marginTop="$2">
           {totalLabel ? (
@@ -1406,6 +1471,26 @@ function GameLogsTable({
       ) : null}
     </YStack>
   );
+}
+
+function GameLogsTable(props: GameLogsTableProps) {
+  const endpoint = resolveGameLogsEndpoint(
+    props.apiEndpoint,
+    props.sport ?? 'mlb',
+  );
+  if (!endpoint) {
+    return (
+      <Text
+        color="$gray10"
+        fontSize="$4"
+        role="status"
+        data-testid="game-logs-unavailable"
+      >
+        Game logs are currently unavailable.
+      </Text>
+    );
+  }
+  return <GameLogsTableContent {...props} apiEndpoint={endpoint} />;
 }
 
 export { GameLogsTable };

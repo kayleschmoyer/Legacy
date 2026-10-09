@@ -6,9 +6,12 @@ import { PremiumGate } from '../../components/PremiumGate';
 import { useIsPremium } from '../../hooks/useIsPremium';
 import { BG_DARK, TEXT_HIGH_CONTRAST } from '../../constants/colors';
 
-const STATS_API_BASE =
-  config.statsApiUrl?.replace(/\/+$/, '') ?? 'http://localhost:5000';
-const FOOTBALL_GAME_LOGS_ENDPOINT = `${STATS_API_BASE}/nfl-game-logs`;
+const STATS_API_BASE = config.statsApiUrl?.replace(/\/+$/, '');
+// No localhost fallback: GameLogsTable supplies a dev-only default and renders
+// an unavailable notice in production when this is undefined (LS-10494).
+const FOOTBALL_GAME_LOGS_ENDPOINT = STATS_API_BASE
+  ? `${STATS_API_BASE}/nfl-game-logs`
+  : undefined;
 
 export function FootballViewGameLogsPage() {
   const isPremium = useIsPremium();

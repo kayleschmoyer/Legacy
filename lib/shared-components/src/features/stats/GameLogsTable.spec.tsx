@@ -1,14 +1,16 @@
 import React from 'react';
-import { act, fireEvent, render } from '@testing-library/react';
+import { act, fireEvent, render, waitFor } from '@testing-library/react';
 import { InteractionManager } from 'react-native';
 import {
   ADVANCED_STAT_KEYS,
   buildGameLogsRequestBody,
   compareCells,
+  describeFetchError,
   GameLogsTable,
   NFL_ADVANCED_STAT_KEYS,
   renderCell,
   reshapeGameLogs,
+  resolveGameLogsEndpoint,
   validateDateRange,
 } from './GameLogsTable';
 import { MLB_TEAMS, NFL_FRANCHISES } from '../../constants/teams';
@@ -868,5 +870,111 @@ describe('GameLogsTable deep link (LS-10661)', () => {
       <GameLogsTable initialPlayerId="fosteru01" />,
     );
     expect(getByPlaceholderText('Enter player ID')).toBeTruthy();
+  });
+});
+
+describe('resolveGameLogsEndpoint (LS-10494)', () => {
+  const originalEnv = process.env.NODE_ENV;
+  const setEnv = (v: string) => {
+    (process.env as Record<string, string>)['NODE_ENV'] = v;
+  };
+  afterEach(() => setEnv(originalEnv ?? 'test'));
+
+  it('prefers an explicit endpoint in every environment', () => {
+    setEnv('production');
+    expect(resolveGameLogsEndpoint('https://api/x', 'nfl')).toBe(
+      'https://api/x',
+    );
+  });
+
+  it('returns undefined in production when none is configured', () => {
+    setEnv('production');
+    expect(resolveGameLogsEndpoint(undefined, 'nfl')).toBeUndefined();
+    expect(resolveGameLogsEndpoint(undefined, 'mlb')).toBeUndefined();
+  });
+
+  it('uses a sport-specific localhost default outside production', () => {
+    setEnv('development');
+    expect(resolveGameLogsEndpoint(undefined, 'nfl')).toBe(
+      'http://localhost:5000/nfl-game-logs',
+    );
+    expect(resolveGameLogsEndpoint(undefined, 'mlb')).toBe(
+      'http://localhost:5000/baseball-game-logs',
+    );
+  });
+});
+
+describe('GameLogsTable unavailable + fetch errors (LS-10494)', () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+    global.fetch = jest.fn();
+    mockInteractionManagerSync();
+  });
+
+  it('renders an unavailable notice and never fetches in production without an endpoint', () => {
+    const original = process.env.NODE_ENV;
+    (process.env as Record<string, string>)['NODE_ENV'] = 'production';
+    try {
+      const { getByTestId, queryByText } = render(
+        <GameLogsTable sport="nfl" />,
+      );
+      expect(getByTestId('game-logs-unavailable')).toBeTruthy();
+      expect(queryByText('Get Player Data')).toBeNull();
+      expect(global.fetch).not.toHaveBeenCalled();
+    } finally {
+      (process.env as Record<string, string>)['NODE_ENV'] = original ?? 'test';
+    }
+  });
+
+  it('shows a visible error with Retry when the fetch fails, and retry refetches', async () => {
+    const fetchMock = global.fetch as jest.Mock;
+    fetchMock.mockImplementationOnce(() =>
+      Promise.reject(new TypeError('Failed to fetch')),
+    );
+    const { getByPlaceholderText, getByText, findByTestId, queryByTestId } =
+      render(<GameLogsTable apiEndpoint="https://test.example.com/logs" />);
+    fireEvent.change(getByPlaceholderText('Enter player ID'), {
+      target: { value: 'BradTo00' },
+    });
+    act(() => {
+      fireEvent.click(
+        getByText('Get Player Data').closest('button') ??
+          getByText('Get Player Data'),
+      );
+    });
+    const err = await findByTestId('game-logs-fetch-error');
+    expect(err.textContent).toContain('Could not reach the stats server');
+
+    mockFetchOnce(makePaginated(1, 5, 5));
+    act(() => {
+      fireEvent.click(
+        getByText('Retry').closest('button') ?? getByText('Retry'),
+      );
+    });
+    await waitFor(() =>
+      expect(queryByTestId('game-logs-fetch-error')).toBeNull(),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows server-error copy for non-2xx responses', async () => {
+    (global.fetch as jest.Mock).mockImplementationOnce(() =>
+      Promise.resolve({ ok: false, status: 503 } as unknown as Response),
+    );
+    const { getByPlaceholderText, getByText, findByTestId } = render(
+      <GameLogsTable apiEndpoint="https://test.example.com/logs" />,
+    );
+    fireEvent.change(getByPlaceholderText('Enter player ID'), {
+      target: { value: 'BradTo00' },
+    });
+    act(() => {
+      fireEvent.click(
+        getByText('Get Player Data').closest('button') ??
+          getByText('Get Player Data'),
+      );
+    });
+    const err = await findByTestId('game-logs-fetch-error');
+    expect(err.textContent).toContain('(503)');
+    expect(describeFetchError(new TypeError('x'))).toContain('Could not reach');
   });
 });

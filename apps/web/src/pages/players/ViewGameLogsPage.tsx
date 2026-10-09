@@ -35,9 +35,12 @@ import { BG_DARK, TEXT_HIGH_CONTRAST } from '../../constants/colors';
  * keeps the gate the single source of truth for premium access and avoids
  * a second, inconsistent gating path in the widget itself.
  */
-const STATS_API_BASE =
-  config.statsApiUrl?.replace(/\/+$/, '') ?? 'http://localhost:5000';
-const GAME_LOGS_ENDPOINT = `${STATS_API_BASE}/baseball-game-logs`;
+const STATS_API_BASE = config.statsApiUrl?.replace(/\/+$/, '');
+// No localhost fallback: GameLogsTable supplies a dev-only default and renders
+// an unavailable notice in production when this is undefined (LS-10494).
+const GAME_LOGS_ENDPOINT = STATS_API_BASE
+  ? `${STATS_API_BASE}/baseball-game-logs`
+  : undefined;
 
 export function ViewGameLogsPage() {
   const isPremium = useIsPremium();
