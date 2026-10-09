@@ -250,6 +250,28 @@ test('classify() leaves hasGithubScripts false for .github/workflows-only change
   }
 });
 
+test('classify() sets hasWorkflows for .github/actions-only changes (LS-10351)', () => {
+  const root = makeSimpleFixture();
+  const originalCwd = process.cwd();
+  try {
+    mkdirSync(join(root, '.github', 'actions', 'setup'), { recursive: true });
+    writeFileSync(
+      join(root, '.github', 'actions', 'setup', 'action.yml'),
+      'name: setup',
+    );
+    git(root, ['add', '-A']);
+    git(root, ['commit', '-q', '-m', 'composite-action-only change']);
+
+    process.chdir(root);
+    const result = classify('main');
+    assert.equal(result.hasWorkflows, true);
+    assert.equal(result.hasGithubScripts, false);
+  } finally {
+    process.chdir(originalCwd);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 /**
  * PC_HAS_ROOT_SCRIPTS flag (LS-10178): scripts/ has no nx project.json
  * either, so `nx affected -t test` (make pc-test) is just as blind to

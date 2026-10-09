@@ -19,7 +19,8 @@
  *                         regardless of this flag (LS-9276), so generated-file
  *                         staleness is caught independent of what the current
  *                         branch's diff touches.
- *   PC_HAS_WORKFLOWS   — files in .github/workflows/
+ *   PC_HAS_WORKFLOWS   — files in .github/workflows/ or .github/actions/ (LS-10351:
+ *                         validate-workflows.js also validates composite actions)
  *   PC_HAS_GH_SCRIPTS  — files in .github/scripts/ (LS-9964)
  *   PC_HAS_PS1         — files matching scripts/**\/*.ps1 (LS-8729)
  *   PC_HAS_ROOT_SCRIPTS — files in scripts/ (LS-10178). scripts/ has no nx
@@ -126,7 +127,10 @@ function classify(baseRef) {
     }
 
     // Workflow changes
-    if (normalized.startsWith('.github/workflows/')) {
+    if (
+      normalized.startsWith('.github/workflows/') ||
+      normalized.startsWith('.github/actions/')
+    ) {
       hasWorkflows = true;
     }
 

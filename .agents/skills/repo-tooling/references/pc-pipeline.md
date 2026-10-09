@@ -51,7 +51,7 @@ failure mode vendoring removes. See [`scripts/schemas/README.md`](../../../../sc
 Each pc invocation runs `node scripts/classify-changes.js --base $(NX_BASE)`, which diffs `NX_BASE...HEAD` and emits three flags:
 
 - `PC_HAS_DB=1` — any changed file under `lib/db-client/` or `lambdas/db/` (enables step 1, migration immutability)
-- `PC_HAS_WORKFLOWS=1` — any changed file under `.github/workflows/` (enables step 7)
+- `PC_HAS_WORKFLOWS=1` — any changed file under `.github/workflows/` or `.github/actions/` (enables step 7)
 - `PC_DOCS_ONLY=1` — ALL changed files are docs (`*.md`, `docs/`, `.agents/skills/`) (skips steps 4, 6, 8, 9)
 
 **Steps 2–3 (schema generation + codegen) always run, regardless of `PC_HAS_DB`** (LS-9276). They used to be gated the same way as step 1, which let generated-file staleness introduced by one PR (e.g. a schema change that didn't regen every codegen target) go undetected by every later PR whose own diff didn't happen to touch `lib/db-client/`/`lambdas/db/`. Both commands are cheap (~20s combined) and a no-op when already fresh, so running them unconditionally closes that gap for local validation — mirroring what `.github/workflows/check-schema.yml`'s `git diff --exit-code -- '*.generated.ts'` already enforces in CI for PRs that touch schema-relevant paths.
