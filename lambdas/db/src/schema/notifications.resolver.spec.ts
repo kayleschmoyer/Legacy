@@ -44,6 +44,7 @@ describe('notifications resolver', () => {
     matchupReminderEnabled: true,
     pushEnabled: true,
     emailEnabled: false,
+    inAppEnabled: true,
     closeGameThreshold: 5,
     createdAt: NOW,
     updatedAt: NOW,
@@ -283,6 +284,7 @@ describe('notifications resolver', () => {
       userId: 10,
       pushEnabled: true,
       emailEnabled: false,
+      inAppEnabled: true,
     });
   });
 
@@ -403,7 +405,9 @@ describe('notifications resolver', () => {
   it('updateNotificationPreferences: updates and returns prefs', async () => {
     const result = await getMutationResolver('updateNotificationPreferences')(
       {},
-      { input: { pushEnabled: false, emailEnabled: true } },
+      {
+        input: { pushEnabled: false, emailEnabled: true, inAppEnabled: false },
+      },
       mockContext,
       undefined as never,
     );
@@ -412,7 +416,11 @@ describe('notifications resolver', () => {
       mockNotificationsService.updateNotificationPreferences,
     ).toHaveBeenCalledWith(
       10,
-      expect.objectContaining({ pushEnabled: false, emailEnabled: true }),
+      expect.objectContaining({
+        pushEnabled: false,
+        emailEnabled: true,
+        inAppEnabled: false,
+      }),
     );
   });
 

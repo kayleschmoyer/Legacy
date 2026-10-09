@@ -15,6 +15,7 @@ const CLOSE_GAME_ALERT_TYPE = 'MATCHUP_CLOSE_GAME';
 
 interface RelevantPreferences {
   pushEnabled: boolean;
+  inAppEnabled?: boolean;
   touchdownAlertEnabled: boolean;
   matchupCloseGameEnabled: boolean;
   closeGameThreshold: number;
@@ -58,10 +59,16 @@ async function isPremiumUser(db: PublicDb, userId: number): Promise<boolean> {
  */
 const DEFAULT_PREFERENCES: RelevantPreferences = {
   pushEnabled: true,
+  inAppEnabled: true,
   touchdownAlertEnabled: false,
   matchupCloseGameEnabled: false,
   closeGameThreshold: 50,
 };
+
+/** Push and in-app are independent channels; skip only if both are off (LS-7090). */
+function hasDeliveryChannel(prefs: RelevantPreferences): boolean {
+  return prefs.pushEnabled || (prefs.inAppEnabled ?? false);
+}
 
 async function getRelevantPreferences(
   db: PublicDb,
@@ -70,6 +77,7 @@ async function getRelevantPreferences(
   const rows = await db
     .select({
       pushEnabled: PublicSchema.notificationPreferences.pushEnabled,
+      inAppEnabled: PublicSchema.notificationPreferences.inAppEnabled,
       touchdownAlertEnabled:
         PublicSchema.notificationPreferences.touchdownAlertEnabled,
       matchupCloseGameEnabled:
@@ -149,7 +157,7 @@ async function publishTouchdownAlerts(
       if (!(await isPremiumUser(db, userId))) continue;
 
       const prefs = await getRelevantPreferences(db, userId);
-      if (!prefs.pushEnabled || !prefs.touchdownAlertEnabled) {
+      if (!hasDeliveryChannel(prefs) || !prefs.touchdownAlertEnabled) {
         continue;
       }
 
@@ -203,7 +211,7 @@ async function publishCloseGameAlerts(
       if (!(await isPremiumUser(db, userId))) continue;
 
       const prefs = await getRelevantPreferences(db, userId);
-      if (!prefs.pushEnabled || !prefs.matchupCloseGameEnabled) {
+      if (!hasDeliveryChannel(prefs) || !prefs.matchupCloseGameEnabled) {
         continue;
       }
 

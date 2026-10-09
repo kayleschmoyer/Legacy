@@ -116,7 +116,8 @@ type NotificationToggleField =
   | 'matchupReminderEnabled'
   | 'touchdownAlertEnabled'
   | 'pushEnabled'
-  | 'emailEnabled';
+  | 'emailEnabled'
+  | 'inAppEnabled';
 
 type NotificationPatch = Partial<
   Record<NotificationToggleField, boolean> & { closeGameThreshold: number }
@@ -1136,6 +1137,7 @@ function NotificationPreferencesSection({
 
   const pushEnabled = prefs?.pushEnabled ?? true;
   const emailEnabled = prefs?.emailEnabled ?? false;
+  const inAppEnabled = prefs?.inAppEnabled ?? true;
   const matchupStartedEnabled = prefs?.matchupStartedEnabled ?? true;
   const matchupEndedEnabled = prefs?.matchupEndedEnabled ?? true;
   const matchupCloseGameEnabled = prefs?.matchupCloseGameEnabled ?? false;
@@ -1186,10 +1188,21 @@ function NotificationPreferencesSection({
           </SaveBanner>
         </SaveBannerWrap>
       )}
-      {headerNode(<SectionMeta>Push &amp; email · Matchup alerts</SectionMeta>)}
+      {headerNode(
+        <SectionMeta>In-app, push &amp; email · Matchup alerts</SectionMeta>,
+      )}
       <CollapsibleBody isCollapsed={isCollapsed}>
         <SectionBody>
           <SectionEyebrow>Delivery</SectionEyebrow>
+
+          <PrefToggle
+            value={inAppEnabled}
+            onChange={(v) => handleToggle('inAppEnabled', v)}
+            label="In-app notifications"
+            description="Alerts in your notifications inbox."
+          />
+
+          <Separator />
 
           <PrefToggle
             value={pushEnabled}

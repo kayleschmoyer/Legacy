@@ -3531,6 +3531,7 @@ export type NotificationPreference = {
   createdAt?: Maybe<Scalars['String']['output']>;
   emailEnabled?: Maybe<Scalars['Boolean']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
+  inAppEnabled?: Maybe<Scalars['Boolean']['output']>;
   matchupCloseGameEnabled?: Maybe<Scalars['Boolean']['output']>;
   matchupEndedEnabled?: Maybe<Scalars['Boolean']['output']>;
   matchupReminderEnabled?: Maybe<Scalars['Boolean']['output']>;
@@ -3544,6 +3545,7 @@ export type NotificationPreference = {
 export type NotificationPreferenceInput = {
   closeGameThreshold?: InputMaybe<Scalars['Int']['input']>;
   emailEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  inAppEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   matchupCloseGameEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   matchupEndedEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   matchupReminderEnabled?: InputMaybe<Scalars['Boolean']['input']>;

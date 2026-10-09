@@ -182,9 +182,10 @@ describe('deliverNotification', () => {
   });
 
   describe('preference enforcement', () => {
-    it('skips delivery when pushEnabled is false', async () => {
+    it('skips delivery when pushEnabled and inAppEnabled are both false', async () => {
       mockGetUserNotificationPreferences.mockResolvedValue({
         pushEnabled: false,
+        inAppEnabled: false,
       });
 
       const result = await deliverNotification(makeEvent());
@@ -229,6 +230,7 @@ describe('deliverNotification', () => {
       mockGetUserNotificationPreferences.mockResolvedValue({
         pushEnabled: false,
         emailEnabled: false,
+        inAppEnabled: false,
       });
       mockGetUserDeviceTokens.mockResolvedValue([
         makeDeviceToken(),
@@ -253,6 +255,40 @@ describe('deliverNotification', () => {
       });
       expect(mockSendPushNotificationsAsync).not.toHaveBeenCalled();
       expect(mockWebPushSendNotification).not.toHaveBeenCalled();
+    });
+
+    // LS-7090 (PRF-019): in-app is its own channel — push off must not
+    // suppress the inbox entry, and in-app off must not suppress push.
+    it('logs history but sends no push when pushEnabled is false and inAppEnabled is true', async () => {
+      mockGetUserNotificationPreferences.mockResolvedValue({
+        pushEnabled: false,
+        inAppEnabled: true,
+      });
+
+      const result = await deliverNotification(makeEvent());
+
+      expect(mockGetUserDeviceTokens).not.toHaveBeenCalled();
+      expect(mockSendPushNotificationsAsync).not.toHaveBeenCalled();
+      expect(result.tokensAttempted).toBe(0);
+      expect(result.historyId).toBe(42);
+      expect(mockLogNotificationHistory).toHaveBeenCalledTimes(1);
+      expect(mockNotifyNotificationReceived).toHaveBeenCalledTimes(1);
+    });
+
+    it('sends push but logs no history when inAppEnabled is false and pushEnabled is true', async () => {
+      mockGetUserNotificationPreferences.mockResolvedValue({
+        pushEnabled: true,
+        inAppEnabled: false,
+      });
+      mockGetUserDeviceTokens.mockResolvedValue([makeDeviceToken()]);
+      mockSendPushNotificationsAsync.mockResolvedValue([{ status: 'ok' }]);
+
+      const result = await deliverNotification(makeEvent());
+
+      expect(result.tokensSent).toBe(1);
+      expect(result.historyId).toBeNull();
+      expect(mockLogNotificationHistory).not.toHaveBeenCalled();
+      expect(mockNotifyNotificationReceived).not.toHaveBeenCalled();
     });
 
     // LS-7091 (PRF-020): emailEnabled gates only the email channel, which has
@@ -429,10 +465,12 @@ describe('deliverNotification', () => {
       });
     });
 
-    it('skips the push when pushEnabled is false (no history logged)', async () => {
+    it('logs no history when inAppEnabled is false', async () => {
       mockGetUserNotificationPreferences.mockResolvedValue({
-        pushEnabled: false,
+        pushEnabled: true,
+        inAppEnabled: false,
       });
+      mockGetUserDeviceTokens.mockResolvedValue([]);
 
       await deliverNotification(makeEvent());
 

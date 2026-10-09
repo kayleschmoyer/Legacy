@@ -4030,6 +4030,7 @@ type NotificationPreference {
   createdAt: String
   emailEnabled: Boolean
   id: Int
+  inAppEnabled: Boolean
   matchupCloseGameEnabled: Boolean
   matchupEndedEnabled: Boolean
   matchupReminderEnabled: Boolean
@@ -4043,6 +4044,7 @@ type NotificationPreference {
 input NotificationPreferenceInput {
   closeGameThreshold: Int
   emailEnabled: Boolean
+  inAppEnabled: Boolean
   matchupCloseGameEnabled: Boolean
   matchupEndedEnabled: Boolean
   matchupReminderEnabled: Boolean

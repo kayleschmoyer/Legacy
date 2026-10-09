@@ -38,6 +38,7 @@ export const notificationPreferences = pgTable(
       .default(false),
     pushEnabled: boolean('push_enabled').notNull().default(true),
     emailEnabled: boolean('email_enabled').notNull().default(false),
+    inAppEnabled: boolean('in_app_enabled').notNull().default(true),
     closeGameThreshold: integer('close_game_threshold').notNull().default(50),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),

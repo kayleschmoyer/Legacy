@@ -14,6 +14,7 @@ export interface NotificationPreference {
   touchdownAlertEnabled: boolean;
   pushEnabled: boolean;
   emailEnabled: boolean;
+  inAppEnabled: boolean;
   closeGameThreshold: number;
   createdAt: Date;
   updatedAt: Date;
@@ -51,6 +52,7 @@ export interface NotificationPreferenceUpdate {
   touchdownAlertEnabled?: boolean;
   pushEnabled?: boolean;
   emailEnabled?: boolean;
+  inAppEnabled?: boolean;
   closeGameThreshold?: number;
 }
 
@@ -86,6 +88,7 @@ export class NotificationService {
         touchdownAlertEnabled: pref.touchdownAlertEnabled,
         pushEnabled: pref.pushEnabled,
         emailEnabled: pref.emailEnabled,
+        inAppEnabled: pref.inAppEnabled,
         closeGameThreshold: pref.closeGameThreshold,
         createdAt: pref.createdAt,
         updatedAt: pref.updatedAt,
@@ -140,6 +143,7 @@ export class NotificationService {
         touchdownAlertEnabled: result.touchdownAlertEnabled,
         pushEnabled: result.pushEnabled,
         emailEnabled: result.emailEnabled,
+        inAppEnabled: result.inAppEnabled,
         closeGameThreshold: result.closeGameThreshold,
         createdAt: result.createdAt,
         updatedAt: result.updatedAt,

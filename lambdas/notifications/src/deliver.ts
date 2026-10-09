@@ -22,10 +22,11 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
 
 /**
  * Delivers a single notification event:
- * 1. Checks user push preferences (skip if pushEnabled = false)
- * 2. Loads active device tokens for the user
- * 3. Sends push notifications via Expo Push API
- * 4. Logs the notification to notification_history
+ * 1. Checks user channel preferences — skip entirely if both pushEnabled and
+ *    inAppEnabled are false (a missing preference counts as enabled)
+ * 2. Loads active device tokens for the user (push channel only)
+ * 3. Sends push notifications via Expo Push API / Web Push
+ * 4. Logs the notification to notification_history (in-app channel only)
  * 5. Deactivates any tokens rejected by Expo as invalid
  */
 export async function deliverNotification(
@@ -33,11 +34,15 @@ export async function deliverNotification(
 ): Promise<SendResult> {
   const { userId, notificationType, title, body, data = {} } = event;
 
-  // 1. Check preferences — skip if user has push disabled
+  // 1. Check preferences — push and in-app are independent channels (LS-7090)
   const prefs =
     await dbService.notifications.getUserNotificationPreferences(userId);
-  if (prefs && !prefs.pushEnabled) {
-    LOGGER.info('Push notifications disabled for user, skipping', { userId });
+  const pushOn = prefs?.pushEnabled ?? true;
+  const inAppOn = prefs?.inAppEnabled ?? true;
+  if (!pushOn && !inAppOn) {
+    LOGGER.info('Push and in-app notifications disabled for user, skipping', {
+      userId,
+    });
     return {
       userId,
       tokensAttempted: 0,
@@ -47,25 +52,24 @@ export async function deliverNotification(
     };
   }
 
-  // 2. Load active device tokens
-  const tokens = await dbService.notifications.getUserDeviceTokens(userId);
+  // 2. Load active device tokens (push channel only)
+  const tokens = pushOn
+    ? await dbService.notifications.getUserDeviceTokens(userId)
+    : [];
   const activeTokens = tokens.filter((t) => t.isActive);
 
   if (activeTokens.length === 0) {
     LOGGER.info('No active device tokens for user', { userId });
     // Still log to history so in-app notification bell is populated
-    const historyId = await dbService.notifications.logNotificationHistory(
-      userId,
-      notificationType,
-      title,
-      body,
-      data,
-    );
-    await pushNotificationReceivedEvent({
-      userId,
-      historyId,
-      notificationType,
-    });
+    const historyId = inAppOn
+      ? await recordInAppNotification({
+          userId,
+          notificationType,
+          title,
+          body,
+          data,
+        })
+      : null;
     return {
       userId,
       tokensAttempted: 0,
@@ -182,22 +186,16 @@ export async function deliverNotification(
     );
   }
 
-  // 6. Log notification to history
-  const historyId = await dbService.notifications.logNotificationHistory(
-    userId,
-    notificationType,
-    title,
-    body,
-    data,
-  );
-
-  // 7. Push WebSocket `notification-received` event so the in-app bell
-  //    badge updates within ~1s instead of waiting for the next poll.
-  await pushNotificationReceivedEvent({
-    userId,
-    historyId,
-    notificationType,
-  });
+  // 6/7. Log to history + notify the in-app bell (in-app channel only)
+  const historyId = inAppOn
+    ? await recordInAppNotification({
+        userId,
+        notificationType,
+        title,
+        body,
+        data,
+      })
+    : null;
 
   LOGGER.info('Notification delivery complete', {
     userId,
@@ -215,6 +213,30 @@ export async function deliverNotification(
     tokensFailed,
     historyId,
   };
+}
+
+/**
+ * In-app channel: log the notification to history, then push a WebSocket
+ * `notification-received` event so the in-app bell badge updates within ~1s
+ * instead of waiting for the next poll.
+ */
+async function recordInAppNotification(params: {
+  userId: number;
+  notificationType: string;
+  title: string;
+  body: string;
+  data: Record<string, unknown>;
+}): Promise<number | null> {
+  const { userId, notificationType, title, body, data } = params;
+  const historyId = await dbService.notifications.logNotificationHistory(
+    userId,
+    notificationType,
+    title,
+    body,
+    data,
+  );
+  await pushNotificationReceivedEvent({ userId, historyId, notificationType });
+  return historyId;
 }
 
 /**

@@ -18,6 +18,7 @@ const NotificationPreferenceInput = builder.inputType(
       touchdownAlertEnabled: t.boolean({ required: false }),
       pushEnabled: t.boolean({ required: false }),
       emailEnabled: t.boolean({ required: false }),
+      inAppEnabled: t.boolean({ required: false }),
       closeGameThreshold: t.int({ required: false }),
     }),
   },
@@ -41,6 +42,7 @@ const NotificationPreferenceRef = builder.objectRef<{
   touchdownAlertEnabled: boolean;
   pushEnabled: boolean;
   emailEnabled: boolean;
+  inAppEnabled: boolean;
   closeGameThreshold: number;
   createdAt: Date;
   updatedAt: Date;
@@ -57,6 +59,7 @@ NotificationPreferenceRef.implement({
     touchdownAlertEnabled: t.exposeBoolean('touchdownAlertEnabled'),
     pushEnabled: t.exposeBoolean('pushEnabled'),
     emailEnabled: t.exposeBoolean('emailEnabled'),
+    inAppEnabled: t.exposeBoolean('inAppEnabled'),
     closeGameThreshold: t.exposeInt('closeGameThreshold'),
     createdAt: t.string({
       resolve: (parent) => parent.createdAt.toISOString(),
@@ -198,6 +201,7 @@ builder.queryField('getUserNotificationPreferences', (t) =>
         touchdownAlertEnabled: prefs.touchdownAlertEnabled,
         pushEnabled: prefs.pushEnabled,
         emailEnabled: prefs.emailEnabled,
+        inAppEnabled: prefs.inAppEnabled,
         closeGameThreshold: prefs.closeGameThreshold,
         createdAt: prefs.createdAt,
         updatedAt: prefs.updatedAt,
@@ -311,6 +315,7 @@ builder.mutationField('updateNotificationPreferences', (t) =>
         touchdownAlertEnabled: prefs.touchdownAlertEnabled,
         pushEnabled: prefs.pushEnabled,
         emailEnabled: prefs.emailEnabled,
+        inAppEnabled: prefs.inAppEnabled,
         closeGameThreshold: prefs.closeGameThreshold,
         createdAt: prefs.createdAt,
         updatedAt: prefs.updatedAt,

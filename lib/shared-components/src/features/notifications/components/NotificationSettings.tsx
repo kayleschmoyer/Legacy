@@ -25,6 +25,7 @@ type UpdatableNotificationKey = Extract<
   | 'touchdownAlertEnabled'
   | 'pushEnabled'
   | 'emailEnabled'
+  | 'inAppEnabled'
 >;
 
 export interface NotificationSettingsProps {
@@ -178,6 +179,27 @@ export function NotificationSettings({
           <Text fontSize="$3" fontWeight="600" color="$gray11">
             Notification Channels
           </Text>
+
+          <XStack
+            justifyContent="space-between"
+            alignItems="center"
+            paddingVertical="$2"
+          >
+            <Label htmlFor="in-app-enabled" flex={1}>
+              <Text>In-App Notifications</Text>
+              <Text fontSize="$2" color="$gray11">
+                Show notifications in your in-app inbox
+              </Text>
+            </Label>
+            <Switch
+              id="in-app-enabled"
+              checked={preferences.inAppEnabled ?? true}
+              onCheckedChange={(checked) => {
+                void handleToggle('inAppEnabled', checked);
+              }}
+              disabled={loading}
+            />
+          </XStack>
 
           <XStack
             justifyContent="space-between"

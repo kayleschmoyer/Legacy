@@ -8,6 +8,7 @@ fragment NotificationPreference on NotificationPreference {
   touchdownAlertEnabled
   pushEnabled
   emailEnabled
+  inAppEnabled
   closeGameThreshold
   createdAt
   updatedAt

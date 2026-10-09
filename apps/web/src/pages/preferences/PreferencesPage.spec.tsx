@@ -448,3 +448,52 @@ describe('PreferencesPage cross-tab prefs (LS-10782)', () => {
     expect(readStored().showSeasonTotals).toBe(false);
   });
 });
+
+describe('PreferencesPage in-app channel toggle (LS-7090)', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it('renders in-app, push and email as three separate switches and saves in-app on its own', async () => {
+    mockUseQuery.mockReturnValue({
+      data: {
+        getUserNotificationPreferences: {
+          __typename: 'NotificationPreferences',
+          pushEnabled: true,
+          emailEnabled: false,
+          inAppEnabled: true,
+        },
+      },
+      error: undefined,
+      loading: false,
+      networkStatus: NetworkStatus.ready,
+      refetch: jest.fn(),
+      updateQuery: jest.fn(),
+    });
+    const updatePrefs = jest.fn().mockResolvedValue({ data: undefined });
+    (useUpdateNotificationPreferencesMutation as jest.Mock).mockReturnValue([
+      updatePrefs,
+    ]);
+
+    render(<PreferencesPage />);
+
+    expect(
+      screen.getByRole('switch', { name: 'In-app notifications' }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('switch', { name: 'Push notifications' }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('switch', { name: 'Email notifications' }),
+    ).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole('switch', { name: 'In-app notifications' }),
+    );
+    await act(() => jest.advanceTimersByTimeAsync(300));
+
+    expect(updatePrefs).toHaveBeenCalledTimes(1);
+    expect(updatePrefs.mock.calls[0][0].variables.input).toEqual({
+      inAppEnabled: false,
+    });
+  });
+});
