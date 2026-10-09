@@ -1,4 +1,5 @@
 import React from 'react';
+import { renderToString } from 'react-dom/server';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { AuthProvider } from './hooks/useAuth';
 import { EnhancedAuthGuard } from './EnhancedAuthGuard';
@@ -147,6 +148,60 @@ describe('EnhancedAuthGuard – session expiry on a public path', () => {
       expect(screen.getByTestId('login-page')).toBeTruthy();
     });
     expect(screen.queryByTestId('app')).toBeNull();
+  });
+});
+
+describe('EnhancedAuthGuard – client-side navigation from a public path (LS-10488)', () => {
+  function renderAtPath(path: string) {
+    const MockedAuthService = jest.mocked(AuthService);
+    MockedAuthService.mockImplementation(
+      () => makeMockAuthService() as unknown as AuthService,
+    );
+    const ui = (currentPath: string) => (
+      <AuthProvider config={testConfig}>
+        <EnhancedAuthGuard currentPath={currentPath} publicPaths={['/pricing']}>
+          <div data-testid="app">app</div>
+        </EnhancedAuthGuard>
+      </AuthProvider>
+    );
+    const view = render(ui(path));
+    return { rerenderAt: (p: string) => view.rerender(ui(p)) };
+  }
+
+  it('shows the login screen when a signed-out user navigates from a public to a protected path', async () => {
+    const { rerenderAt } = renderAtPath('/pricing');
+    await waitFor(() => {
+      expect(screen.getByTestId('app')).toBeTruthy();
+    });
+
+    // Same auth state, new path: the guard must re-gate on the new path.
+    rerenderAt('/profile/subscription');
+
+    await waitFor(() => {
+      expect(screen.getByTestId('login-page')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('app')).toBeNull();
+  });
+
+  it('shows the loading state, not the page, on a protected path while auth is resolving', () => {
+    const MockedAuthService = jest.mocked(AuthService);
+    MockedAuthService.mockImplementation(
+      () => makeMockAuthService() as unknown as AuthService,
+    );
+    // Effects do not run in a server render, so AuthProvider is still in its
+    // initial isLoading state — the window a mid-session navigation hits.
+    const html = renderToString(
+      <AuthProvider config={testConfig}>
+        <EnhancedAuthGuard
+          currentPath="/profile/subscription"
+          publicPaths={['/pricing']}
+        >
+          <div data-testid="app">app</div>
+        </EnhancedAuthGuard>
+      </AuthProvider>,
+    );
+    expect(html).toContain('Loading...');
+    expect(html).not.toContain('data-testid="app"');
   });
 });
 

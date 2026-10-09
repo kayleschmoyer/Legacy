@@ -20,10 +20,7 @@ import {
   AppProvider,
   ErrorBoundary,
 } from '@legacy-sports/shared-components/ui';
-import {
-  AuthProvider,
-  EnhancedAuthGuard,
-} from '@legacy-sports/shared-components/auth';
+import { AuthProvider } from '@legacy-sports/shared-components/auth';
 import type { OAuthConfig } from '@legacy-sports/shared-components/auth';
 import { TamaguiProvider } from 'tamagui';
 import { tamaguiConfig } from '@legacy-sports/tamagui-config';
@@ -44,6 +41,7 @@ import { GrowthBookProvider } from './context/GrowthBookProvider';
 import { MotionPreferenceSync } from './context/MotionPreference';
 import { ConsentManager } from './consent/ConsentManager';
 import { LoginPage } from './pages/login/LoginPage';
+import { RouterAwareAuthGuard } from './components/auth/RouterAwareAuthGuard';
 import { clearWebPushRegistration } from './hooks/useWebPushRegistration';
 import { clearUserScopedStorage } from './lib/user-scoped-storage';
 
@@ -158,19 +156,14 @@ function ThemeAwareApp() {
 
   return (
     <ReduxProvider store={store}>
-      <BrowserRouter
-        basename={basePath || '/'}
-        future={{ v7_relativeSplatPath: true, v7_startTransition: true }}
+      <AppProvider
+        apolloClient={apolloClient}
+        colorScheme={resolvedTheme}
+        tamaguiConfig={tamaguiConfig}
       >
-        <AppProvider
-          apolloClient={apolloClient}
-          colorScheme={resolvedTheme}
-          tamaguiConfig={tamaguiConfig}
-        >
-          <ThemeServerSync />
-          <App />
-        </AppProvider>
-      </BrowserRouter>
+        <ThemeServerSync />
+        <App />
+      </AppProvider>
     </ReduxProvider>
   );
 }
@@ -272,28 +265,37 @@ try {
                 clearUserScopedStorage();
               }}
             >
-              <EnhancedAuthGuard
-                loginTitle="Welcome to Legacy Sports!"
-                loginSubtitle="Sign in to access your fantasy leagues and stats"
-                loginComponent={
-                  <ApolloProvider client={apolloClient}>
-                    <LoginPage />
-                  </ApolloProvider>
-                }
-                publicPaths={PUBLIC_PATHS}
-                publicExactPaths={PUBLIC_EXACT_PATHS}
-                onLoginSuccess={() => {
-                  LOGGER.info('Web app login successful!');
-                  trackLogin('google');
-                }}
-                onLoginFailure={(error: string) => {
-                  LOGGER.error('Web app login failed:', error);
+              <BrowserRouter
+                basename={basePath || '/'}
+                future={{
+                  v7_relativeSplatPath: true,
+                  v7_startTransition: true,
                 }}
               >
-                <GrowthBookProvider>
-                  <ThemeAwareApp />
-                </GrowthBookProvider>
-              </EnhancedAuthGuard>
+                <RouterAwareAuthGuard
+                  basePath={basePath}
+                  loginTitle="Welcome to Legacy Sports!"
+                  loginSubtitle="Sign in to access your fantasy leagues and stats"
+                  loginComponent={
+                    <ApolloProvider client={apolloClient}>
+                      <LoginPage />
+                    </ApolloProvider>
+                  }
+                  publicPaths={PUBLIC_PATHS}
+                  publicExactPaths={PUBLIC_EXACT_PATHS}
+                  onLoginSuccess={() => {
+                    LOGGER.info('Web app login successful!');
+                    trackLogin('google');
+                  }}
+                  onLoginFailure={(error: string) => {
+                    LOGGER.error('Web app login failed:', error);
+                  }}
+                >
+                  <GrowthBookProvider>
+                    <ThemeAwareApp />
+                  </GrowthBookProvider>
+                </RouterAwareAuthGuard>
+              </BrowserRouter>
             </AuthProvider>
           </ThemedTamaguiProvider>
         </ThemeProvider>
