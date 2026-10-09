@@ -65,6 +65,10 @@ Maestro flows follow `maestro/flows/trade-center/trade-center.yaml` (`launch-aut
 
 LS-6882 (custom-URL validation) is Done; LS-10443 then removed the custom-URL field for the user variant, so the user picker is presets-only — absence is pinned by the PLB test above and no MIME/size/EXIF journey applies. The team-logo variant (residual URL validation) is tracked by LS-10613 and is out of scope for this page. Preset keyboard/AT accessibility is an open bug, LS-10523; do not add a keyboard assertion until it is fixed.
 
+### Premium gating (LS-7213 / PRS-012) — accepted design choice
+
+The avatar picker is intentionally identical for every tier: there are no premium-only presets, animated avatars/GIFs or frames, and no `isPremium` gate in `AvatarPicker.tsx` or `presets.ts`. No design in `docs/design/` specifies premium avatar perks, so none are built. Premium is differentiated on the profile card instead (gold ring + Premium chip, LS-7234). Reopen as a new ticket only once a design defines which presets are premium, what animates, and whether the server must enforce the gate (and the avatar host allowlist from LS-7209 is extended for animated assets). PRS-012 variant-premium findings should therefore assert the picker is the same as for free users.
+
 ## Related
 
 - **Epic:** LS-5293 — QA — Page: Profile Settings
