@@ -157,6 +157,7 @@ const snapshotBase = {
   teamCount: 10,
   rosterSize: 25,
   gamesPerMatchup: 7,
+  totalMatchups: 10,
   matchupDays: 7,
   startersCount: 9,
 };
@@ -527,8 +528,14 @@ describe('Snapshot', () => {
   it('renders football-specific labels when isFootball is true', () => {
     render(<Snapshot {...snapshotBase} isFootball={true} />);
     expect(screen.getByText('Weeks / Season')).toBeInTheDocument();
+    expect(screen.getByText('Games / Matchup')).toBeInTheDocument();
     expect(screen.getByText('Weekly Format')).toBeInTheDocument();
-    expect(screen.queryByText('Games / Matchup')).not.toBeInTheDocument();
+    // LS-10522: each label shows its own value, not gamesPerMatchup twice
+    const value = (label: string) =>
+      screen.getByText(label).parentElement?.querySelector('.value')
+        ?.textContent;
+    expect(value('Weeks / Season')).toBe('10');
+    expect(value('Games / Matchup')).toBe('7');
     expect(screen.queryByText('Matchup Length')).not.toBeInTheDocument();
   });
 

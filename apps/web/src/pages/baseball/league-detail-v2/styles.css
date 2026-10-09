@@ -824,7 +824,7 @@
 /* Snapshot */
 .ls-snapshot {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(var(--ls-snap-cols, 5), 1fr);
   gap: 0;
   margin-bottom: 24px;
   background: linear-gradient(

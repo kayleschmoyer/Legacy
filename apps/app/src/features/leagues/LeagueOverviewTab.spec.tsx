@@ -107,6 +107,7 @@ const BASE_PROPS = {
     lmNotes: null,
     maxRosterSize: 25,
     gamesPerMatchup: 5,
+    totalMatchups: 10,
     currentWeekNumber: 14,
     inviteCode: 'ABC123',
     sport: Sport.Baseball,
@@ -257,6 +258,10 @@ describe('LeagueOverviewTab', () => {
       />,
     );
     expect(screen.getByText('Weeks / Season')).toBeTruthy();
+    expect(screen.getByText('Games / Matchup')).toBeTruthy();
+    // LS-10522: Weeks / Season shows totalMatchups, Games / Matchup the per-matchup count
+    expect(screen.getByText('10')).toBeTruthy();
+    expect(screen.getByText('5')).toBeTruthy();
     expect(screen.getByText('Format')).toBeTruthy();
     expect(screen.getByText('H2H')).toBeTruthy();
   });

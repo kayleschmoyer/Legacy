@@ -41,6 +41,7 @@ interface OverviewLeague {
   lmNotes?: string | null;
   maxRosterSize?: number | null;
   gamesPerMatchup?: number | null;
+  totalMatchups?: number | null;
   currentWeekNumber?: number | null;
   inviteCode?: string | null;
   sport?: string | null;
@@ -284,15 +285,18 @@ export function LeagueOverviewTab({
   const stats = [
     { label: 'Teams', value: String(rankedStandings.length || '—') },
     { label: 'Roster Size', value: String(league.maxRosterSize ?? '—') },
-    isFootball
-      ? {
-          label: 'Weeks / Season',
-          value: String(league.gamesPerMatchup ?? '—'),
-        }
-      : {
-          label: 'Games / Matchup',
-          value: String(league.gamesPerMatchup ?? '—'),
-        },
+    ...(isFootball
+      ? [
+          {
+            label: 'Weeks / Season',
+            value: String(league.totalMatchups ?? '—'),
+          },
+        ]
+      : []),
+    {
+      label: 'Games / Matchup',
+      value: String(league.gamesPerMatchup ?? '—'),
+    },
     isFootball
       ? { label: 'Format', value: 'H2H' }
       : { label: 'Matchup', value: '7 days' },

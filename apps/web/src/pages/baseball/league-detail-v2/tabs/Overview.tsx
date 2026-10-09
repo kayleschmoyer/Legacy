@@ -42,6 +42,7 @@ export const Snapshot: React.FC<{
   teamCount: number;
   rosterSize: number;
   gamesPerMatchup: number;
+  totalMatchups?: number | null;
   matchupDays: number;
   startersCount: number;
   isFootball: boolean;
@@ -49,17 +50,26 @@ export const Snapshot: React.FC<{
   teamCount,
   rosterSize,
   gamesPerMatchup,
+  totalMatchups,
   matchupDays,
   startersCount,
   isFootball,
 }) => (
-  <div className="ls-snapshot">
+  <div
+    className="ls-snapshot"
+    style={
+      isFootball ? ({ '--ls-snap-cols': 6 } as React.CSSProperties) : undefined
+    }
+  >
     {[
       { label: 'Teams', value: String(teamCount) },
       { label: 'Roster Size', value: String(rosterSize) },
-      isFootball
-        ? { label: 'Weeks / Season', value: String(gamesPerMatchup) }
-        : { label: 'Games / Matchup', value: String(gamesPerMatchup) },
+      ...(isFootball
+        ? [
+            { label: 'Weeks / Season', value: String(totalMatchups ?? '—') },
+            { label: 'Games / Matchup', value: String(gamesPerMatchup) },
+          ]
+        : [{ label: 'Games / Matchup', value: String(gamesPerMatchup) }]),
       isFootball
         ? { label: 'Weekly Format', value: 'Head-to-Head' }
         : {
@@ -587,6 +597,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
         teamCount={teams.length}
         rosterSize={league.maxRosterSize ?? 0}
         gamesPerMatchup={league.gamesPerMatchup ?? 0}
+        totalMatchups={league.totalMatchups}
         matchupDays={7}
         startersCount={startersCount}
         isFootball={isFootball}
