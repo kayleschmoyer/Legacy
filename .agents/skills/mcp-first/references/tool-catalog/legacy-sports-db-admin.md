@@ -10,7 +10,7 @@
 
 Read-only SQL and migration status/apply against the dev RDS over HTTPS — no SSM tunnel required.
 
-Hosted connector only — no local stdio process. 4 tools.
+Hosted connector only — no local stdio process.
 
 ---
 

@@ -644,29 +644,29 @@ td.param-desc {
     <div class="masthead-inner">
       <p class="eyebrow">Legacy Sports &middot; agent toolchain</p>
       <h1>MCP Tool Index</h1>
-      <p class="lede">Every tool exposed by the 13 Model Context Protocol servers in
+      <p class="lede">Every tool exposed by the Model Context Protocol servers in
         <code>tools/mcp/</code> &mdash; names, descriptions, and full input schemas, read
         straight from the server sources.</p>
       <dl class="statline">
         <div class="stat">
           <dt>Servers</dt>
-          <dd>13</dd>
+          <dd data-stat="servers"></dd>
         </div>
         <div class="stat">
           <dt>Tools</dt>
-          <dd>278</dd>
+          <dd data-stat="tools"></dd>
         </div>
         <div class="stat">
           <dt>Parameters</dt>
-          <dd>966</dd>
+          <dd data-stat="params"></dd>
         </div>
         <div class="stat">
           <dt>Run locally</dt>
-          <dd>10</dd>
+          <dd data-stat="local"></dd>
         </div>
         <div class="stat">
           <dt>Hosted</dt>
-          <dd>6</dd>
+          <dd data-stat="hosted"></dd>
         </div>
       </dl>
     </div>
@@ -719,8 +719,6 @@ td.param-desc {
 
 <script id="mcp-model" type="application/json">{
   "generatedFrom": "tools/mcp/*/src/{index,lambda}.ts",
-  "serverCount": 13,
-  "toolCount": 278,
   "servers": [
     {
       "dir": "worktree-server",
@@ -733,7 +731,6 @@ td.param-desc {
       "transports": [
         "stdio"
       ],
-      "toolCount": 63,
       "tools": [
         {
           "name": "auth_check_all",
@@ -2607,7 +2604,6 @@ td.param-desc {
       "transports": [
         "stdio"
       ],
-      "toolCount": 18,
       "tools": [
         {
           "name": "ci_run_custom_checks",
@@ -3202,7 +3198,6 @@ td.param-desc {
       "transports": [
         "stdio"
       ],
-      "toolCount": 16,
       "tools": [
         {
           "name": "nx_affected",
@@ -3779,7 +3774,6 @@ td.param-desc {
         "stdio",
         "hosted"
       ],
-      "toolCount": 25,
       "tools": [
         {
           "name": "ci_audit_session_bash",
@@ -5040,7 +5034,6 @@ td.param-desc {
         "stdio",
         "hosted"
       ],
-      "toolCount": 61,
       "tools": [
         {
           "name": "get_job_logs",
@@ -7534,7 +7527,6 @@ td.param-desc {
         "stdio",
         "hosted"
       ],
-      "toolCount": 21,
       "tools": [
         {
           "name": "jira_add_comment",
@@ -8593,7 +8585,6 @@ td.param-desc {
       "transports": [
         "stdio"
       ],
-      "toolCount": 28,
       "tools": [
         {
           "name": "aws_apigateway_inspect",
@@ -9720,7 +9711,6 @@ td.param-desc {
       "transports": [
         "hosted"
       ],
-      "toolCount": 4,
       "tools": [
         {
           "name": "db_execute",
@@ -9876,7 +9866,6 @@ td.param-desc {
       "transports": [
         "hosted"
       ],
-      "toolCount": 8,
       "tools": [
         {
           "name": "rollbar_auth_status",
@@ -10181,7 +10170,6 @@ td.param-desc {
       "transports": [
         "hosted"
       ],
-      "toolCount": 3,
       "tools": [
         {
           "name": "discord_auth_status",
@@ -10245,7 +10233,6 @@ td.param-desc {
       "transports": [
         "stdio"
       ],
-      "toolCount": 8,
       "tools": [
         {
           "name": "browser_cleanup",
@@ -10460,7 +10447,6 @@ td.param-desc {
       "transports": [
         "stdio"
       ],
-      "toolCount": 18,
       "tools": [
         {
           "name": "adr_create",
@@ -11149,7 +11135,6 @@ td.param-desc {
       "transports": [
         "stdio"
       ],
-      "toolCount": 5,
       "tools": [
         {
           "name": "android_app",
@@ -11421,6 +11406,22 @@ td.param-desc {
     for (const tool of server.tools) tool._haystack = searchText(tool);
   }
 
+  // LS-11018: every count is derived here, not committed in the file.
+  const toolTotal = model.servers.reduce((n, s) => n + s.tools.length, 0);
+  const statValues = {
+    servers: model.servers.length,
+    tools: toolTotal,
+    params: model.servers.reduce(
+      (n, s) => n + s.tools.reduce((m, t) => m + Object.keys(t.inputs || {}).length, 0),
+      0,
+    ),
+    local: model.servers.filter((s) => s.transports.includes('stdio')).length,
+    hosted: model.servers.filter((s) => s.transports.includes('hosted')).length,
+  };
+  for (const el of document.querySelectorAll('[data-stat]')) {
+    el.textContent = String(statValues[el.dataset.stat]);
+  }
+
   const renderEnum = (values) =>
     '<div class="enum-list">' +
     values.map((v) => '<span class="pill">' + escapeHtml(JSON.stringify(v)) + '</span>').join('') +
@@ -11507,7 +11508,7 @@ td.param-desc {
               escapeHtml(TRANSPORTS[t].label) + '</span>')
             .join('') +
         '</span>' +
-        '<span class="server-count">' + tools.length + '/' + server.toolCount + ' tools</span>' +
+        '<span class="server-count">' + tools.length + '/' + server.tools.length + ' tools</span>' +
       '</div>' +
       '<p class="server-summary">' + escapeHtml(server.summary) + '</p>' +
       '<div class="tools">' + tools.map((tool) => renderTool(tool, server, term)).join('') + '</div>' +
@@ -11555,8 +11556,8 @@ td.param-desc {
       .join('');
 
     resultCount.textContent = needle
-      ? shown + ' of ' + model.toolCount + ' tools'
-      : model.toolCount + ' tools';
+      ? shown + ' of ' + toolTotal + ' tools'
+      : toolTotal + ' tools';
 
     if (needle && shown && shown <= 12) {
       for (const el of results.querySelectorAll('.tool')) el.open = true;

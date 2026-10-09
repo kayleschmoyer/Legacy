@@ -10,7 +10,7 @@
 
 Ticket CRUD with guardrails, sprint assignment, blocker resolution, and epic descendant trees.
 
-Available both locally (stdio) and via the hosted connector. 21 tools.
+Available both locally (stdio) and via the hosted connector.
 
 ---
 

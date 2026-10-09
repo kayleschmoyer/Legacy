@@ -10,7 +10,7 @@
 
 Production error triage: list and inspect items and occurrences, and set item status.
 
-Hosted connector only — no local stdio process. 8 tools.
+Hosted connector only — no local stdio process.
 
 ---
 

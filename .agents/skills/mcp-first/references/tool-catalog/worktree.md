@@ -10,7 +10,7 @@
 
 Git worktree lifecycle, branch/commit/push plumbing, and repo-wide git queries for parallel ticket work.
 
-Local stdio process only — not exposed as a hosted connector. 63 tools.
+Local stdio process only — not exposed as a hosted connector.
 
 ---
 

@@ -10,7 +10,7 @@
 
 Read-only access to the one admin notes channel: list recent messages and fetch one by id.
 
-Hosted connector only — no local stdio process. 3 tools.
+Hosted connector only — no local stdio process.
 
 ---
 

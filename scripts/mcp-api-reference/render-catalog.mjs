@@ -120,7 +120,9 @@ export function renderCatalog(server) {
     '',
     server.summary,
     '',
-    `${transportNote} ${server.toolCount} tool${server.toolCount === 1 ? '' : 's'}.`,
+    // LS-11018: no tool count — a committed total goes stale when two PRs
+    // bump it to the same value and git merges the identical lines cleanly.
+    transportNote,
     '',
     '---',
     '',

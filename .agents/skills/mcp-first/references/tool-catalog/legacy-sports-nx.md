@@ -10,7 +10,7 @@
 
 Nx project graph, affected-target runs, per-chunk pc execution, lint/format/test runners, and package health checks.
 
-Local stdio process only — not exposed as a hosted connector. 16 tools.
+Local stdio process only — not exposed as a hosted connector.
 
 ---
 

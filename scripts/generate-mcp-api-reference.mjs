@@ -44,7 +44,7 @@ import {
   measureDefinitionTokens,
   updateSingleServerBudget,
 } from './mcp-api-reference/budget.mjs';
-import { collect } from './mcp-api-reference/collect.mjs';
+import { artifactModel, collect } from './mcp-api-reference/collect.mjs';
 import { computeInlineCsp } from './mcp-api-reference/csp.mjs';
 import { renderCatalog } from './mcp-api-reference/render-catalog.mjs';
 import { render } from './mcp-api-reference/render.mjs';
@@ -186,25 +186,23 @@ function main() {
     return;
   }
 
+  // Artifacts are written from the count-free model (LS-11018); `model` keeps
+  // its counts for the budget check and this script's own console output.
+  const committed = artifactModel(model);
   const outputs = [
-    { path: JSON_PATH, content: `${JSON.stringify(model, null, 2)}\n` },
-    { path: HTML_PATH, content: render(model) },
+    { path: JSON_PATH, content: `${JSON.stringify(committed, null, 2)}\n` },
+    { path: HTML_PATH, content: render(committed) },
   ];
 
   // One page per hosted server, for its own GET /docs route.
-  const hosted = model.servers.filter((server) =>
+  const hosted = committed.servers.filter((server) =>
     server.transports.includes('hosted'),
   );
   for (const server of hosted) {
-    const scopedModel = {
-      ...model,
-      serverCount: 1,
-      toolCount: server.toolCount,
-      servers: [server],
-    };
-    const html = render(scopedModel, {
-      scope: { label: server.label, totalServers: model.serverCount },
-    });
+    const html = render(
+      { ...committed, servers: [server] },
+      { scope: { label: server.label } },
+    );
     const csp = computeInlineCsp(html);
     outputs.push({
       path: join(PAGES_DIR, `${pageKey(server)}.generated.ts`),

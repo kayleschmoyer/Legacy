@@ -10,7 +10,7 @@
 
 Pull request and review lifecycle — PR dashboards, review threads, labels, and merge readiness.
 
-Available both locally (stdio) and via the hosted connector. 61 tools.
+Available both locally (stdio) and via the hosted connector.
 
 ---
 

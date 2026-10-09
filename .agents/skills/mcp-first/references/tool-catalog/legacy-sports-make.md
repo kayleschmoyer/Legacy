@@ -10,7 +10,7 @@
 
 Whitelisted Makefile targets, the pre-commit (pc) pipeline and its chunks, PR validation, and Terraform state surgery.
 
-Local stdio process only — not exposed as a hosted connector. 18 tools.
+Local stdio process only — not exposed as a hosted connector.
 
 ---
 

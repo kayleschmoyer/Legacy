@@ -10,7 +10,7 @@
 
 CloudWatch logs, Lambda/EC2/API Gateway inspection, Secrets Manager, SSM, and SSO auth health.
 
-Local stdio process only — not exposed as a hosted connector. 28 tools.
+Local stdio process only — not exposed as a hosted connector.
 
 ---
 

@@ -56,37 +56,26 @@ const TRANSPORT_COPY = {
 export function render(model, meta = {}) {
   const { servers } = model;
   const scope = meta.scope;
-  const localCount = servers.filter((s) =>
-    s.transports.includes('stdio'),
-  ).length;
-  const hostedCount = servers.filter((s) =>
-    s.transports.includes('hosted'),
-  ).length;
-  const paramCount = servers.reduce(
-    (sum, server) =>
-      sum +
-      server.tools.reduce(
-        (n, tool) => n + Object.keys(tool.inputs ?? {}).length,
-        0,
-      ),
-    0,
-  );
 
+  // LS-11018: counts are filled in by the page script from the embedded model,
+  // never written into the file — a committed total goes stale when two PRs
+  // bump it to the same value and git merges the identical lines cleanly. See
+  // artifactModel() in ./collect.mjs.
   const stats = scope
     ? [
-        { value: model.toolCount, label: 'Tools' },
-        { value: paramCount, label: 'Parameters' },
+        { stat: 'tools', label: 'Tools' },
+        { stat: 'params', label: 'Parameters' },
         {
           value: servers[0].transports.includes('stdio') ? 'Both' : 'Hosted',
           label: 'Transport',
         },
       ]
     : [
-        { value: model.serverCount, label: 'Servers' },
-        { value: model.toolCount, label: 'Tools' },
-        { value: paramCount, label: 'Parameters' },
-        { value: localCount, label: 'Run locally' },
-        { value: hostedCount, label: 'Hosted' },
+        { stat: 'servers', label: 'Servers' },
+        { stat: 'tools', label: 'Tools' },
+        { stat: 'params', label: 'Parameters' },
+        { stat: 'local', label: 'Run locally' },
+        { stat: 'hosted', label: 'Hosted' },
       ];
 
   const title = scope ? `${scope.label} MCP Tools` : 'MCP Tool Index';
@@ -96,9 +85,9 @@ export function render(model, meta = {}) {
   const lede = scope
     ? `Every tool this server exposes &mdash; names, descriptions, and full input
         schemas, read straight from <code>${escapeHtml(servers[0].packageDir)}</code>.
-        One of ${scope.totalServers} MCP servers in the repo; the other
-        ${scope.totalServers - 1} are indexed in <code>docs/mcp/api-reference.html</code>.`
-    : `Every tool exposed by the ${model.serverCount} Model Context Protocol servers in
+        One of the repo's MCP servers; all of them are indexed in
+        <code>docs/mcp/api-reference.html</code>.`
+    : `Every tool exposed by the Model Context Protocol servers in
         <code>tools/mcp/</code> &mdash; names, descriptions, and full input schemas, read
         straight from the server sources.`;
 
@@ -126,7 +115,7 @@ ${stats
   .map(
     (stat) => `        <div class="stat">
           <dt>${escapeHtml(stat.label)}</dt>
-          <dd>${escapeHtml(stat.value)}</dd>
+          ${stat.stat ? `<dd data-stat="${stat.stat}"></dd>` : `<dd>${escapeHtml(stat.value)}</dd>`}
         </div>`,
   )
   .join('\n')}
@@ -878,6 +867,22 @@ function script() {
     for (const tool of server.tools) tool._haystack = searchText(tool);
   }
 
+  // LS-11018: every count is derived here, not committed in the file.
+  const toolTotal = model.servers.reduce((n, s) => n + s.tools.length, 0);
+  const statValues = {
+    servers: model.servers.length,
+    tools: toolTotal,
+    params: model.servers.reduce(
+      (n, s) => n + s.tools.reduce((m, t) => m + Object.keys(t.inputs || {}).length, 0),
+      0,
+    ),
+    local: model.servers.filter((s) => s.transports.includes('stdio')).length,
+    hosted: model.servers.filter((s) => s.transports.includes('hosted')).length,
+  };
+  for (const el of document.querySelectorAll('[data-stat]')) {
+    el.textContent = String(statValues[el.dataset.stat]);
+  }
+
   const renderEnum = (values) =>
     '<div class="enum-list">' +
     values.map((v) => '<span class="pill">' + escapeHtml(JSON.stringify(v)) + '</span>').join('') +
@@ -964,7 +969,7 @@ function script() {
               escapeHtml(TRANSPORTS[t].label) + '</span>')
             .join('') +
         '</span>' +
-        '<span class="server-count">' + tools.length + '/' + server.toolCount + ' tools</span>' +
+        '<span class="server-count">' + tools.length + '/' + server.tools.length + ' tools</span>' +
       '</div>' +
       '<p class="server-summary">' + escapeHtml(server.summary) + '</p>' +
       '<div class="tools">' + tools.map((tool) => renderTool(tool, server, term)).join('') + '</div>' +
@@ -1012,8 +1017,8 @@ function script() {
       .join('');
 
     resultCount.textContent = needle
-      ? shown + ' of ' + model.toolCount + ' tools'
-      : model.toolCount + ' tools';
+      ? shown + ' of ' + toolTotal + ' tools'
+      : toolTotal + ' tools';
 
     if (needle && shown && shown <= 12) {
       for (const el of results.querySelectorAll('.tool')) el.open = true;

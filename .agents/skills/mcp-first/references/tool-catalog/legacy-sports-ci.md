@@ -10,7 +10,7 @@
 
 GitHub Actions run triage: list/view runs, fetch and search logs, rerun failed jobs, and read Playwright reports.
 
-Available both locally (stdio) and via the hosted connector. 25 tools.
+Available both locally (stdio) and via the hosted connector.
 
 ---
 

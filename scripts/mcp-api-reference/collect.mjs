@@ -246,6 +246,29 @@ export function collect(repoRoot, { ref } = {}) {
   };
 }
 
+/**
+ * The model as written into committed artifacts: the derived counts
+ * (`serverCount`, `toolCount`, per-server `toolCount`) are dropped.
+ *
+ * LS-11018: a committed aggregate is not merge-safe. Two PRs that each add a
+ * tool both rewrite `"toolCount": 18` to `19`; git merges identical line edits
+ * cleanly, so the combined tree says 19 while it holds 20 tools. GitHub's
+ * server-side merges (merge queue batch builds) ignore the local merge driver
+ * in .gitattributes, so nothing flags it until mcp-api-reference-sync.sh fails
+ * a full batch CI run, once per bisection level. Every count is derivable from
+ * `servers[].tools`, so artifacts carry only that, and readers count it.
+ */
+export function artifactModel(model) {
+  return {
+    generatedFrom: model.generatedFrom,
+    servers: model.servers.map((server) => {
+      const rest = { ...server };
+      delete rest.toolCount;
+      return rest;
+    }),
+  };
+}
+
 export function repoRootFrom(metaUrl) {
   const here = new URL('.', metaUrl).pathname;
   return join(here, '..', '..');

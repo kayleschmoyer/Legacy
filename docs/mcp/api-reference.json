@@ -1,7 +1,5 @@
 {
   "generatedFrom": "tools/mcp/*/src/{index,lambda}.ts",
-  "serverCount": 13,
-  "toolCount": 278,
   "servers": [
     {
       "dir": "worktree-server",
@@ -14,7 +12,6 @@
       "transports": [
         "stdio"
       ],
-      "toolCount": 63,
       "tools": [
         {
           "name": "auth_check_all",
@@ -1888,7 +1885,6 @@
       "transports": [
         "stdio"
       ],
-      "toolCount": 18,
       "tools": [
         {
           "name": "ci_run_custom_checks",
@@ -2483,7 +2479,6 @@
       "transports": [
         "stdio"
       ],
-      "toolCount": 16,
       "tools": [
         {
           "name": "nx_affected",
@@ -3060,7 +3055,6 @@
         "stdio",
         "hosted"
       ],
-      "toolCount": 25,
       "tools": [
         {
           "name": "ci_audit_session_bash",
@@ -4321,7 +4315,6 @@
         "stdio",
         "hosted"
       ],
-      "toolCount": 61,
       "tools": [
         {
           "name": "get_job_logs",
@@ -6815,7 +6808,6 @@
         "stdio",
         "hosted"
       ],
-      "toolCount": 21,
       "tools": [
         {
           "name": "jira_add_comment",
@@ -7874,7 +7866,6 @@
       "transports": [
         "stdio"
       ],
-      "toolCount": 28,
       "tools": [
         {
           "name": "aws_apigateway_inspect",
@@ -9001,7 +8992,6 @@
       "transports": [
         "hosted"
       ],
-      "toolCount": 4,
       "tools": [
         {
           "name": "db_execute",
@@ -9157,7 +9147,6 @@
       "transports": [
         "hosted"
       ],
-      "toolCount": 8,
       "tools": [
         {
           "name": "rollbar_auth_status",
@@ -9462,7 +9451,6 @@
       "transports": [
         "hosted"
       ],
-      "toolCount": 3,
       "tools": [
         {
           "name": "discord_auth_status",
@@ -9526,7 +9514,6 @@
       "transports": [
         "stdio"
       ],
-      "toolCount": 8,
       "tools": [
         {
           "name": "browser_cleanup",
@@ -9741,7 +9728,6 @@
       "transports": [
         "stdio"
       ],
-      "toolCount": 18,
       "tools": [
         {
           "name": "adr_create",
@@ -10430,7 +10416,6 @@
       "transports": [
         "stdio"
       ],
-      "toolCount": 5,
       "tools": [
         {
           "name": "android_app",

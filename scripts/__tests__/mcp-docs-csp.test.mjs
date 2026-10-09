@@ -17,7 +17,7 @@ import { strict as assert } from 'node:assert';
 import { createHash } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { collect } from '../mcp-api-reference/collect.mjs';
+import { artifactModel, collect } from '../mcp-api-reference/collect.mjs';
 import { computeInlineCsp } from '../mcp-api-reference/csp.mjs';
 import { render } from '../mcp-api-reference/render.mjs';
 
@@ -28,23 +28,17 @@ function independentHashSource(content) {
 }
 
 function ciServerPage() {
-  const model = collect(REPO_ROOT);
+  const model = artifactModel(collect(REPO_ROOT));
   const server = model.servers.find((s) => s.id === 'legacy-sports-ci');
   assert.ok(
     server,
     'expected a legacy-sports-ci server in the collected model',
   );
 
-  const html = render(
-    {
-      ...model,
-      serverCount: 1,
-      toolCount: server.toolCount,
-      servers: [server],
-    },
-    { scope: { label: server.label, totalServers: model.serverCount } },
+  return render(
+    { ...model, servers: [server] },
+    { scope: { label: server.label } },
   );
-  return html;
 }
 
 test('computeInlineCsp finds exactly one inline style block and two inline script blocks', () => {

@@ -10,7 +10,7 @@
 
 Drive the local dev site: start/stop the dev server, log in, navigate, and capture screenshots.
 
-Local stdio process only — not exposed as a hosted connector. 8 tools.
+Local stdio process only — not exposed as a hosted connector.
 
 ---
 

@@ -10,7 +10,7 @@
 
 Android device/emulator connectivity, app install/launch, adb-backed screenshots, filtered logcat, and Gradle builds. Local-only — no SDK in any cloud agent environment.
 
-Local stdio process only — not exposed as a hosted connector. 5 tools.
+Local stdio process only — not exposed as a hosted connector.
 
 ---
 

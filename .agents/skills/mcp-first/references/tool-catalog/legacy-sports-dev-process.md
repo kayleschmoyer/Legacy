@@ -10,7 +10,7 @@
 
 RFCs, ADRs, postmortems, test plans, reproduction capture, and cross-session continuation checkpoints.
 
-Local stdio process only — not exposed as a hosted connector. 18 tools.
+Local stdio process only — not exposed as a hosted connector.
 
 ---
 
