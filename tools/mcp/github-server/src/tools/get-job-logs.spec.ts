@@ -606,10 +606,11 @@ describe('getJobLogs', () => {
 
       expect(result.isError).toBeFalsy();
       const payload = parse(result.content[0].text);
-      expect(payload.scopedToFailingStep).toBe(true);
-      expect(payload.failingSteps).toEqual(['Build']);
-      expect(payload.logs as string).toContain('build error here');
-      expect(payload.logs as string).not.toContain('setup output');
+      const [job] = payload.jobs as Array<Record<string, unknown>>;
+      expect(job.scopedToFailingStep).toBe(true);
+      expect(job.failingSteps).toEqual(['Build']);
+      expect(job.logs as string).toContain('build error here');
+      expect(job.logs as string).not.toContain('setup output');
       // Only the jobs-list call — no separate per-job detail fetch needed.
       expect(mockRest).toHaveBeenCalledTimes(1);
     });
@@ -875,8 +876,76 @@ describe('getJobLogs', () => {
 
       expect(result.isError).toBeFalsy();
       const payload = parse(result.content[0].text);
-      expect(payload.logs as string).not.toContain('BlobNotFound');
-      expect(payload.logs as string).toMatch(/not yet available/i);
+      const [job] = payload.jobs as Array<Record<string, unknown>>;
+      expect(job.status).toBe('logs_not_yet_available');
+      expect(job.message as string).not.toContain('BlobNotFound');
+      expect(job.message as string).toMatch(/not yet available/i);
+    });
+  });
+
+  describe('per-job entries on the run_id path (LS-10184)', () => {
+    it('applies tail_lines per job so each failing job keeps its own failure', async () => {
+      mockRest.mockResolvedValue({
+        total_count: 2,
+        jobs: [
+          { id: 10, name: 'lint & format', conclusion: 'failure' },
+          { id: 11, name: 'Summarize & Report', conclusion: 'failure' },
+        ],
+      });
+      mockGetArrayBuffer.mockImplementation(
+        (_o: string, _r: string, path: string) =>
+          Promise.resolve(
+            makeLogBuffer(
+              path.includes('/10/')
+                ? 'noise\nPrettier check failed\n'
+                : 'noise\nCleaning up orphan processes\n',
+            ),
+          ),
+      );
+
+      const result = await getJobLogs({
+        runId: 99,
+        failedOnly: true,
+        tailLines: 2,
+      });
+
+      const payload = parse(result.content[0].text);
+      expect(payload).not.toHaveProperty('logs');
+      expect(payload).not.toHaveProperty('scopedToFailingStep');
+      const jobs = payload.jobs as Array<Record<string, unknown>>;
+      expect(jobs.map((j) => [j.jobId, j.jobName])).toEqual([
+        [10, 'lint & format'],
+        [11, 'Summarize & Report'],
+      ]);
+      expect(jobs[0].logs as string).toContain('Prettier check failed');
+      expect(jobs[1].logs as string).toContain('Cleaning up orphan');
+    });
+
+    it('reports an un-fetchable job as a per-job status without hiding the others', async () => {
+      mockRest.mockResolvedValue({
+        total_count: 2,
+        jobs: [
+          { id: 10, name: 'lint', conclusion: 'failure' },
+          { id: 11, name: 'report', conclusion: 'failure' },
+        ],
+      });
+      mockGetArrayBuffer.mockImplementation(
+        (_o: string, _r: string, path: string) =>
+          path.includes('/11/')
+            ? Promise.reject(new Error('boom'))
+            : Promise.resolve(makeLogBuffer('real failure')),
+      );
+
+      const result = await getJobLogs({ runId: 99, failedOnly: true });
+
+      const jobs = parse(result.content[0].text).jobs as Array<
+        Record<string, unknown>
+      >;
+      expect(jobs[0].status).toBe('ok');
+      expect(jobs[0].logs as string).toContain('real failure');
+      expect(jobs[1].status).toBe('fetch_failed');
+      expect(jobs[1].message as string).toContain('boom');
+      expect(jobs[1]).not.toHaveProperty('logs');
     });
   });
 });

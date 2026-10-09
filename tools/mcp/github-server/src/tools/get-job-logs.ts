@@ -659,6 +659,101 @@ function applyLimits(
   };
 }
 
+interface ScopeInfo {
+  scopedToFailingStep: boolean;
+  stepNames: string[];
+  stepScopeFailed: boolean;
+}
+
+/**
+ * Render one job's (already step-scoped) log text into the response fields
+ * for the requested mode (grep_pattern / error_summary / plain tail). Shared
+ * by the single-job path and the per-job entries of the run_id path so
+ * tail_lines/max_chars are always applied to a single job's log (LS-10184).
+ */
+function renderLogFields(
+  rawText: string,
+  scope: ScopeInfo,
+  params: GetJobLogsParams,
+  tailLines: number,
+  maxChars: number,
+): Record<string, unknown> {
+  const { scopedToFailingStep, stepNames, stepScopeFailed } = scope;
+  const stepScopeFailedMessage = stepScopeFailed
+    ? 'failed_step_only was requested but no failing step could be located ' +
+      '(no matching step entry and no ##[error] annotation in the log) -- ' +
+      'showing the unscoped tail instead.'
+    : undefined;
+  const allLines = rawText.split(/\r?\n/);
+  const scopeFields = {
+    scopedToFailingStep,
+    ...(scopedToFailingStep ? { failingSteps: stepNames } : {}),
+    ...(stepScopeFailed ? { stepScopeFailed, stepScopeFailedMessage } : {}),
+  };
+
+  if (params.grepPattern) {
+    const matchedLines = extractGrepMatches(
+      allLines,
+      buildGrepMatcher(params.grepPattern),
+    );
+    const { text, truncated, totalBytes, returnedLines } = applyLimits(
+      matchedLines,
+      tailLines,
+      maxChars,
+      params.truncateLineLength,
+    );
+    return {
+      grepPattern: params.grepPattern,
+      totalLogLines: allLines.length,
+      matchedLines: matchedLines.length,
+      ...scopeFields,
+      truncated,
+      returnedLines,
+      ...(truncated ? { returnedFrom: 'tail' } : {}),
+      totalBytes,
+      logs: text,
+    };
+  }
+
+  if (params.errorSummary) {
+    const errorLines = extractErrorSummary(allLines);
+    const { text, truncated, totalBytes, returnedLines } = applyLimits(
+      errorLines,
+      tailLines,
+      maxChars,
+      params.truncateLineLength,
+    );
+    return {
+      errorSummary: true,
+      totalLogLines: allLines.length,
+      errorLines: errorLines.length,
+      ...scopeFields,
+      truncated,
+      returnedLines,
+      ...(truncated ? { returnedFrom: 'tail' } : {}),
+      totalBytes,
+      logs: text,
+    };
+  }
+
+  const { text, truncated, totalBytes, returnedLines } = applyLimits(
+    allLines,
+    tailLines,
+    maxChars,
+    params.truncateLineLength,
+  );
+  return {
+    totalLines: allLines.length,
+    tailLines,
+    ...scopeFields,
+    truncated,
+    returnedLines,
+    ...(truncated ? { returnedFrom: 'tail' } : {}),
+    totalBytes,
+    logs: text,
+  };
+}
+
 export async function getJobLogs(
   params: GetJobLogsParams,
 ): Promise<ToolResult> {
@@ -748,40 +843,7 @@ export async function getJobLogs(
       };
     }
 
-    let rawText: string;
-    let jobLabel: string;
-    let scopedToFailingStep = false;
-    let failingSteps: string[] = [];
-    let stepScopeFailed = false;
-
-    if (params.jobId) {
-      let scoped;
-      try {
-        scoped = await fetchScopedJobLog(
-          owner,
-          name,
-          params.jobId,
-          undefined,
-          params.failedStepOnly,
-        );
-      } catch (err) {
-        if (isBlobNotFoundError(err)) {
-          return {
-            isError: true,
-            content: [{ type: 'text', text: LOGS_NOT_YET_AVAILABLE_MESSAGE }],
-          };
-        }
-        throw err;
-      }
-      rawText = scoped.text;
-      scopedToFailingStep = scoped.scopedToFailingStep;
-      failingSteps = scoped.stepNames;
-      stepScopeFailed = scoped.stepScopeFailed;
-      jobLabel = `job ${params.jobId}`;
-    } else {
-      if (!params.runId) {
-        throw new Error('runId is required when jobId is not provided');
-      }
+    if (params.runId && !params.jobId) {
       const allJobs = await fetchAllJobs(owner, name, params.runId);
       const jobs = filterJobs(allJobs, filterOptions);
       if (jobs.length === 0) {
@@ -796,10 +858,16 @@ export async function getJobLogs(
           ],
         };
       }
-      const stepNamesByJob = new Set<string>();
-      let anyStepScopeFailed = false;
-      const parts = await Promise.all(
+      // One entry per job (LS-10184): limits are applied per job so a small
+      // tail_lines still reaches each job's own failure instead of landing in
+      // the last job's runner cleanup output.
+      const entries = await Promise.all(
         jobs.map(async (job) => {
+          const identity = {
+            jobId: job.id,
+            jobName: job.name,
+            conclusion: job.conclusion,
+          };
           try {
             const scoped = await fetchScopedJobLog(
               owner,
@@ -808,63 +876,44 @@ export async function getJobLogs(
               job.steps,
               params.failedStepOnly,
             );
-            if (scoped.scopedToFailingStep) {
-              scopedToFailingStep = true;
-              for (const s of scoped.stepNames) stepNamesByJob.add(s);
-            }
-            if (scoped.stepScopeFailed) anyStepScopeFailed = true;
-            return `${job.name}\n${scoped.text}`;
+            return {
+              ...identity,
+              status: 'ok',
+              ...renderLogFields(
+                scoped.text,
+                scoped,
+                params,
+                tailLines,
+                maxChars,
+              ),
+            };
           } catch (err) {
             if (isBlobNotFoundError(err)) {
-              return `${job.name}\n${LOGS_NOT_YET_AVAILABLE_MESSAGE}`;
+              return {
+                ...identity,
+                status: 'logs_not_yet_available',
+                message: LOGS_NOT_YET_AVAILABLE_MESSAGE,
+              };
             }
-            return `${job.name}\n(Failed to fetch logs for this job)`;
+            return {
+              ...identity,
+              status: 'fetch_failed',
+              message: `Failed to fetch logs for this job: ${err instanceof Error ? err.message : String(err)}`,
+            };
           }
         }),
       );
-      failingSteps = [...stepNamesByJob];
-      stepScopeFailed = anyStepScopeFailed;
-      rawText = parts.join('\n\n');
-      jobLabel = `run ${params.runId}`;
-    }
 
-    const stepScopeFailedMessage = stepScopeFailed
-      ? 'failed_step_only was requested but no failing step could be located ' +
-        '(no matching step entry and no ##[error] annotation in the log) -- ' +
-        'showing the unscoped tail instead.'
-      : undefined;
-
-    const allLines = rawText.split(/\r?\n/);
-
-    if (params.grepPattern) {
-      const matcher = buildGrepMatcher(params.grepPattern);
-      const matchedLines = extractGrepMatches(allLines, matcher);
-      const { text, truncated, totalBytes, returnedLines } = applyLimits(
-        matchedLines,
-        tailLines,
-        maxChars,
-        params.truncateLineLength,
-      );
       return {
         content: [
           {
             type: 'text',
             text: JSON.stringify(
               {
-                jobLabel,
-                grepPattern: params.grepPattern,
-                totalLogLines: allLines.length,
-                matchedLines: matchedLines.length,
-                scopedToFailingStep,
-                ...(scopedToFailingStep ? { failingSteps } : {}),
-                ...(stepScopeFailed
-                  ? { stepScopeFailed, stepScopeFailedMessage }
-                  : {}),
-                truncated,
-                returnedLines,
-                ...(truncated ? { returnedFrom: 'tail' } : {}),
-                totalBytes,
-                logs: text,
+                jobLabel: `run ${params.runId}`,
+                totalJobs: allJobs.length,
+                matchedJobs: jobs.length,
+                jobs: entries,
               },
               null,
               2,
@@ -874,49 +923,27 @@ export async function getJobLogs(
       };
     }
 
-    if (params.errorSummary) {
-      const errorLines = extractErrorSummary(allLines);
-      const { text, truncated, totalBytes, returnedLines } = applyLimits(
-        errorLines,
-        tailLines,
-        maxChars,
-        params.truncateLineLength,
-      );
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(
-              {
-                jobLabel,
-                errorSummary: true,
-                totalLogLines: allLines.length,
-                errorLines: errorLines.length,
-                scopedToFailingStep,
-                ...(scopedToFailingStep ? { failingSteps } : {}),
-                ...(stepScopeFailed
-                  ? { stepScopeFailed, stepScopeFailedMessage }
-                  : {}),
-                truncated,
-                returnedLines,
-                ...(truncated ? { returnedFrom: 'tail' } : {}),
-                totalBytes,
-                logs: text,
-              },
-              null,
-              2,
-            ),
-          },
-        ],
-      };
+    if (!params.jobId) {
+      throw new Error('jobId is required when runId is not provided');
     }
-
-    const { text, truncated, totalBytes, returnedLines } = applyLimits(
-      allLines,
-      tailLines,
-      maxChars,
-      params.truncateLineLength,
-    );
+    let scoped;
+    try {
+      scoped = await fetchScopedJobLog(
+        owner,
+        name,
+        params.jobId,
+        undefined,
+        params.failedStepOnly,
+      );
+    } catch (err) {
+      if (isBlobNotFoundError(err)) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: LOGS_NOT_YET_AVAILABLE_MESSAGE }],
+        };
+      }
+      throw err;
+    }
 
     return {
       content: [
@@ -924,19 +951,14 @@ export async function getJobLogs(
           type: 'text',
           text: JSON.stringify(
             {
-              jobLabel,
-              totalLines: allLines.length,
-              tailLines,
-              scopedToFailingStep,
-              ...(scopedToFailingStep ? { failingSteps } : {}),
-              ...(stepScopeFailed
-                ? { stepScopeFailed, stepScopeFailedMessage }
-                : {}),
-              truncated,
-              returnedLines,
-              ...(truncated ? { returnedFrom: 'tail' } : {}),
-              totalBytes,
-              logs: text,
+              jobLabel: `job ${params.jobId}`,
+              ...renderLogFields(
+                scoped.text,
+                scoped,
+                params,
+                tailLines,
+                maxChars,
+              ),
             },
             null,
             2,
