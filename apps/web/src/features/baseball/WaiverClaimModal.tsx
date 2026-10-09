@@ -475,10 +475,10 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
                                 )}
                             </XStack>
                             <XStack gap="$2">
-                              {mp.seasonsPlayed != null && (
+                              {mp.careerSeasons != null && (
                                 <Text fontSize={10} color="$color8">
-                                  {mp.seasonsPlayed}{' '}
-                                  {mp.seasonsPlayed === 1
+                                  {mp.careerSeasons}{' '}
+                                  {mp.careerSeasons === 1
                                     ? 'season'
                                     : 'seasons'}
                                 </Text>

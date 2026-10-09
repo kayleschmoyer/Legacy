@@ -3643,6 +3643,8 @@ export type Player = {
   careerBatting?: Maybe<CareerBatting>;
   /** Career pitching statistics for the player */
   careerPitching?: Maybe<CareerPitching>;
+  /** Number of distinct seasons the player has stats for, scoped to the player's sport (MLB: batting or pitching; NFL: any football_season_* table). Null when unknown (LS-10515) */
+  careerSeasons?: Maybe<Scalars['Int']['output']>;
   /** The franchise the player is most associated with (e.g. 'NYY', 'BRO'), derived from season rows as the club they played the most games for, tie-broken by most recent season. Distinct from `mlbTeam`: that is the present-day club and is constrained by FK to the 30 current franchises, whereas this is the career club and so also covers defunct and relocated ones. Null when no season rows are on file (LS-9832). */
   club?: Maybe<Scalars['String']['output']>;
   /** List of positions this player is eligible to play (e.g. SP, RP, 1B, SS) */

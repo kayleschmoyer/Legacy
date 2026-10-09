@@ -18,6 +18,7 @@ import {
   createCareerFootballReceivingLoader,
   createCareerFootballRushingLoader,
   createCareerPitchingLoader,
+  createCareerSeasonsLoader,
   createCareerYearRangeLoader,
   createGameBattingLoader,
   createGameFieldingLoader,
@@ -66,6 +67,7 @@ import {
 export {
   createCareerBattingLoader,
   createBattingSeasonsPlayedLoader,
+  createCareerSeasonsLoader,
   createPitchingSeasonsPlayedLoader,
   createGameBattingLoader,
   createGamePitchingLoader,
@@ -112,6 +114,7 @@ export const createLoaders = (db: GenericDatabase<typeof PublicSchema>) => ({
   careerFootballDefense: createCareerFootballDefenseLoader(db),
   careerFootballDefenseIdp: createCareerFootballDefenseIdpLoader(db),
   battingSeasonsPlayed: createBattingSeasonsPlayedLoader(db),
+  careerSeasons: createCareerSeasonsLoader(db),
   pitchingSeasonsPlayed: createPitchingSeasonsPlayedLoader(db),
   careerYearRange: createCareerYearRangeLoader(db),
   matchupMessages: createMatchupMessagesLoader(db),

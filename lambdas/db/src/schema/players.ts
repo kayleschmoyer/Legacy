@@ -300,7 +300,20 @@ PlayerRef.implement({
         'Number of distinct MLB seasons the player has batting stats for (AL/NL only)',
       nullable: true,
       resolve: async (parent, _args, context) => {
-        return context.loaders.battingSeasonsPlayed.load(parent.id);
+        // Null (not 0) when the player has no batting rows, so a pitcher or
+        // football player is never rendered as "0 seasons" (LS-10515).
+        const seasons = await context.loaders.battingSeasonsPlayed.load(
+          parent.id,
+        );
+        return seasons > 0 ? seasons : null;
+      },
+    }),
+    careerSeasons: t.int({
+      description:
+        "Number of distinct seasons the player has stats for, scoped to the player's sport (MLB: batting or pitching; NFL: any football_season_* table). Null when unknown (LS-10515)",
+      nullable: true,
+      resolve: async (parent, _args, context) => {
+        return context.loaders.careerSeasons.load(parent.id);
       },
     }),
     pitchingSeasonsPlayed: t.int({

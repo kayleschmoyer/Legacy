@@ -78,6 +78,79 @@ export const createBattingSeasonsPlayedLoader = (
   });
 
 /**
+ * DataLoader for a player's career season count, scoped to the player's sport
+ * (LS-10515). Resolves to null — never 0 — when no season rows exist, so the
+ * UI can hide the figure instead of showing a false "0 seasons".
+ *
+ * - baseball: distinct seasons in the union of season_batting and
+ *   season_pitching (so pitchers with no batting rows are counted)
+ * - football: distinct seasons in the union of the football_season_* tables
+ */
+export const createCareerSeasonsLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<number, number | null>(async (keys) => {
+    const players = await db
+      .select({
+        id: PublicSchema.players.id,
+        sport: PublicSchema.players.sport,
+      })
+      .from(PublicSchema.players)
+      .where(inArray(PublicSchema.players.id, keys));
+    const sportById = new Map(players.map((p) => [p.id, p.sport]));
+    const baseballIds = keys.filter((k) => sportById.get(k) === 'baseball');
+    const footballIds = keys.filter((k) => sportById.get(k) === 'football');
+
+    const seasonsByPlayer = new Map<number, Set<number>>();
+    const add = (rows: { playerId: number; season: number }[]) => {
+      for (const r of rows) {
+        const set = seasonsByPlayer.get(r.playerId) ?? new Set<number>();
+        set.add(r.season);
+        seasonsByPlayer.set(r.playerId, set);
+      }
+    };
+
+    const t = PublicSchema;
+    const queries: Promise<{ playerId: number; season: number }[]>[] = [];
+    if (baseballIds.length > 0) {
+      for (const table of [t.seasonBatting, t.seasonPitching]) {
+        queries.push(
+          db
+            .selectDistinct({
+              playerId: table.playerId,
+              season: table.season,
+            })
+            .from(table)
+            .where(inArray(table.playerId, baseballIds)),
+        );
+      }
+    }
+    if (footballIds.length > 0) {
+      for (const table of [
+        t.footballSeasonPassing,
+        t.footballSeasonRushing,
+        t.footballSeasonReceiving,
+        t.footballSeasonKicking,
+        t.footballSeasonDefense,
+        t.footballSeasonDefenseIdp,
+      ]) {
+        queries.push(
+          db
+            .selectDistinct({
+              playerId: table.playerId,
+              season: table.season,
+            })
+            .from(table)
+            .where(inArray(table.playerId, footballIds)),
+        );
+      }
+    }
+    for (const rows of await Promise.all(queries)) add(rows);
+
+    return keys.map((key) => seasonsByPlayer.get(key)?.size || null);
+  });
+
+/**
  * DataLoader for count of distinct AL/NL seasons with a pitching appearance
  * (LS-10807) — read from career_pitching_appearances, the same relation the
  * league pitcher career-minimum rule uses.
