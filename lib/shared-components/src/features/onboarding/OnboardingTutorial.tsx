@@ -14,6 +14,10 @@ import {
   type OnboardingLinkRenderProps,
 } from './OnboardingStepBlocks';
 import {
+  type OnboardingUpsell,
+  OnboardingUpsellCard,
+} from './OnboardingUpsellCard';
+import {
   getOnboardingSteps,
   type OnboardingAccent,
   type OnboardingSlotId,
@@ -21,6 +25,7 @@ import {
 import { BLACK, BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
 
 export type { OnboardingLinkRenderProps } from './OnboardingStepBlocks';
+export type { OnboardingUpsell } from './OnboardingUpsellCard';
 
 /** How the user left the tutorial without finishing it. */
 export type OnboardingSkipMethod =
@@ -66,6 +71,11 @@ export interface OnboardingTutorialProps {
   /** Illustration overrides; `null` hides a slot, omitted uses the default. */
   slots?: Partial<Record<OnboardingSlotId, React.ReactNode>>;
   analytics?: OnboardingTutorialAnalytics;
+  /**
+   * Premium upsell card shown below the final-step checklist (LS-6912). Hosts
+   * pass it only once they know the user is not premium; omit it otherwise.
+   */
+  upsell?: OnboardingUpsell;
   /** Adds the "Your Pro features" step for Premium users (LS-6899). */
   isPremium?: boolean;
 }
@@ -131,6 +141,7 @@ export function OnboardingTutorial({
   onNavigate,
   slots,
   analytics,
+  upsell,
   isPremium = false,
 }: OnboardingTutorialProps): React.JSX.Element {
   const steps = React.useMemo(() => getOnboardingSteps(isPremium), [isPremium]);
@@ -180,6 +191,11 @@ export function OnboardingTutorial({
 
   const handleLinkPress = (href: string) => {
     onNavigate?.(href);
+    finish('completed');
+  };
+
+  const handleUpgrade = () => {
+    upsell?.onUpgrade();
     finish('completed');
   };
 
@@ -335,6 +351,11 @@ export function OnboardingTutorial({
                 renderLink={renderLink}
                 onLinkPress={handleLinkPress}
               />
+              {isLast && upsell ? (
+                <OnboardingUpsellCard
+                  upsell={{ ...upsell, onUpgrade: handleUpgrade }}
+                />
+              ) : null}
             </YStack>
           </ScrollView>
 

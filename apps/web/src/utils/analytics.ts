@@ -261,6 +261,19 @@ export function trackOnboardingCompleted(): void {
   trackEvent('onboarding_completed', { category: 'onboarding' });
 }
 
+/** Premium upsell card at the end of onboarding (LS-6912). */
+export function trackOnboardingUpsellShown(): void {
+  trackEvent('onboarding_upsell_shown', { category: 'onboarding' });
+}
+
+export function trackOnboardingUpsellClicked(): void {
+  trackEvent('onboarding_upsell_clicked', { category: 'onboarding' });
+}
+
+export function trackOnboardingUpsellDismissed(): void {
+  trackEvent('onboarding_upsell_dismissed', { category: 'onboarding' });
+}
+
 /**
  * Track player selection
  * @param playerId - The selected player ID

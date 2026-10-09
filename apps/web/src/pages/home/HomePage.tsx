@@ -40,6 +40,7 @@ import { leagueDetailRoute, leagueRosterRoute } from './homeRoutes';
 import { formatDisplayName } from '../../lib/formatDisplayName';
 import { PageMeta } from '../../components/PageMeta';
 import {
+  buildOnboardingUpsell,
   onboardingTutorialAnalytics,
   renderOnboardingLink,
 } from '../../utils/onboardingTutorialWeb';
@@ -50,7 +51,7 @@ import {
   withAlpha,
 } from '../../constants/colors';
 import { useThemeContext } from '../../context/ThemeContext';
-import { useIsPremium } from '../../hooks/useIsPremium';
+import { useIsPremiumStatus } from '../../hooks/useIsPremium';
 
 /* ─── Routes ─── */
 
@@ -121,7 +122,7 @@ export function HomePage(): React.JSX.Element {
   const [showArchived, setShowArchived] = useState(false);
   const { resolvedTheme } = useThemeContext();
   const isLight = resolvedTheme === 'light';
-  const isPremium = useIsPremium();
+  const { isPremium, isLoading: premiumLoading } = useIsPremiumStatus();
 
   const defaultSport = useMemo(() => readDefaultSport(), []);
 
@@ -381,6 +382,12 @@ export function HomePage(): React.JSX.Element {
           onStepChange={handleTutorialStepChange}
           analytics={onboardingTutorialAnalytics}
           renderLink={renderOnboardingLink}
+          upsell={
+            // Premium users must never see the upsell; wait for status to load.
+            !premiumLoading && !isPremium
+              ? buildOnboardingUpsell((path) => navigate(path))
+              : undefined
+          }
           isPremium={isPremium}
         />
       )}

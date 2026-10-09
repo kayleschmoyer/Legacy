@@ -17,6 +17,8 @@ interface SummariesResult {
 }
 
 const mockUseSummaries = jest.fn<SummariesResult, []>();
+const mockTutorialProps = jest.fn<void, [{ upsell?: unknown }]>();
+let mockPremiumStatus = { isPremium: false, isLoading: false };
 type PrefsResult = {
   data?: { getUserPreferences: { onboardingCompletedAt: string | null } };
   loading: boolean;
@@ -47,7 +49,10 @@ jest.mock('@legacy-sports/shared-components/sports', () => ({
 }));
 
 jest.mock('@legacy-sports/shared-components/ui', () => ({
-  OnboardingTutorial: () => <div data-testid="onboarding-tutorial" />,
+  OnboardingTutorial: (props: { upsell?: unknown }) => {
+    mockTutorialProps(props);
+    return <div data-testid="onboarding-tutorial" />;
+  },
 }));
 
 jest.mock('@legacy-sports/graphql', () => ({
@@ -71,13 +76,16 @@ jest.mock('../../components/PageMeta', () => ({ PageMeta: () => null }));
 jest.mock('../../utils/onboardingTutorialWeb', () => ({
   onboardingTutorialAnalytics: {},
   renderOnboardingLink: () => null,
+  buildOnboardingUpsell: () => ({ onUpgrade: jest.fn() }),
 }));
 
 jest.mock('../../context/ThemeContext', () => ({
   useThemeContext: () => ({ resolvedTheme: 'dark' }),
 }));
 
-jest.mock('../../hooks/useIsPremium', () => ({ useIsPremium: () => false }));
+jest.mock('../../hooks/useIsPremium', () => ({
+  useIsPremiumStatus: () => mockPremiumStatus,
+}));
 
 describe('HomePage onboarding gate (LS-10716)', () => {
   beforeEach(() => {
@@ -91,6 +99,8 @@ describe('HomePage onboarding gate (LS-10716)', () => {
     });
     mockUpdatePrefs.mockClear();
     mockHomeScreen.mockReturnValue(null);
+    mockTutorialProps.mockReset();
+    mockPremiumStatus = { isPremium: false, isLoading: false };
   });
 
   it('does not open the tutorial when the leagues query fails', () => {
@@ -137,6 +147,39 @@ describe('HomePage onboarding gate (LS-10716)', () => {
     render(<HomePage />);
 
     expect(screen.getByTestId('onboarding-tutorial')).toBeInTheDocument();
+  });
+
+  describe('Premium upsell (LS-6912)', () => {
+    const newUser = () =>
+      mockUseSummaries.mockReturnValue({
+        data: { getUserLeagueSummaries: [] },
+        loading: false,
+      });
+    const lastUpsell = (): unknown => {
+      const calls = mockTutorialProps.mock.calls;
+      return calls[calls.length - 1]?.[0].upsell;
+    };
+
+    it('offers the upsell to a confirmed non-premium user', () => {
+      newUser();
+      render(<HomePage />);
+      expect(lastUpsell()).toBeDefined();
+    });
+
+    it('never offers the upsell to a premium user', () => {
+      newUser();
+      mockPremiumStatus = { isPremium: true, isLoading: false };
+      render(<HomePage />);
+      expect(screen.getByTestId('onboarding-tutorial')).toBeInTheDocument();
+      expect(lastUpsell()).toBeUndefined();
+    });
+
+    it('withholds the upsell while premium status is loading', () => {
+      newUser();
+      mockPremiumStatus = { isPremium: false, isLoading: true };
+      render(<HomePage />);
+      expect(lastUpsell()).toBeUndefined();
+    });
   });
 
   it('does not open the tutorial for a user who has leagues', () => {

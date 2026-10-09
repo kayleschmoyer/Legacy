@@ -573,6 +573,67 @@ describe('OnboardingTutorial — copy (LS-10774)', () => {
   });
 });
 
+describe('OnboardingTutorial — Premium upsell (LS-6912)', () => {
+  const makeUpsell = () => ({
+    onUpgrade: jest.fn(),
+    onShown: jest.fn(),
+    onDismiss: jest.fn(),
+  });
+
+  it('renders no upsell when the host passes none', () => {
+    render(<OnboardingTutorial onClose={jest.fn()} />);
+    advanceToLastStep();
+
+    expect(screen.queryByTestId('onboarding-upsell')).toBeNull();
+  });
+
+  it('shows the card only on the final step, firing onShown once', () => {
+    const upsell = makeUpsell();
+    render(<OnboardingTutorial onClose={jest.fn()} upsell={upsell} />);
+
+    expect(screen.queryByTestId('onboarding-upsell')).toBeNull();
+    advanceToLastStep();
+
+    expect(screen.getByTestId('onboarding-upsell')).toBeInTheDocument();
+    expect(
+      screen.getByText('Unlock everything with Premium'),
+    ).toBeInTheDocument();
+    expect(upsell.onShown).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides the card and reports dismissal without closing the tutorial', () => {
+    const upsell = makeUpsell();
+    const onClose = jest.fn();
+    render(<OnboardingTutorial onClose={onClose} upsell={upsell} />);
+    advanceToLastStep();
+
+    fireEvent.click(screen.getByTestId('onboarding-upsell-dismiss'));
+
+    expect(screen.queryByTestId('onboarding-upsell')).toBeNull();
+    expect(upsell.onDismiss).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('upgrades via the CTA and completes the tutorial', () => {
+    const upsell = makeUpsell();
+    const onClose = jest.fn();
+    render(
+      <OnboardingTutorial
+        onClose={onClose}
+        upsell={upsell}
+        analytics={analytics}
+      />,
+    );
+    advanceToLastStep();
+
+    fireEvent.click(screen.getByTestId('onboarding-upsell-cta'));
+
+    expect(upsell.onUpgrade).toHaveBeenCalledTimes(1);
+    expect(analytics.onCompleted).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('OnboardingTutorial — Premium Pro features step (LS-6899)', () => {
   it('shows the Your Pro features card to Premium users', () => {
     render(<OnboardingTutorial onClose={jest.fn()} isPremium />);
