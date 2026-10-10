@@ -15,6 +15,7 @@ import {
   canonicalSummary,
   countOccurrenceComments,
   groupFlakyBySpec,
+  listFlakyLabelIssues,
   nextOccurrence,
   pickExistingIssue,
   renderSummaryMd,
@@ -198,4 +199,61 @@ test('renderSummaryMd renders a table row per spec and neutralizes pipes', () =>
 
 test('renderSummaryMd handles a night with no flaky tests', () => {
   assert.ok(renderSummaryMd([]).includes('No flaky tests tonight.'));
+});
+
+// ---------------------------------------------------------------------------
+// listFlakyLabelIssues — /rest/api/3/search/jql paging (LS-11033)
+// ---------------------------------------------------------------------------
+
+/** Fake jiraApi that serves `pages` in order and records each call. */
+function fakeSearchApi(pages) {
+  const calls = [];
+  const api = async (method, path, body) => {
+    calls.push({ method, path, body });
+    return pages[calls.length - 1];
+  };
+  return { api, calls };
+}
+
+test('listFlakyLabelIssues follows nextPageToken until it is absent', async () => {
+  const { api, calls } = fakeSearchApi([
+    { issues: [{ key: 'LS-1' }, { key: 'LS-2' }], nextPageToken: 'tok-2' },
+    { issues: [{ key: 'LS-3' }], nextPageToken: 'tok-3' },
+    { issues: [{ key: 'LS-4' }] },
+  ]);
+  const issues = await listFlakyLabelIssues('LS', api);
+  assert.deepEqual(
+    issues.map((i) => i.key),
+    ['LS-1', 'LS-2', 'LS-3', 'LS-4'],
+  );
+  assert.equal(calls.length, 3);
+  for (const call of calls) {
+    assert.equal(call.method, 'POST');
+    assert.equal(call.path, '/rest/api/3/search/jql');
+    assert.deepEqual(call.body.fields, ['summary', 'status', 'created']);
+    assert.ok(call.body.jql.includes('labels = "e2e-flaky"'));
+    // search/jql rejects offset paging with a 400.
+    assert.equal('startAt' in call.body, false);
+  }
+  assert.equal('nextPageToken' in calls[0].body, false);
+  assert.equal(calls[1].body.nextPageToken, 'tok-2');
+  assert.equal(calls[2].body.nextPageToken, 'tok-3');
+});
+
+test('listFlakyLabelIssues keeps paging past a short page while a token remains', async () => {
+  // search/jql may return fewer than maxResults on a non-final page; only the
+  // missing token ends paging (the old `length < pageSize` heuristic would stop).
+  const { api, calls } = fakeSearchApi([
+    { issues: [{ key: 'LS-1' }], nextPageToken: 'tok-2' },
+    { issues: [{ key: 'LS-2' }] },
+  ]);
+  const issues = await listFlakyLabelIssues('LS', api);
+  assert.equal(issues.length, 2);
+  assert.equal(calls.length, 2);
+});
+
+test('listFlakyLabelIssues returns [] for an empty result', async () => {
+  const { api, calls } = fakeSearchApi([{ issues: [] }]);
+  assert.deepEqual(await listFlakyLabelIssues('LS', api), []);
+  assert.equal(calls.length, 1);
 });

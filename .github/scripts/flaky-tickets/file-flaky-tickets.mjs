@@ -227,23 +227,29 @@ async function jiraApi(method, path, body, attempt = 1) {
   );
 }
 
-/** List every issue in the project carrying the e2e-flaky label (paginated). */
-async function listFlakyLabelIssues(projectKey) {
+/**
+ * List every issue in the project carrying the e2e-flaky label (paginated).
+ *
+ * Uses POST /rest/api/3/search/jql — the old GET /rest/api/3/search returns
+ * HTTP 410 Gone (LS-11033). The new endpoint pages with an opaque
+ * `nextPageToken` (no startAt/total); its absence marks the last page.
+ * `api` is injectable for tests.
+ */
+export async function listFlakyLabelIssues(projectKey, api = jiraApi) {
   const jql = `project = ${projectKey} AND labels = "${FLAKY_LABEL}" ORDER BY created DESC`;
   const issues = [];
-  let startAt = 0;
-  const pageSize = 100;
-  for (;;) {
-    const page = await jiraApi(
-      'GET',
-      `/rest/api/3/search?jql=${encodeURIComponent(jql)}` +
-        `&fields=summary,status,created&maxResults=${pageSize}&startAt=${startAt}`,
-    );
-    const pageIssues = page?.issues ?? [];
-    issues.push(...pageIssues);
-    if (pageIssues.length < pageSize) break;
-    startAt += pageSize;
-  }
+  let nextPageToken;
+  do {
+    const body = {
+      jql,
+      fields: ['summary', 'status', 'created'],
+      maxResults: 100,
+      ...(nextPageToken ? { nextPageToken } : {}),
+    };
+    const page = await api('POST', '/rest/api/3/search/jql', body);
+    issues.push(...(page?.issues ?? []));
+    nextPageToken = page?.nextPageToken;
+  } while (nextPageToken);
   return issues;
 }
 

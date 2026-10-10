@@ -473,31 +473,42 @@ jobs:
               continue
             fi
 
-            # Fetch all children of the epic via JQL search (paginated)
+            # Fetch all children of the epic via JQL search (paginated).
+            # /rest/api/3/search/jql pages with an opaque nextPageToken (no
+            # startAt/total) and caps maxResults at 100; the old
+            # /rest/api/3/search endpoint returns HTTP 410 Gone (LS-11033).
             ENCODED_JQL=$(echo -n "parent=$EPIC_KEY" | jq -sRr @uri)
             ALL_STATUSES=""
-            START_AT=0
-            PAGE_SIZE=200
-            TOTAL=0
+            PAGE_TOKEN=""
+            PAGE_SIZE=100
+            CHILD_FETCH_FAILED=false
 
             while true; do
-              CHILD_RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/search?jql=$ENCODED_JQL&fields=status&maxResults=$PAGE_SIZE&startAt=$START_AT") || {
+              TOKEN_PARAM=""
+              if [[ -n "$PAGE_TOKEN" ]]; then
+                TOKEN_PARAM="&nextPageToken=$(echo -n "$PAGE_TOKEN" | jq -sRr @uri)"
+              fi
+              CHILD_RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/search/jql?jql=$ENCODED_JQL&fields=status&maxResults=$PAGE_SIZE$TOKEN_PARAM") || {
                 echo "⚠️  Could not fetch children of $EPIC_KEY — skipping epic sync."
+                CHILD_FETCH_FAILED=true
                 break
               }
 
-              TOTAL=$(echo "$CHILD_RESPONSE" | jq -r '.total')
               PAGE_STATUSES=$(echo "$CHILD_RESPONSE" | jq -r '.issues[].fields.status.name')
-              FETCHED=$(echo "$CHILD_RESPONSE" | jq -r '.issues | length')
+              ALL_STATUSES=$(printf '%s\n%s' "$ALL_STATUSES" "$PAGE_STATUSES" | grep -v '^$' || true)
 
-              ALL_STATUSES=$(printf '%s\n%s' "$ALL_STATUSES" "$PAGE_STATUSES" | grep -v '^$')
-
-              START_AT=$((START_AT + FETCHED))
-              if [[ "$START_AT" -ge "$TOTAL" ]]; then
+              PAGE_TOKEN=$(echo "$CHILD_RESPONSE" | jq -r '.nextPageToken // empty')
+              if [[ -z "$PAGE_TOKEN" ]]; then
                 break
               fi
             done
 
+            # A partial child list could roll the epic up to the wrong status.
+            if [[ "$CHILD_FETCH_FAILED" == "true" ]]; then
+              continue
+            fi
+
+            TOTAL=$(echo -n "$ALL_STATUSES" | grep -c . || true)
             if [[ "$TOTAL" == "0" ]]; then
               echo "ℹ️  Epic $EPIC_KEY has no children — skipping."
               continue

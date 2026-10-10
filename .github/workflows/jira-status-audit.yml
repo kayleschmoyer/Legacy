@@ -506,11 +506,18 @@ jobs:
           # In Progress / In Review when a child is reopened (LS-4683).
           ENCODED_JQL=$(echo -n 'project = LS AND issuetype = Epic' | jq -sRr @uri)
           ALL_EPICS="[]"
-          START_AT=0
+          PAGE_TOKEN=""
           PAGE_SIZE=100
 
+          # /rest/api/3/search/jql pages with an opaque nextPageToken (no
+          # startAt/total); the old /rest/api/3/search endpoint returns
+          # HTTP 410 Gone (LS-11033).
           while true; do
-            RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/search?jql=$ENCODED_JQL&fields=status,labels,summary&maxResults=$PAGE_SIZE&startAt=$START_AT") || {
+            TOKEN_PARAM=""
+            if [[ -n "$PAGE_TOKEN" ]]; then
+              TOKEN_PARAM="&nextPageToken=$(echo -n "$PAGE_TOKEN" | jq -sRr @uri)"
+            fi
+            RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/search/jql?jql=$ENCODED_JQL&fields=status,labels,summary&maxResults=$PAGE_SIZE$TOKEN_PARAM") || {
               echo "❌ Failed to fetch epics — skipping epic audit"
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "## 🏛️ Epic Rollup Audit" >> $GITHUB_STEP_SUMMARY
@@ -518,13 +525,11 @@ jobs:
               exit 0
             }
 
-            TOTAL=$(echo "$RESPONSE" | jq -r '.total')
-            FETCHED=$(echo "$RESPONSE" | jq -r '.issues | length')
             PAGE_ISSUES=$(echo "$RESPONSE" | jq -c '.issues')
             ALL_EPICS=$(echo "$ALL_EPICS $PAGE_ISSUES" | jq -s '.[0] + .[1]')
 
-            START_AT=$((START_AT + FETCHED))
-            if [[ "$START_AT" -ge "$TOTAL" ]]; then
+            PAGE_TOKEN=$(echo "$RESPONSE" | jq -r '.nextPageToken // empty')
+            if [[ -z "$PAGE_TOKEN" ]]; then
               break
             fi
           done
@@ -556,21 +561,22 @@ jobs:
             # Fetch all children (paginated)
             CHILD_JQL=$(echo -n "parent=$EPIC_KEY" | jq -sRr @uri)
             ALL_STATUSES=""
-            CHILD_START=0
-            CHILD_TOTAL=0
+            CHILD_TOKEN=""
             CHILD_FETCH_FAILED=false
 
             while true; do
-              CHILD_RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/search?jql=$CHILD_JQL&fields=status&maxResults=200&startAt=$CHILD_START") || {
+              CHILD_TOKEN_PARAM=""
+              if [[ -n "$CHILD_TOKEN" ]]; then
+                CHILD_TOKEN_PARAM="&nextPageToken=$(echo -n "$CHILD_TOKEN" | jq -sRr @uri)"
+              fi
+              CHILD_RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/search/jql?jql=$CHILD_JQL&fields=status&maxResults=100$CHILD_TOKEN_PARAM") || {
                 echo "  ⚠️  $EPIC_KEY: could not fetch children — skipping"
                 ERRORS=$((ERRORS + 1))
                 CHILD_FETCH_FAILED=true
                 break
               }
 
-              CHILD_TOTAL=$(echo "$CHILD_RESPONSE" | jq -r '.total')
               PAGE_STATUSES=$(echo "$CHILD_RESPONSE" | jq -r '.issues[].fields.status.name')
-              CHILD_FETCHED=$(echo "$CHILD_RESPONSE" | jq -r '.issues | length')
 
               if [[ -n "$ALL_STATUSES" && -n "$PAGE_STATUSES" ]]; then
                 ALL_STATUSES=$(printf '%s\n%s' "$ALL_STATUSES" "$PAGE_STATUSES")
@@ -578,8 +584,8 @@ jobs:
                 ALL_STATUSES="$PAGE_STATUSES"
               fi
 
-              CHILD_START=$((CHILD_START + CHILD_FETCHED))
-              if [[ "$CHILD_START" -ge "$CHILD_TOTAL" ]]; then
+              CHILD_TOKEN=$(echo "$CHILD_RESPONSE" | jq -r '.nextPageToken // empty')
+              if [[ -z "$CHILD_TOKEN" ]]; then
                 break
               fi
             done
@@ -589,7 +595,7 @@ jobs:
               continue
             fi
 
-            if [[ "$CHILD_TOTAL" == "0" || -z "$ALL_STATUSES" ]]; then
+            if [[ -z "$ALL_STATUSES" ]]; then
               echo "  ℹ️  $EPIC_KEY: no children — skipping"
               continue
             fi
