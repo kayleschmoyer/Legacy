@@ -728,14 +728,17 @@ jobs:
           echo "pnpm-lock.yaml matches all workspace package.json files"
 
   # ============================================================================
-  # STAGE 3 — E2E tests (runs after lint (incl. format), test, AND build all pass)
+  # STAGE 3 — E2E tests (runs as soon as build passes)
   # ============================================================================
+  # LS-11027: e2e consumes only the web build, so it no longer waits on lint
+  # and test. Waiting on them idled every shard for ~17 min after build was
+  # ready (merge-queue batch run 37980977190). lint and test still gate the
+  # run through `summarize` (CI Gate), so a red lint or test still fails CI;
+  # the cost is that e2e also runs when they fail.
   e2e:
     name: "E2E Tests (Shard ${{ matrix.shard }})"
-    needs: [detect-changes, lint, test, build]
+    needs: [detect-changes, build]
     if: >-
-      needs.lint.result == 'success' &&
-      needs.test.result == 'success' &&
       needs.build.result == 'success' &&
       (needs.detect-changes.outputs.web == 'true' ||
       needs.detect-changes.outputs.e2e == 'true' ||
@@ -924,10 +927,9 @@ jobs:
   #     once-a-day full Mobile Chrome suite in run-playwright-tests.yml.
   e2e-mobile:
     name: "E2E Tests (Mobile Chrome — Shard ${{ matrix.shard }})"
-    needs: [detect-changes, lint, test, build]
+    # LS-11027: build only — see the e2e job above.
+    needs: [detect-changes, build]
     if: >-
-      needs.lint.result == 'success' &&
-      needs.test.result == 'success' &&
       needs.build.result == 'success' &&
       (needs.detect-changes.outputs.web == 'true' ||
       needs.detect-changes.outputs.e2e == 'true' ||
