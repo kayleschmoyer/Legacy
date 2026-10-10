@@ -26,7 +26,7 @@
  *     src/integration/tests/draft-board-a11y-ui.integration.spec.ts
  */
 
-import type { Page } from '@playwright/test';
+import type { APIRequestContext, Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { cleanupLeague } from '../helpers/cleanup-league';
 import { createLeagueViaUI } from '../helpers/create-league';
@@ -36,6 +36,7 @@ import {
   waitThroughTransientLoadingScreen,
 } from '../helpers/draft-board-overlay';
 import { pauseDraft, resumeDraft } from '../helpers/pause-draft';
+import { withLeagueDeletionDiagnosis } from '../helpers/league-exists';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { test } from '../fixtures/ui';
 
@@ -55,17 +56,34 @@ let state: A11yState;
 /**
  * Navigate to the draft board and wait for the live draft UI to fully appear.
  * Returns when `role=main aria-label="Player draft board"` is visible.
+ *
+ * Each test creates a fresh browser context so the Apollo cache is cold; wait
+ * through the transient "Loading draft board..." screen while
+ * GetLiveDraftLeagueDraft is in-flight before asserting the board.
+ *
+ * If the board never appears because the league was deleted mid-spec by an
+ * overlapping live-backend run's cleanup (LS-11054), the failure says so
+ * instead of surfacing as a bare "main landmark not found" (LS-11055).
  */
 async function openDraftBoard(
   page: Page,
+  api: APIRequestContext,
   leagueId: number,
   timeout = 45_000,
 ): Promise<void> {
-  await page.goto(`/baseball/league/${leagueId}/draft`);
-  await page.waitForLoadState('domcontentloaded');
-  await expect(
-    page.getByRole('main', { name: /player draft board/i }),
-  ).toBeVisible({ timeout });
+  await withLeagueDeletionDiagnosis(
+    api,
+    leagueId,
+    'draft-board-a11y',
+    async () => {
+      await page.goto(`/baseball/league/${leagueId}/draft`);
+      await page.waitForLoadState('domcontentloaded');
+      await waitThroughTransientLoadingScreen(page);
+      await expect(
+        page.getByRole('main', { name: /player draft board/i }),
+      ).toBeVisible({ timeout });
+    },
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -205,8 +223,9 @@ test.describe
 
   test('Phase 4: Draft board exposes correct ARIA landmarks', async ({
     commissionerPage: page,
+    apiCommissioner,
   }) => {
-    await openDraftBoard(page, state.leagueId);
+    await openDraftBoard(page, apiCommissioner, state.leagueId);
 
     await test.step('main landmark is labeled "Player draft board"', async () => {
       const main = page.getByRole('main', { name: /player draft board/i });
@@ -242,14 +261,10 @@ test.describe
 
   test('Phase 5: Position filter radiogroup keyboard navigation', async ({
     commissionerPage: page,
+    apiCommissioner,
   }) => {
-    await page.goto(`/baseball/league/${state.leagueId}/draft`);
-    await page.waitForLoadState('domcontentloaded');
-
     // Draft is paused (Phase 3) so the live board renders deterministically.
-    await expect(
-      page.getByRole('main', { name: /player draft board/i }),
-    ).toBeVisible({ timeout: 45_000 });
+    await openDraftBoard(page, apiCommissioner, state.leagueId);
 
     const group = page.getByRole('radiogroup', { name: /filter by position/i });
     await expect(group).toBeVisible({ timeout: 15_000 });
@@ -315,18 +330,10 @@ test.describe
 
   test('Phase 6: View mode radiogroup accessibility', async ({
     commissionerPage: page,
+    apiCommissioner,
   }) => {
-    await page.goto(`/baseball/league/${state.leagueId}/draft`);
-    await page.waitForLoadState('domcontentloaded');
-
     // Draft is paused (Phase 3) so the live board renders deterministically.
-    // Each test creates a fresh browser context so the Apollo cache is cold;
-    // wait through the transient "Loading draft board..." screen while
-    // GetLiveDraftLeagueDraft is in-flight before asserting the board.
-    await waitThroughTransientLoadingScreen(page);
-    await expect(
-      page.getByRole('main', { name: /player draft board/i }),
-    ).toBeVisible({ timeout: 45_000 });
+    await openDraftBoard(page, apiCommissioner, state.leagueId);
 
     const viewGroup = page.getByRole('tablist', { name: /view mode/i });
     await expect(viewGroup).toBeVisible({ timeout: 15_000 });
@@ -335,8 +342,6 @@ test.describe
     // The overlay is position:fixed (z-index 9999) and receives coordinate-based
     // clicks even when force:true is used, preventing the view-mode buttons from
     // getting the click event.
-    const announceOverlay = page.getByTestId('draft-announce-overlay');
-
     /** Helper: dismiss overlay if visible, then do a direct JS click on target. */
     const clickWithOverlayDismiss = async (
       btn: ReturnType<typeof viewGroup.getByRole>,
@@ -391,17 +396,10 @@ test.describe
 
   test('Phase 7: Search textbox is accessible and filters players', async ({
     commissionerPage: page,
+    apiCommissioner,
   }) => {
-    await page.goto(`/baseball/league/${state.leagueId}/draft`);
-    await page.waitForLoadState('domcontentloaded');
-
     // Draft is paused (Phase 3) so the live board renders deterministically.
-    // See Phase 6 comment for why the transient "Loading draft board..." screen
-    // is still possible on a cold Apollo cache.
-    await waitThroughTransientLoadingScreen(page);
-    await expect(
-      page.getByRole('main', { name: /player draft board/i }),
-    ).toBeVisible({ timeout: 45_000 });
+    await openDraftBoard(page, apiCommissioner, state.leagueId);
 
     const searchInput = page.getByRole('textbox', { name: /search players/i });
     await expect(searchInput).toBeVisible({ timeout: 15_000 });
@@ -446,17 +444,10 @@ test.describe
 
   test('Phase 8: Watchlist toggle buttons expose aria-pressed', async ({
     commissionerPage: page,
+    apiCommissioner,
   }) => {
-    await page.goto(`/baseball/league/${state.leagueId}/draft`);
-    await page.waitForLoadState('domcontentloaded');
-
     // Draft is paused (Phase 3) so the live board renders deterministically.
-    // See Phase 6 comment for why the transient "Loading draft board..." screen
-    // is still possible on a cold Apollo cache.
-    await waitThroughTransientLoadingScreen(page);
-    await expect(
-      page.getByRole('main', { name: /player draft board/i }),
-    ).toBeVisible({ timeout: 45_000 });
+    await openDraftBoard(page, apiCommissioner, state.leagueId);
 
     // Same overlay-blocking constraint as Phase 7 — see hidePausedDraftOverlay.
     await hidePausedDraftOverlay(page);
