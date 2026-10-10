@@ -44,7 +44,7 @@ Use `--testPathPatterns` (plural; the singular form is deprecated in Jest 30+). 
 
 ## CI behavior
 
-PR CI runs `pnpm exec nx affected -t typecheck test` (ci-pipeline.yml `test` job) and the result gates merge through the CI Gate aggregate. Lambda unit suites are included as of 2026-07-02 via explicit `project.json` jest targets — **except `lambdas/db`**, deliberately left ungated pending red-suite cleanup (details homed in [What Gates Merge](../SKILL.md#what-gates-merge)). `lambdas/db` has `test:all-files` (`jest`, no flags) for a guaranteed full local run.
+PR CI runs `typecheck test` over the affected projects (ci-pipeline.yml `test` job — a 4-shard matrix since LS-11028, each shard running `nx run-many -t typecheck test` on its share) and the result gates merge through the CI Gate aggregate. Lambda unit suites are included as of 2026-07-02 via explicit `project.json` jest targets — **except `lambdas/db`**, deliberately left ungated pending red-suite cleanup (details homed in [What Gates Merge](../SKILL.md#what-gates-merge)). `lambdas/db` has `test:all-files` (`jest`, no flags) for a guaranteed full local run.
 
 ## Coverage
 

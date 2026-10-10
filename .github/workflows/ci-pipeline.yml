@@ -414,13 +414,40 @@ jobs:
           tool: format
           log: ${{ runner.temp }}/ci-format.log
 
+  # LS-11028: typecheck + unit tests are sharded across a matrix. One job took
+  # ~20 min on a full-affected merge-queue batch (41 projects, Nx cache 0/84 —
+  # batch trees are new PR combinations, so the cache cannot help).
+  #
+  # The job id stays `test` ON PURPOSE — it is the matrix itself, not a fan-out
+  # plus an aggregator — so `needs.test.result` keeps GitHub's native matrix
+  # rollup (any shard failure → failure; a cancelled shard → cancelled, never a
+  # synthesised failure) for summarize, ci-gate.js and the e2e `needs`. Shard
+  # job names "test (shard i/N)" still match ci-gate.js's GATE_JOB_LEAF_NAMES
+  # leaf ("test" + space) and ci-failure-labels.js's "🚀 CI Pipeline / test"
+  # prefix, so cancellation classification and the CI: Test Failure label are
+  # unchanged.
+  #
+  # Each shard runs the projects .github/scripts/test-shard-partition.mjs
+  # assigns it (a workspace-wide, commit-deterministic split) ∩ nx affected.
+  # To change the shard count, edit BOTH `matrix.shard` and SHARD_TOTAL.
   test:
-    name: "test"
+    name: "test (shard ${{ matrix.shard }}/4)"
     needs: [detect-changes]
     if: always() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')
     runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
+    strategy:
+      # Unlike e2e (LS-1119), keep siblings running: the single job reported
+      # every failing project in one pass, and a shard is short enough that
+      # finishing it is cheaper than a second CI round to find the next break.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     outputs:
+      # Matrix outputs are not merged — the last shard to set it wins, and a
+      # shard whose capture step was skipped sets nothing. With several shards
+      # failing, the excerpt shows one of them; the label/gate verdict is
+      # unaffected (it comes from needs.test.result).
       failure-excerpt: ${{ steps.capture.outputs.excerpt }}
     env:
       # Cap per-process heap lower than the global 4096 so that NX_PARALLEL=2 + Jest
@@ -444,9 +471,24 @@ jobs:
           include-optional-deps: false
 
       - name: "Typecheck & Test"
+        env:
+          SHARD: ${{ matrix.shard }}
+          SHARD_TOTAL: "4"
         run: |
           set -o pipefail
-          pnpm exec nx affected -t typecheck test 2>&1 | tee "$RUNNER_TEMP/ci-test.log"
+          run_shard() {
+            pnpm exec nx show projects --affected --json > "$RUNNER_TEMP/affected.json" || return
+            PROJECTS=$(node .github/scripts/test-shard-partition.mjs \
+              --shard "$SHARD" --total "$SHARD_TOTAL" \
+              --affected "$RUNNER_TEMP/affected.json") || return
+            if [ -z "$PROJECTS" ]; then
+              echo "No affected projects assigned to shard $SHARD/$SHARD_TOTAL — nothing to run."
+              return 0
+            fi
+            echo "Shard $SHARD/$SHARD_TOTAL projects: $PROJECTS"
+            pnpm exec nx run-many -t typecheck test -p "$PROJECTS"
+          }
+          run_shard 2>&1 | tee "$RUNNER_TEMP/ci-test.log"
 
       - name: "Capture test failure"
         id: capture

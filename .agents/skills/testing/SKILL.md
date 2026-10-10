@@ -112,7 +112,7 @@ Every Playwright spec must be registered in its suite's surface map — a JSON m
 Re-verify volatile facts before trusting them:
 
 - Required merge contexts: `grep -n '"context"' .github/ruleset.json` (config) vs live: `gh api repos/{owner}/{repo}/rulesets`
-- PR CI test command: `grep -n "nx affected -t typecheck test" .github/workflows/ci-pipeline.yml`
+- PR CI test command: `grep -n "nx run-many -t typecheck test" .github/workflows/ci-pipeline.yml` (sharded across the `test` matrix — LS-11028)
 - Lambda test targets: `pnpm exec nx show project db --json` (look for an explicit `test` target, not the package.json script)
 - Surface-map enforcement: `head .github/checks/integration-select-tests.sh`
 - Test-user pool seats: `grep -n "TIER_SEATS" apps/web-e2e/src/utils/test-user-auth.ts`
