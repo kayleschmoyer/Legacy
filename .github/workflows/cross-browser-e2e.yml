@@ -242,43 +242,6 @@ jobs:
           export NX_NO_CLOUD=true
           pnpm exec nx build web
 
-      - name: "Start Dev Server"
-        shell: bash
-        run: |
-          export NX_NO_CLOUD=true
-
-          if [ -d "dist/apps/web" ]; then
-            echo "Serving pre-built web artifact..."
-            if command -v serve >/dev/null 2>&1; then
-              serve -s dist/apps/web -l 4200 --no-clipboard &
-            else
-              pnpm dlx serve@14.2.4 -s dist/apps/web -l 4200 --no-clipboard &
-            fi
-          else
-            echo "Falling back to nx serve..."
-            pnpm exec nx serve web --port=4200 --host=localhost &
-          fi
-          SERVER_PID=$!
-          echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
-
-          echo "Waiting for dev server on http://localhost:4200 ..."
-          for i in {1..90}; do
-            if curl -sf http://localhost:4200 >/dev/null 2>&1; then
-              echo "Dev server ready"
-              break
-            fi
-            if ! kill -0 $SERVER_PID 2>/dev/null; then
-              echo "Dev server crashed"
-              exit 1
-            fi
-            sleep 1
-          done
-
-          if ! curl -sf http://localhost:4200 >/dev/null 2>&1; then
-            echo "Dev server did not start within 90 seconds"
-            exit 1
-          fi
-
       - name: "Run Playwright Tests"
         id: tests
         shell: bash
@@ -311,11 +274,6 @@ jobs:
 
           echo "Running: pnpm exec playwright test ${PLAYWRIGHT_ARGS[*]}"
           pnpm exec playwright test "${PLAYWRIGHT_ARGS[@]}"
-
-      - name: "Stop Dev Server"
-        if: always()
-        shell: bash
-        run: kill $SERVER_PID 2>/dev/null || true
 
       # Report upload (AC1): the browsable HTML report per engine, retained as a
       # workflow artifact. Uploaded even on failure so a red cross-browser run is

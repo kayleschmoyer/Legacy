@@ -723,13 +723,15 @@ jobs:
           echo "    All required AMI-baked browsers present."
 
       # =======================================================================
-      # E2E suite: fetch the shared web build and start a local server
+      # E2E suite: fetch the shared web build
       # =======================================================================
       # The app is built once per run by the build-web job above (LS-10329)
       # and shared via S3, keyed by commit SHA — every e2e shard downloads
       # the same (coverage-instrumented, on automated runs) bundle instead of
       # rebuilding it. if-no-files-found: error so a missing artifact fails
-      # loudly here rather than silently falling back to `nx serve` below.
+      # loudly here. Playwright's own webServer (apps/web-e2e/playwright.config.ts)
+      # serves dist/apps/web via `vite preview` on E2E_PORT (4280); no separate
+      # server step is needed (LS-11051 removed an unused `serve :4200`).
       - name: "Download Web Build from S3"
         if: matrix.suite == 'e2e'
         uses: ./.github/actions/s3-artifact
@@ -738,45 +740,6 @@ jobs:
           name: web-build
           path: dist/apps/web
           if-no-files-found: error
-
-      - name: "Start Dev Server"
-        if: matrix.suite == 'e2e'
-        shell: bash
-        run: |
-          export NX_NO_CLOUD=true
-
-          if [ -d "dist/apps/web" ]; then
-            echo "Serving pre-built web artifact..."
-            # Prefer globally-installed serve (baked into AMI), fall back to pnpm dlx
-            if command -v serve >/dev/null 2>&1; then
-              serve -s dist/apps/web -l 4200 --no-clipboard &
-            else
-              pnpm dlx serve@14.2.4 -s dist/apps/web -l 4200 --no-clipboard &
-            fi
-          else
-            echo "Falling back to nx serve..."
-            pnpm exec nx serve web --port=4200 --host=localhost &
-          fi
-          SERVER_PID=$!
-          echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
-
-          echo "Waiting for dev server on http://localhost:4200 ..."
-          for i in {1..90}; do
-            if curl -sf http://localhost:4200 >/dev/null 2>&1; then
-              echo "Dev server ready"
-              break
-            fi
-            if ! kill -0 $SERVER_PID 2>/dev/null; then
-              echo "Dev server crashed"
-              exit 1
-            fi
-            sleep 1
-          done
-
-          if ! curl -sf http://localhost:4200 >/dev/null 2>&1; then
-            echo "Dev server did not start within 90 seconds"
-            exit 1
-          fi
 
       # =======================================================================
       # Run Playwright tests
@@ -1101,11 +1064,6 @@ jobs:
           name: playwright-output/${{ strategy.job-index }}
           path: playwright-output/
           if-no-files-found: ignore
-
-      - name: "Stop Dev Server"
-        if: always() && matrix.suite == 'e2e'
-        shell: bash
-        run: kill $SERVER_PID 2>/dev/null || true
 
       # =======================================================================
       # Artifacts — blob reports uploaded to S3 for merge+deploy
