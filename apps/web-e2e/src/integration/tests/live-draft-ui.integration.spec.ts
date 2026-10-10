@@ -3,13 +3,22 @@
  *
  * Tests the real-time live draft flow end-to-end with 4 simultaneous browser
  * contexts (commissioner + 3 managers), each making picks on their own turn:
- *   1. Create a league (4 teams)
- *   2. Three managers join via invite code
+ *   Seed (beforeAll, API): create a 4-team league and join 3 managers
  *   3. Verify live draft settings (defaults: Live/Standard/Snake)
- *   4. Commissioner starts the draft
+ *   4. Commissioner starts the draft (UI); early rounds fast-forwarded via API
  *   5. All 4 users open the draft board; whoever sees "Your pick" picks
  *   6. Verify draft completes and commissioner roster is filled
  *   7. Manager verifies their roster via their own browser context
+ *
+ * LS-11044: league creation and manager joins used to run through the UI
+ * (createLeagueViaUI / joinLeagueAsManager) — both are already covered by
+ * other integration specs — and Phase 5 drafted every one of the 76 picks
+ * through four browsers, making this the single heaviest spec (~1400s) on its
+ * integration shard. The league is now API-seeded at the smallest valid
+ * baseball roster, the commissioner fast-forwards all but the last
+ * UI_PICK_ROUNDS rounds via `commissionerPick`, and the browsers draft only
+ * the final rounds — still a full multi-user live draft (every seat picks on
+ * its own turn, the WS canary still runs, the draft still completes).
  *
  * Run:
  *   pnpm exec playwright test apps/web-e2e/src/integration/tests/live-draft-ui.integration.spec.ts
@@ -19,12 +28,23 @@ import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { LOGGER } from '@legacy-sports/logging';
 import { cleanupLeague } from '../helpers/cleanup-league';
-import { createLeagueViaUI } from '../helpers/create-league';
-import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { test } from '../fixtures/ui';
 import { gqlFetch, gqlFetchEnvelope } from '../helpers/gql-fetch';
 
 import { testLeagueName } from '../league-run-scope';
+
+// Smallest valid baseball roster (ROSTER_RANGE_BY_SPORT.baseball.min in
+// lambdas/db/src/schema/leagues/sport-validation.ts). Draft rounds equal
+// maxRosterSize, so this bounds the total pick count at 4 × 15 = 60.
+const MAX_ROSTER_SIZE = 15;
+const NUMBER_OF_TEAMS = 4;
+// Rounds the four browsers draft through the UI after the API fast-forward.
+// 3 snake rounds = 12 picks: every seat picks at least twice on its own turn,
+// enough for the LS-8884 WS canary's 3 attempts and the Phase 6/7 roster-name
+// checks, without paying ~10s × 76 UI picks.
+const UI_PICK_ROUNDS = 3;
+const API_PICK_COUNT = NUMBER_OF_TEAMS * (MAX_ROSTER_SIZE - UI_PICK_ROUNDS);
+
 // ---------------------------------------------------------------------------
 // Shared state accumulated across serial tests.
 // ---------------------------------------------------------------------------
@@ -48,16 +68,90 @@ test.describe
   .serial('Live Draft UI (Live Backend) @integration @critical', () => {
   test.describe.configure({ retries: 0 });
 
-  test.beforeAll(() => {
-    state = {
-      leagueId: 0,
-      inviteCode: '',
-      leagueName: '',
-      teams: [],
-      commissionerPicks: [],
-      manager1Picks: [],
-    };
-  });
+  // -----------------------------------------------------------------
+  // SEED — CREATE LEAGUE + MANAGERS JOIN (API, LS-11044)
+  // -----------------------------------------------------------------
+
+  test.beforeAll(
+    async ({ commissionerJwt, managerJwt1, managerJwt2, managerJwt3 }) => {
+      state = {
+        leagueId: 0,
+        inviteCode: '',
+        leagueName: testLeagueName('Live Draft'),
+        teams: [],
+        commissionerPicks: [],
+        manager1Picks: [],
+      };
+
+      // Explicit numberOfDivisions: 1 — the server-side default splits the
+      // league into divisions that must each hold ≥6 teams (LS-11032).
+      const created = await gqlFetch<{
+        createLeagueAndTeams: { league: { id: number; inviteCode: string } };
+      }>(
+        commissionerJwt,
+        `mutation CreateLeagueForLiveDraftUi($input: CreateLeagueAndTeamsInput!) {
+           createLeagueAndTeams(input: $input) {
+             league { id inviteCode }
+           }
+         }`,
+        {
+          input: {
+            leagueName: state.leagueName,
+            numberOfTeams: NUMBER_OF_TEAMS,
+            numberOfDivisions: 1,
+            maxRosterSize: MAX_ROSTER_SIZE,
+            playerPool: 'all',
+          },
+        },
+      );
+      state.leagueId = Number(created.createLeagueAndTeams.league.id);
+      state.inviteCode = created.createLeagueAndTeams.league.inviteCode;
+
+      const managers = [
+        { jwt: managerJwt1, teamName: 'Draft Kings' },
+        { jwt: managerJwt2, teamName: 'The Selectors' },
+        { jwt: managerJwt3, teamName: 'Pick Masters' },
+      ];
+
+      for (const { jwt, teamName } of managers) {
+        await gqlFetch(
+          jwt,
+          `mutation JoinLeagueForLiveDraftUi($inviteCode: String!, $teamName: String!) {
+             joinLeagueByCode(inviteCode: $inviteCode, teamName: $teamName) { id }
+           }`,
+          { inviteCode: state.inviteCode, teamName },
+        );
+
+        // The join mutation returning doesn't guarantee the leagueMembers row
+        // is queryable yet (LS-4350): later phases that enter the league as
+        // this manager would see "League not found". Poll the manager's own
+        // `userTeamId` until it resolves before progressing.
+        await expect
+          .poll(
+            async () => {
+              const data = await gqlFetch<{ userTeamId: number | null }>(
+                jwt,
+                `query GetUserTeamIdForJoin($leagueId: Int!) {
+                   userTeamId(leagueId: $leagueId)
+                 }`,
+                { leagueId: state.leagueId },
+              ).catch(() => null);
+              return data?.userTeamId ?? null;
+            },
+            {
+              timeout: 30_000,
+              intervals: [500, 1_000, 2_000],
+              message: `Manager join for "${teamName}" did not persist a leagueMembers row in league ${state.leagueId} within 30s`,
+            },
+          )
+          .not.toBeNull();
+
+        state.teams.push(teamName);
+      }
+
+      expect(state.teams).toHaveLength(3);
+    },
+  );
 
   // Layer-2 per-test league cleanup (LS-4539). Removes orphans even when the
   // test body throws — Playwright still runs afterAll on test failure. Process
@@ -65,86 +159,6 @@ test.describe
   // pre-run sweep in global-setup (Layer 1).
   test.afterAll(async ({ apiCommissioner }) => {
     await cleanupLeague(apiCommissioner, state.leagueId);
-  });
-
-  // -----------------------------------------------------------------
-  // PHASE 1 — CREATE LEAGUE (reused from full-season)
-  // -----------------------------------------------------------------
-
-  test('Phase 1: Create league via the UI', async ({
-    commissionerPage: page,
-  }) => {
-    state.leagueName = testLeagueName('Live Draft');
-    const result = await createLeagueViaUI(page, {
-      leagueName: state.leagueName,
-    });
-    state.leagueId = result.leagueId;
-    state.inviteCode = result.inviteCode;
-  });
-
-  // -----------------------------------------------------------------
-  // PHASE 2 — MANAGERS JOIN LEAGUE (reused from full-season)
-  // -----------------------------------------------------------------
-
-  // Phase 2 uses dedicated manager fixture pages (one browser context per
-  // manager) instead of switchUser() on the commissioner page.  switchUser()
-  // has a known race condition (LS-3672, LS-3705) where the background
-  // refreshJwt() can dispatch AUTH_LOGOUT after page.evaluate() sets the new
-  // user profile, clearing localStorage and causing the subsequent reload to
-  // land on the LoginPage.  Dedicated fixture pages set cookies + localStorage
-  // atomically at context-creation time — no race window.
-  test('Phase 2: Managers join the league', async ({
-    managerJwt1,
-    managerJwt2,
-    managerJwt3,
-    managerPage1,
-    managerPage2,
-    managerPage3,
-  }) => {
-    const managers = [
-      { page: managerPage1, jwt: managerJwt1, teamName: 'Draft Kings' },
-      { page: managerPage2, jwt: managerJwt2, teamName: 'The Selectors' },
-      { page: managerPage3, jwt: managerJwt3, teamName: 'Pick Masters' },
-    ];
-
-    for (const { page, jwt, teamName } of managers) {
-      // Full join orchestration lives in joinLeagueAsManager (LS-4447).
-      await joinLeagueAsManager(page, {
-        jwt,
-        inviteCode: state.inviteCode,
-        teamName,
-      });
-
-      // The URL redirect alone doesn't guarantee the leagueMembers row is
-      // queryable yet (LS-4350): later phases that re-enter the league as
-      // this manager will see "League not found" because `GetLeagueById`
-      // throws ForbiddenError when the membership lookup returns no row.
-      // Poll the manager's own `userTeamId` with their JWT until it
-      // resolves to a non-null team id before progressing.
-      await expect
-        .poll(
-          async () => {
-            const data = await gqlFetch<{ userTeamId: number | null }>(
-              jwt,
-              `query GetUserTeamIdForJoin($leagueId: Int!) {
-                 userTeamId(leagueId: $leagueId)
-               }`,
-              { leagueId: state.leagueId },
-            );
-            return data.userTeamId;
-          },
-          {
-            timeout: 30_000,
-            intervals: [500, 1_000, 2_000],
-            message: `Manager join for "${teamName}" did not persist a leagueMembers row in league ${state.leagueId} within 30s`,
-          },
-        )
-        .not.toBeNull();
-
-      state.teams.push(teamName);
-    }
-
-    expect(state.teams).toHaveLength(3);
   });
 
   // -----------------------------------------------------------------
@@ -192,8 +206,8 @@ test.describe
     // Set pick timer to the minimum (30 s) so that when the browser fails to
     // detect "Your pick" via WebSocket and the draft falls back to timer-expiry
     // auto-picks, each pick still completes in ~36 s (30 s timer + reload
-    // overhead) instead of the 120 s default.  Worst-case ceiling: 63 stall-picks
-    // × 36 s ≈ 38 min — inside the 40 min Phase 5 timeout (LS-4343).
+    // overhead) instead of the 120 s default (LS-4343).  Worst-case ceiling:
+    // 12 UI stall-picks × 36 s ≈ 7 min — inside the 15 min Phase 5 timeout.
     await test.step('Set pick timer to 30 s to bound timer-expiry fallback path', async () => {
       const data = await gqlFetch<{
         updateDraftSettings?: { pickTimeLimitSeconds: number };
@@ -233,7 +247,7 @@ test.describe
       // is in flight its text is "Processing..." and it is disabled — so
       // `getByRole('button', { name: /Start Draft/i })` returns zero matches
       // until the Apollo round-trip resolves. On the fresh league created in
-      // Phase 1, this query is a cold-start hit; manual-110 finished in 6.7 s
+      // the beforeAll seed, this query is a cold-start hit; manual-110 finished in 6.7 s
       // but manual-111 exhausted the 15 s timeout (LS-4324, mirrors LS-4321's
       // Lambda cold-start pattern). `toBeEnabled` gates on the same
       // `matchupsLoading=false` flag the button binds to, so it returns the
@@ -263,6 +277,73 @@ test.describe
   });
 
   // -----------------------------------------------------------------
+  // PHASE 4b — FAST-FORWARD EARLY ROUNDS VIA API (LS-11044)
+  // -----------------------------------------------------------------
+
+  test('Phase 4b: Commissioner fast-forwards early rounds via API', async ({
+    commissionerJwt,
+    managerJwt1,
+  }) => {
+    test.setTimeout(240_000);
+
+    // getLeagueDraft goes through verifyLeagueMembership — use a manager JWT
+    // (a plain league_members row), same as the Phase 5 currentPick poll.
+    const draftId = await gqlFetch<{
+      getLeagueDraft?: { id?: number | null } | null;
+    }>(
+      managerJwt1,
+      `query GetLiveDraftIdForFastForward($leagueId: Int!) {
+         getLeagueDraft(leagueId: $leagueId) { id }
+       }`,
+      { leagueId: state.leagueId },
+    ).then((d) => d.getLeagueDraft?.id ?? null);
+    expect(draftId).not.toBeNull();
+
+    // openSlotsOnly: false — the default filters to the *caller's* open slots,
+    // but these picks land on whichever seat is on the clock.
+    const pool = await gqlFetch<{
+      getAvailableDraftPlayers: Array<{ id: number }> | null;
+    }>(
+      commissionerJwt,
+      `query AvailablePlayersForFastForward($draftId: Int!) {
+         getAvailableDraftPlayers(draftId: $draftId, limit: 200, openSlotsOnly: false) { id }
+       }`,
+      { draftId },
+    ).then((d) => d.getAvailableDraftPlayers ?? []);
+    expect(pool.length).toBeGreaterThan(API_PICK_COUNT);
+
+    // The 30 s pick timer (Phase 3) can auto-pick a pool player between our
+    // calls; a rejected pick just moves on to the next pool player. Bound
+    // consecutive rejections so a genuinely broken mutation fails fast.
+    let picksMade = 0;
+    let consecutiveErrors = 0;
+    for (let i = 0; i < pool.length && picksMade < API_PICK_COUNT; i++) {
+      try {
+        await gqlFetch(
+          commissionerJwt,
+          `mutation FastForwardLiveDraftPick($draftId: Int!, $playerId: Int!) {
+             commissionerPick(draftId: $draftId, playerId: $playerId) { playerId teamId }
+           }`,
+          { draftId, playerId: pool[i].id },
+        );
+        picksMade++;
+        consecutiveErrors = 0;
+      } catch (e) {
+        consecutiveErrors++;
+        const msg = e instanceof Error ? e.message : String(e);
+        LOGGER.info(
+          `[live-draft] fast-forward pick rejected (${consecutiveErrors} in a row): ${msg}`,
+        );
+        if (consecutiveErrors >= 5) throw e;
+      }
+    }
+    LOGGER.info(
+      `[live-draft] Fast-forwarded ${picksMade} picks via commissionerPick; ${NUMBER_OF_TEAMS * MAX_ROSTER_SIZE - picksMade} left for the UI`,
+    );
+    expect(picksMade).toBe(API_PICK_COUNT);
+  });
+
+  // -----------------------------------------------------------------
   // PHASE 5 — MULTI-USER LIVE DRAFT (4 browser contexts)
   // -----------------------------------------------------------------
 
@@ -274,7 +355,8 @@ test.describe
     commissionerJwt,
     managerJwt1,
   }) => {
-    // Allow up to 40 minutes for all picks.
+    // Allow up to 15 minutes for the UI rounds (LS-11044: only the last
+    // UI_PICK_ROUNDS × 4 = 12 picks run through the browsers now).
     //
     // Pick detection uses Apollo HTTP polling (5 s interval) — not WebSocket.
     // When pages lose "Your pick" detection, the draft falls back to timer-expiry
@@ -287,8 +369,8 @@ test.describe
     //   • Nudge checks every 5 misses (~13.5 s); at most 1–2 nudge cycles needed
     //   • Stall resolution: ~30–45 s per stuck pick
     //   • UI-detected picks: ~3 s each; stall-fallback picks: ~35–45 s each
-    //   • Measured runtime for a full 76-pick draft: ~23 min (well under 40 min)
-    test.setTimeout(2_400_000);
+    //   • Worst case, every UI pick stalls: 12 × ~45 s ≈ 9 min (under 15 min)
+    test.setTimeout(900_000);
 
     const pages: { label: string; page: Page }[] = [
       { label: 'Commissioner', page: commissionerPage },

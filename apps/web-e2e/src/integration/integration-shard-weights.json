@@ -2,10 +2,10 @@
   "//": "LS-7845 — approximate worst-case wall-clock cost (seconds) per integration spec, used by shard-partition.ts to balance the nightly --shard fan-out by weight instead of by alphabetical file order. Playwright's native --shard splits the sorted file list into contiguous thirds, which dumped every heavy draft/season spec into the middle third (shard 2) and overloaded the live backend there while shards 1 & 3 stayed green. Weights are rough runtime estimates (seed: each spec's test.setTimeout ceilings and observed nightly durations) — they only need to be good enough to keep the LPT bins balanced, not exact. Add an entry whenever a new heavy spec lands; unmapped specs fall back to defaultWeightSeconds and the partition CLI warns about them on stderr.",
   "defaultWeightSeconds": 90,
   "weights": {
-    "live-draft-ui.integration.spec.ts": 1400,
     "mock-draft-simulator-ui.integration.spec.ts": 600,
     "full-season-ui.integration.spec.ts": 480,
     "matchup-detail-ui.integration.spec.ts": 480,
+    "live-draft-ui.integration.spec.ts": 400,
     "matchup-roster-editor-ui.integration.spec.ts": 300,
     "matchup-roster-recap-ui.integration.spec.ts": 300,
     "roster-management-ui.integration.spec.ts": 300,

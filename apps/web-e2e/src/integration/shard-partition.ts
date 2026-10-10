@@ -24,7 +24,7 @@
  * (`integration-shard-weights.json`) and distribute files across shards with the
  * Longest-Processing-Time (LPT) greedy bin-packing heuristic. LPT keeps the
  * per-shard total runtime within one max-weight of optimal, which in practice
- * isolates the 40-minute `live-draft-ui` on its own shard and spreads the rest
+ * keeps the heaviest draft/season specs on separate shards and spreads the rest
  * evenly. The workflow then passes each shard its explicit file list (no
  * `--shard`); shard identity for the cleanup guards travels via the
  * `INTEGRATION_SHARD_CURRENT` / `INTEGRATION_SHARD_TOTAL` env vars instead.
