@@ -2,7 +2,7 @@
 # Run Playwright Tests
 # =============================================================================
 # Automated full-suite run (post-deploy, debounced): integration suite (real
-# server, 3 shards) and full E2E suite including @slow tests (3 shards) —
+# server, 3 shards) and full E2E suite including @slow tests (4 shards) —
 # no grep filters. Fires when Deploy completes on main, at most once per
 # FULL_SUITE_MIN_INTERVAL_HOURS (repo var, default 20h) — see the `gate` job.
 # This replaces the former 03:00 UTC nightly cron (schedule-free CI policy):
@@ -238,9 +238,10 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # Compute the test matrix.
-  # Nightly: integration (INTEGRATION_SHARD_CEILING shards) + e2e (3 shards,
-  #          chromium, all tests) + shared-live (1 shard) + Mobile Chrome
-  #          (Pixel 5, LS-8457) over the full suite (3 shards, LS-10332) +
+  # Nightly: integration (INTEGRATION_SHARD_CEILING shards) + e2e
+  #          (E2E_SHARD_COUNT shards, chromium, all tests) + shared-live
+  #          (1 shard) + Mobile Chrome (Pixel 5, LS-8457) over the full suite
+  #          (E2E_SHARD_COUNT shards, LS-10332) +
   #          Mobile Safari (iPhone 12, LS-8502) over @critical (1 shard).
   # Manual:  single suite, N shards (integration clamped to the ceiling),
   #          using workflow_dispatch inputs.
@@ -293,9 +294,18 @@ jobs:
           # Do NOT raise this without re-validating via workflow_dispatch
           # (test-suite=integration) at the higher count and confirming 0
           # 429-driven failures across ≥2 runs. E2E is hermetic (no shared
-          # backend) and stays at 3 shards for speed.
+          # backend) and is sized by E2E_SHARD_COUNT below.
           # ---------------------------------------------------------------
           INTEGRATION_SHARD_CEILING=3
+
+          # Nightly hermetic e2e shard count — chromium AND Mobile Chrome
+          # (LS-11034). Run 37943431617's full suite was ~570 test-minutes
+          # per project at 4 workers/shard; even perfectly duration-balanced
+          # (see the weighted partition in run-tests), 3 shards is ~48 min of
+          # tests + ~3 min setup per shard, too close to the 60-min job
+          # timeout. 4 shards lands ~39 min. Raise again if the per-shard
+          # estimate the partitioner logs creeps toward 45 min.
+          E2E_SHARD_COUNT=4
 
           # Emit one {"suite","shard":"i/n"} JSON object per line for a suite.
           emit_shards() {
@@ -308,7 +318,7 @@ jobs:
 
           if [ "${{ github.event_name }}" = "workflow_run" ] || [ "${{ inputs.test-suite }}" = "all" ]; then
             # Automated full suite or manual "all": integration (ceiling shards) + e2e
-            # (3 shards) + shared-live (1 shard), all tests, no filters.
+            # (E2E_SHARD_COUNT shards) + shared-live (1 shard), all tests, no filters.
             #
             # shared-live (LS-8296) runs the ADR-0016 dual-mode specs
             # (src/tests/shared/) LIVE against the shared backend as its own
@@ -329,7 +339,7 @@ jobs:
             MATRIX=$(
               {
                 emit_shards integration "$INTEGRATION_SHARD_CEILING"
-                emit_shards e2e 3
+                emit_shards e2e "$E2E_SHARD_COUNT"
                 emit_shards shared-live 1
                 # Mobile-device coverage (LS-8457): the Pixel 5 (Mobile Chrome)
                 # Playwright project on the automated full-suite run (and manual
@@ -337,11 +347,11 @@ jobs:
                 # runs only the affected specs on Mobile Chrome unless the
                 # selection escalates to run-all, so this once-a-day run is the
                 # backstop that catches a mobile regression affected-selection
-                # missed. Sharded 3x like the chromium e2e entries above so the
+                # missed. Sharded like the chromium e2e entries above so the
                 # full suite fits the 60-minute per-job timeout. These entries
                 # carry an extra matrix key (project) the run-tests job reads;
                 # the chromium/integration/shared-live entries leave it empty.
-                emit_shards e2e 3 | jq -c '. + {project: "Mobile Chrome"}'
+                emit_shards e2e "$E2E_SHARD_COUNT" | jq -c '. + {project: "Mobile Chrome"}'
                 # Mobile Safari (iPhone 12 → webkit, LS-8502): now that webkit is
                 # baked into the runner AMI (LS-8500), re-add the matching
                 # matrix entry gated out by LS-8457. Stays ONE shard over the
@@ -406,7 +416,7 @@ jobs:
             echo "title=Nightly Playwright Suite" >> "$GITHUB_OUTPUT"
             {
               echo 'description<<EOF_PLAYWRIGHT_NOTIFY'
-              echo '**Suite:** Integration (real server, sharded) + E2E (3 shards) + Shared-live (1 shard)'
+              echo '**Suite:** Integration (real server, sharded) + E2E (4 shards) + Shared-live (1 shard)'
               echo '**Browser:** chromium · **Workers:** e2e 4 / integration 1 / shared-live 1 · **Retries:** e2e 2 / integration 0 / shared-live 0'
               echo '**Filters:** none — all tests including @slow'
               echo '**Mobile @critical:** Pixel 5 (LS-8457) · iPhone 12 (LS-8502)'
@@ -417,7 +427,7 @@ jobs:
             echo "title=Manual Playwright Suite (All)" >> "$GITHUB_OUTPUT"
             {
               echo 'description<<EOF_PLAYWRIGHT_NOTIFY'
-              echo '**Suite:** Integration (real server, sharded) + E2E (3 shards) + Shared-live (1 shard)'
+              echo '**Suite:** Integration (real server, sharded) + E2E (4 shards) + Shared-live (1 shard)'
               echo '**Browser:** chromium · **Workers:** e2e 4 / integration 1 / shared-live 1 · **Retries:** e2e 2 / integration 0 / shared-live 0'
               echo '**Filters:** none — all tests including @slow'
               echo '**Mobile @critical:** Pixel 5 (LS-8457) · iPhone 12 (LS-8502)'
@@ -470,6 +480,8 @@ jobs:
     if: contains(needs.prepare.outputs.matrix, '"suite":"e2e"')
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
+    outputs:
+      e2e-shard-weights: ${{ steps.shard-weights.outputs.weights }}
     env:
       # Same expression as run-tests below: automated full-suite runs and the
       # on-demand repopulate lever instrument the build via vite-plugin-istanbul
@@ -524,6 +536,36 @@ jobs:
           name: web-build
           path: dist/apps/web
           if-no-files-found: error
+
+      # Duration weights for the weighted e2e partition (LS-11034), resolved
+      # ONCE per run here and handed to every shard via the job output: if
+      # each shard fetched S3 itself, one transient miss would make shards
+      # partition from different weights and silently drop or double-run
+      # specs. Prefers the copy deploy-report refreshes after every full-suite
+      # run; falls back to the committed seed when it has expired (3-day
+      # ci-artifacts lifecycle) or is unreadable. AWS credentials come from
+      # the s3-artifact upload step above.
+      - name: "Resolve E2E Shard Weights"
+        id: shard-weights
+        shell: bash
+        env:
+          WEIGHTS_URI: s3://legacy-sports-dev-ci-artifacts/ci-artifacts/e2e-shard-weights/latest.json
+          SEED: apps/web-e2e/src/e2e-shard-weights.json
+        run: |
+          # Print the manifest as one compact line; exit non-zero unless it
+          # parses and carries a "projects" object.
+          COMPACT='const m = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+          if (!m.projects || typeof m.projects !== "object") process.exit(1);
+          process.stdout.write(JSON.stringify(m));'
+          SRC="$SEED"
+          if aws s3 cp "$WEIGHTS_URI" /tmp/e2e-shard-weights.json --quiet 2>/dev/null \
+            && node -e "$COMPACT" /tmp/e2e-shard-weights.json > /dev/null; then
+            SRC=/tmp/e2e-shard-weights.json
+            echo "Using refreshed e2e shard weights from $WEIGHTS_URI"
+          else
+            echo "::notice::No usable refreshed e2e shard weights at $WEIGHTS_URI — using the committed seed $SEED"
+          fi
+          echo "weights=$(node -e "$COMPACT" "$SRC")" >> "$GITHUB_OUTPUT"
 
   run-tests:
     name: "Playwright ${{ matrix.suite }}${{ matrix.project && format(' [{0}]', matrix.project) || '' }} (${{ matrix.shard }})"
@@ -781,6 +823,11 @@ jobs:
           # The API smoke tests always run; the UI popup test is skipped when absent.
           GOOGLE_TEST_EMAIL: ${{ matrix.suite == 'integration' && secrets.GOOGLE_TEST_EMAIL || '' }}
           GOOGLE_TEST_PASSWORD: ${{ matrix.suite == 'integration' && secrets.GOOGLE_TEST_PASSWORD || '' }}
+          # Duration weights for the weighted e2e partition (LS-11034), resolved
+          # once per run by build-web so every shard partitions identically.
+          # Empty when build-web did not produce them; the committed seed is
+          # used then (still identical on every shard).
+          E2E_SHARD_WEIGHTS_JSON: ${{ matrix.suite == 'e2e' && needs.build-web.outputs.e2e-shard-weights || '' }}
         run: |
           SUITE="${{ matrix.suite }}"
           IS_AUTOMATED="${{ github.event_name == 'workflow_run' }}"
@@ -810,21 +857,25 @@ jobs:
               # Mobile-device matrix entry (LS-8457): the explicit project
               # (Mobile Chrome / Mobile Safari) overrides the nightly-like
               # chromium default.
-              PLAYWRIGHT_ARGS+=( "--project=${{ matrix.project }}" )
+              E2E_PROJECT="${{ matrix.project }}"
             elif [ "$IS_NIGHTLY_LIKE" = "true" ]; then
-              PLAYWRIGHT_ARGS+=( "--project=chromium" )
+              E2E_PROJECT="chromium"
             else
-              PLAYWRIGHT_ARGS+=( "--project=${{ inputs.browser }}" )
+              E2E_PROJECT="${{ inputs.browser }}"
             fi
+            PLAYWRIGHT_ARGS+=( "--project=$E2E_PROJECT" )
           fi
 
           # Grep patterns — nightly-like runs all tests (no filters, @slow included)
+          HAS_GREP="false"
           if [ "$IS_NIGHTLY_LIKE" != "true" ]; then
             if [ "${{ inputs.test-grep }}" != "(all)" ]; then
               PLAYWRIGHT_ARGS+=( "--grep=${{ inputs.test-grep }}" )
+              HAS_GREP="true"
             fi
             if [ "${{ inputs.test-grep-invert }}" != "(none)" ]; then
               PLAYWRIGHT_ARGS+=( "--grep-invert=${{ inputs.test-grep-invert }}" )
+              HAS_GREP="true"
             fi
           fi
 
@@ -833,6 +884,7 @@ jobs:
           # Chrome runs the full suite (LS-10332).
           if [ -n "${{ matrix.grep }}" ]; then
             PLAYWRIGHT_ARGS+=( "--grep=${{ matrix.grep }}" )
+            HAS_GREP="true"
           fi
 
           # Specific test file (manual dispatch only)
@@ -842,8 +894,11 @@ jobs:
           fi
 
           # Sharding.
-          # E2E: native Playwright --shard. Count-based contiguous splitting is
-          # fine for the hermetic suite (no shared live backend to contend on).
+          # E2E: weighted-balance partition by measured duration (LS-11034),
+          # falling back to native Playwright --shard. Native --shard splits
+          # by test COUNT, but per-test cost varies >10× across specs: the
+          # nightly chromium shards ran 47 / 59 / 60+ min and 3/3 hit the job
+          # timeout (run 37943431617). See the e2e block below.
           # Integration: weighted-balance partition (LS-7845). Playwright's
           # count-based --shard splits the alphabetically-sorted spec files into
           # contiguous thirds, which dumped every heavy draft/season spec into
@@ -853,8 +908,10 @@ jobs:
           # explicit file list; shard identity for the cleanup guards in
           # global-setup/teardown travels via INTEGRATION_SHARD_CURRENT/TOTAL
           # instead of --shard.
-          INTEGRATION_SPEC_ARGS=()
+          SHARD_SPEC_ARGS=()
+          WEIGHTED_SHARD="false"
           if [ "$SUITE" = "integration" ]; then
+            WEIGHTED_SHARD="true"
             SHARD_SPEC="${{ matrix.shard }}"
             SHARD_INDEX="${SHARD_SPEC%%/*}"
             SHARD_TOTAL="${SHARD_SPEC##*/}"
@@ -869,10 +926,10 @@ jobs:
               # non-integration TEST_FILE branch below does.
               read -ra TEST_FILE_ARGS <<< "$TEST_FILE"
               for spec_file in "${TEST_FILE_ARGS[@]}"; do
-                INTEGRATION_SPEC_ARGS+=( "apps/web-e2e/src/integration/tests/$spec_file" )
+                SHARD_SPEC_ARGS+=( "apps/web-e2e/src/integration/tests/$spec_file" )
               done
-              echo "Named integration spec(s) (bypassing shard-partition.ts) → ${#INTEGRATION_SPEC_ARGS[@]} spec(s):"
-              printf '  - %s\n' "${INTEGRATION_SPEC_ARGS[@]}"
+              echo "Named integration spec(s) (bypassing shard-partition.ts) → ${#SHARD_SPEC_ARGS[@]} spec(s):"
+              printf '  - %s\n' "${SHARD_SPEC_ARGS[@]}"
             else
               if ! pnpm exec tsx apps/web-e2e/src/integration/shard-partition.ts \
                 --dir apps/web-e2e/src/integration/tests \
@@ -882,9 +939,9 @@ jobs:
                 echo "::error::Failed to compute weighted integration shard $SHARD_INDEX/$SHARD_TOTAL"
                 exit 1
               fi
-              mapfile -t INTEGRATION_SPEC_ARGS < /tmp/integration-shard-specs.txt
-              echo "Balanced integration shard $SHARD_INDEX/$SHARD_TOTAL → ${#INTEGRATION_SPEC_ARGS[@]} spec(s):"
-              printf '  - %s\n' "${INTEGRATION_SPEC_ARGS[@]}"
+              mapfile -t SHARD_SPEC_ARGS < /tmp/integration-shard-specs.txt
+              echo "Balanced integration shard $SHARD_INDEX/$SHARD_TOTAL → ${#SHARD_SPEC_ARGS[@]} spec(s):"
+              printf '  - %s\n' "${SHARD_SPEC_ARGS[@]}"
             fi
 
             # Per-shard staggered start (LS-7867). The integration shards may
@@ -903,8 +960,47 @@ jobs:
               sleep "$STAGGER"
             fi
           else
-            # 1/1 is valid and runs all tests in one shard.
-            PLAYWRIGHT_ARGS+=( "--shard=${{ matrix.shard }}" )
+            SHARD_SPEC="${{ matrix.shard }}"
+            SHARD_INDEX="${SHARD_SPEC%%/*}"
+            SHARD_TOTAL="${SHARD_SPEC##*/}"
+
+            # Weighted e2e partition (LS-11034): only for a multi-shard run of
+            # the whole suite on a project that has duration weights (the
+            # nightly chromium + Mobile Chrome entries, or a matching manual
+            # dispatch). A grep or named-file run selects a subset the per-spec
+            # weights don't describe, so it keeps native --shard. Candidate
+            # specs come from `playwright test --list` for the same project
+            # so testIgnore (Mobile Chrome's desktop-only specs) and nested
+            # dirs are honoured; each shard then runs an explicit file list.
+            if [ "$SHARD_TOTAL" -gt 1 ] && [ -z "$TEST_FILE" ] && [ "$HAS_GREP" != "true" ]; then
+              WEIGHTS_FILE="apps/web-e2e/src/e2e-shard-weights.json"
+              if [ -n "$E2E_SHARD_WEIGHTS_JSON" ]; then
+                printf '%s' "$E2E_SHARD_WEIGHTS_JSON" > /tmp/e2e-shard-weights.json
+                WEIGHTS_FILE=/tmp/e2e-shard-weights.json
+              fi
+              if pnpm exec playwright test "--config=$CONFIG" "--project=$E2E_PROJECT" --list --reporter=json > /tmp/e2e-list.json \
+                && pnpm exec tsx apps/web-e2e/src/integration/shard-partition.ts \
+                  --list-json /tmp/e2e-list.json \
+                  --dir apps/web-e2e/src/tests \
+                  --weights "$WEIGHTS_FILE" \
+                  --project "$E2E_PROJECT" \
+                  --shards "$SHARD_TOTAL" --index "$SHARD_INDEX" \
+                  > /tmp/e2e-shard-specs.txt; then
+                mapfile -t SHARD_SPEC_ARGS < /tmp/e2e-shard-specs.txt
+                WEIGHTED_SHARD="true"
+                echo "Balanced e2e [$E2E_PROJECT] shard $SHARD_INDEX/$SHARD_TOTAL → ${#SHARD_SPEC_ARGS[@]} spec(s):"
+                printf '  - %s\n' "${SHARD_SPEC_ARGS[@]}"
+              else
+                # Deterministic inputs mean a failure here (e.g. no weights for
+                # this project) hits every shard alike, so they all fall back
+                # together and coverage holds.
+                echo "::warning::Weighted e2e partition unavailable for [$E2E_PROJECT] — falling back to native --shard."
+              fi
+            fi
+            if [ "$WEIGHTED_SHARD" != "true" ]; then
+              # 1/1 is valid and runs all tests in one shard.
+              PLAYWRIGHT_ARGS+=( "--shard=${{ matrix.shard }}" )
+            fi
           fi
 
           # Workers and retries
@@ -947,13 +1043,13 @@ jobs:
           # "file1.spec.ts file2.spec.ts" as a single quoted string causes
           # Playwright to treat the entire value as one literal filename,
           # find no match, and run 0 tests while still exiting 0 (ok: true).
-          if [ "$SUITE" = "integration" ]; then
-            if [ "${#INTEGRATION_SPEC_ARGS[@]}" -eq 0 ]; then
-              echo "No specs assigned to integration shard ${INTEGRATION_SHARD_CURRENT}/${INTEGRATION_SHARD_TOTAL} — nothing to run."
+          if [ "$WEIGHTED_SHARD" = "true" ]; then
+            if [ "${#SHARD_SPEC_ARGS[@]}" -eq 0 ]; then
+              echo "No specs assigned to $SUITE shard ${SHARD_INDEX}/${SHARD_TOTAL} — nothing to run."
               exit 0
             fi
-            echo "Running: pnpm exec playwright test ${PLAYWRIGHT_ARGS[*]} -- ${INTEGRATION_SPEC_ARGS[*]}"
-            pnpm exec playwright test "${PLAYWRIGHT_ARGS[@]}" -- "${INTEGRATION_SPEC_ARGS[@]}" 2>&1 | tee "$LOG_FILE"
+            echo "Running: pnpm exec playwright test ${PLAYWRIGHT_ARGS[*]} -- ${SHARD_SPEC_ARGS[*]}"
+            pnpm exec playwright test "${PLAYWRIGHT_ARGS[@]}" -- "${SHARD_SPEC_ARGS[@]}" 2>&1 | tee "$LOG_FILE"
             exit "${PIPESTATUS[0]}"
           elif [ -n "$TEST_FILE" ]; then
             read -ra TEST_FILE_ARGS <<< "$TEST_FILE"
@@ -1061,9 +1157,11 @@ jobs:
           sparse-checkout: |
             .github/actions/s3-artifact
             .github/scripts/e2e-ledger
+            .github/scripts/e2e-shard-weights.mjs
             scripts/rewrite-pw-attachment-paths.py
             apps/web-e2e/src/reporters/agent-md-reporter.ts
             apps/web-e2e/src/e2e-surface-map.json
+            apps/web-e2e/src/e2e-shard-weights.json
           sparse-checkout-cone-mode: false
           fetch-depth: 1
 
@@ -1175,6 +1273,44 @@ jobs:
           else
             echo "No E2E ledger records staged — skipping S3 sync"
           fi
+
+      # E2E shard weights (LS-11034): fold this run's per-spec durations into
+      # the weights build-web hands the weighted e2e partition, so shard
+      # balance tracks the suite without a hand-maintained table. Only a
+      # full-suite run (automated, or manual "all") measures the whole suite
+      # with no grep; a cancelled shard just leaves its specs' previous
+      # weights in place (see e2e-shard-weights.mjs). Starts from the S3 copy,
+      # or from the committed seed once that has expired. Fail-open: a miss
+      # here only means the next run partitions from older weights.
+      - name: "Configure AWS Credentials (e2e shard weights)"
+        id: weights-aws
+        if: ${{ !cancelled() && steps.merge.outputs.has-report == 'true' && (github.event_name == 'workflow_run' || inputs['test-suite'] == 'all') }}
+        continue-on-error: true
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6
+        with:
+          role-to-assume: "arn:aws:iam::176661590736:role/legacy-sports-dev-ci-artifacts"
+          aws-region: us-east-1
+
+      - name: "Refresh E2E Shard Weights"
+        if: ${{ !cancelled() && steps.weights-aws.outcome == 'success' }}
+        continue-on-error: true
+        env:
+          WEIGHTS_URI: s3://legacy-sports-dev-ci-artifacts/ci-artifacts/e2e-shard-weights/latest.json
+          SEED: apps/web-e2e/src/e2e-shard-weights.json
+        run: |
+          PREVIOUS="$SEED"
+          if aws s3 cp "$WEIGHTS_URI" /tmp/e2e-shard-weights-prev.json --quiet 2>/dev/null; then
+            PREVIOUS=/tmp/e2e-shard-weights-prev.json
+          else
+            echo "::notice::No refreshed e2e shard weights at $WEIGHTS_URI — refreshing from the committed seed"
+          fi
+          node .github/scripts/e2e-shard-weights.mjs \
+            --report test-results.json \
+            --previous "$PREVIOUS" \
+            --out e2e-shard-weights.json \
+            --run-id "${{ github.run_id }}"
+          aws s3 cp e2e-shard-weights.json "$WEIGHTS_URI" --quiet \
+            || echo "::warning::E2E shard weights S3 write failed — next run partitions from older weights (fail-open)"
 
       - name: "Rewrite Attachment Paths in test-results.json"
         if: steps.merge.outputs.has-report == 'true'
@@ -1859,7 +1995,7 @@ jobs:
 
           # Build test run summary
           if [ "${{ github.event_name }}" = "workflow_run" ] || [ "${{ inputs['test-suite'] }}" = "all" ]; then
-            SUMMARY_LINE1="**Suite:** Integration (real server, sharded) + E2E (3 shards) + Shared-live (1 shard)"
+            SUMMARY_LINE1="**Suite:** Integration (real server, sharded) + E2E (4 shards) + Shared-live (1 shard)"
             SUMMARY_LINE2="**Browser:** chromium · **Workers:** e2e 4 / integration 1 / shared-live 1 · **Retries:** e2e 2 / integration 0 / shared-live 0"
             SUMMARY_LINE3="**Filters:** none — all tests including @slow · **Mobile @critical:** Pixel 5 (LS-8457) · iPhone 12 (LS-8502)"
           else

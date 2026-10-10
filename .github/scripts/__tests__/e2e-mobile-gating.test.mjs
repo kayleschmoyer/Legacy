@@ -152,8 +152,24 @@ describe('run-playwright-tests.yml nightly mobile matrix (LS-10332)', () => {
       `Mobile Chrome must not carry a grep filter; got: ${chrome[0].trim()}`,
     );
     assert.ok(
-      chrome[0].includes('emit_shards e2e 3'),
+      chrome[0].includes('emit_shards e2e "$E2E_SHARD_COUNT"'),
       'the full Mobile Chrome suite is sharded like the chromium e2e entries',
+    );
+  });
+
+  it('chromium e2e and Mobile Chrome share one shard count (LS-11034)', () => {
+    assert.match(script, /^\s*E2E_SHARD_COUNT=\d+\s*$/m);
+    const chromium = script
+      .split('\n')
+      .filter(
+        (line) =>
+          !line.trim().startsWith('#') &&
+          line.includes('emit_shards e2e') &&
+          !line.includes('Mobile '),
+      );
+    assert.deepEqual(
+      chromium.map((line) => line.trim()),
+      ['emit_shards e2e "$E2E_SHARD_COUNT"'],
     );
   });
 

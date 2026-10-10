@@ -26,7 +26,7 @@ merges once PR checks are green, and no workflow triggers on `merge_group`.
 | PR — `e2e-mobile` in `ci-pipeline.yml` | run-all (`e2e-affected-run-all == 'true'`)                 | Full hermetic suite, same 3-shard matrix as chromium, 45-minute budget       |
 | PR — `e2e-mobile` in `ci-pipeline.yml` | narrow, affected specs mapped (`e2e-affected-specs != ''`) | One shard, 20-minute budget: the `@critical` safety net + the affected specs |
 | PR — `e2e-mobile` in `ci-pipeline.yml` | narrow, no affected specs                                  | Skipped (`CI Gate` and `e2e-affected` treat `skipped` as a pass)             |
-| Nightly — `run-playwright-tests.yml`   | automated full-suite run (and manual `all`)                | Full suite, no grep filter, 3 shards                                         |
+| Nightly — `run-playwright-tests.yml`   | automated full-suite run (and manual `all`)                | Full suite, no grep filter, 4 duration-balanced shards (LS-11034)            |
 
 Mobile Safari is unchanged: nightly-only, one shard over `@critical` (locked decision — its flake
 history, LS-9328/LS-9409, keeps it off the merge-blocking gate).

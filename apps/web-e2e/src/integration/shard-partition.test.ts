@@ -8,10 +8,16 @@ import {
   partitionSpecs,
   shardSpecs,
   type ShardWeights,
+  specsFromListReport,
 } from './shard-partition';
 
 const WEIGHTS_PATH = path.resolve(__dirname, 'integration-shard-weights.json');
 const TESTS_DIR = path.resolve(__dirname, 'tests');
+const E2E_WEIGHTS_PATH = path.resolve(
+  __dirname,
+  '..',
+  'e2e-shard-weights.json',
+);
 
 const sampleWeights: ShardWeights = {
   defaultWeightSeconds: 90,
@@ -192,4 +198,47 @@ void test('real manifest balances the live suite across 3 shards', () => {
 void test('weights manifest file exists at the expected path', () => {
   assert.ok(fs.existsSync(WEIGHTS_PATH));
   assert.ok(fs.existsSync(TESTS_DIR));
+});
+
+// --- Hermetic e2e suite: per-project manifest + --list input (LS-11034) ------
+
+void test('loadWeights reads one project from a multi-project manifest', () => {
+  const weights = loadWeights(E2E_WEIGHTS_PATH, 'Mobile Chrome');
+  assert.ok(weights.defaultWeightSeconds > 0);
+  assert.ok(Object.keys(weights.weights).length > 0);
+});
+
+void test('loadWeights rejects a project the manifest has no weights for', () => {
+  assert.throws(
+    () => loadWeights(E2E_WEIGHTS_PATH, 'firefox'),
+    /project "firefox"/,
+  );
+});
+
+void test('specsFromListReport returns unique, sorted spec files', () => {
+  const specs = specsFromListReport({
+    suites: [
+      { file: 'z.spec.ts' },
+      { file: 'shared/b.dual.spec.ts' },
+      { file: 'a.spec.ts' },
+      { file: 'a.spec.ts' },
+      {},
+    ],
+  });
+  assert.deepEqual(specs, ['a.spec.ts', 'shared/b.dual.spec.ts', 'z.spec.ts']);
+});
+
+void test('the e2e seed balances both nightly projects across 4 shards', () => {
+  for (const project of ['chromium', 'Mobile Chrome']) {
+    const weights = loadWeights(E2E_WEIGHTS_PATH, project);
+    const specs = Object.keys(weights.weights);
+    const { totals } = partitionSpecs({ specs, weights, shards: 4 });
+    const max = Math.max(...totals);
+    const min = Math.min(...totals);
+    // Ticket target: shards within ~15% of each other.
+    assert.ok(
+      (max - min) / max < 0.15,
+      `${project} shard totals too uneven: ${totals.join(', ')}`,
+    );
+  }
 });

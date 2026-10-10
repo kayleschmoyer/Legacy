@@ -39,6 +39,24 @@
  *
  * It prints the spec paths assigned to shard 2 (one per line, `<dir>/<file>`),
  * ready to splat after `--` into `playwright test`.
+ *
+ * Hermetic e2e suite (LS-11034)
+ * -----------------------------
+ * The same LPT partition balances the nightly chromium and Mobile Chrome e2e
+ * shards, which native count-based `--shard` left at 47 / 59 / 60+ min (3/3
+ * hit the 60-min timeout). Two flags adapt it:
+ *
+ *   --project <name>   read `projects[<name>]` from a multi-project manifest
+ *                      (`apps/web-e2e/src/e2e-shard-weights.json`, refreshed
+ *                      from nightly durations by
+ *                      `.github/scripts/e2e-shard-weights.mjs`).
+ *   --list-json <file> take the candidate specs from
+ *                      `playwright test --list --reporter=json --project=<name>`
+ *                      instead of listing `--dir`. That honours the project's
+ *                      `testIgnore` (Mobile Chrome skips the desktop-grid
+ *                      specs) and nested dirs (`shared/*.dual.spec.ts`), so a
+ *                      spec that never runs on the project cannot skew a shard.
+ *                      `--dir` is then only the output path prefix.
  */
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -65,14 +83,25 @@ const FALLBACK_DEFAULT_WEIGHT = 90;
  * Throws if the file is missing or malformed — a silent fallback to all-default
  * weights would re-introduce the imbalance this module exists to prevent.
  */
-export function loadWeights(weightsPath: string): ShardWeights {
+export function loadWeights(
+  weightsPath: string,
+  project?: string,
+): ShardWeights {
   const raw = fs.readFileSync(weightsPath, 'utf-8');
-  const parsed = JSON.parse(raw) as Partial<ShardWeights> & {
-    weights?: Record<string, number>;
+  const manifest = JSON.parse(raw) as Partial<ShardWeights> & {
+    projects?: Record<string, Partial<ShardWeights>>;
   };
-  if (!parsed.weights || typeof parsed.weights !== 'object') {
+  // Multi-project manifest (LS-11034): one weights table per Playwright
+  // project, since the same spec costs differently per viewport/browser.
+  const parsed =
+    project === undefined ? manifest : manifest.projects?.[project];
+  const label =
+    project === undefined
+      ? weightsPath
+      : `${weightsPath} (project "${project}")`;
+  if (!parsed?.weights || typeof parsed.weights !== 'object') {
     throw new Error(
-      `Shard weights manifest ${weightsPath} is missing a "weights" object.`,
+      `Shard weights manifest ${label} is missing a "weights" object.`,
     );
   }
   const defaultWeightSeconds =
@@ -92,6 +121,21 @@ export function listSpecFiles(testsDir: string): string[] {
     .readdirSync(testsDir)
     .filter((f) => f.endsWith('.spec.ts'))
     .sort();
+}
+
+/**
+ * Extract the spec files from a `playwright test --list --reporter=json`
+ * report. Top-level suites are files, keyed relative to the project's testDir
+ * — the same keys the e2e weights manifest uses. Sorted and de-duplicated.
+ */
+export function specsFromListReport(report: {
+  suites?: Array<{ file?: string }>;
+}): string[] {
+  const files = new Set<string>();
+  for (const suite of report.suites ?? []) {
+    if (suite.file) files.add(suite.file.replace(/\\/g, '/'));
+  }
+  return [...files].sort();
 }
 
 /**
@@ -164,6 +208,8 @@ interface CliArgs {
   weights: string;
   shards: number;
   index: number;
+  project?: string;
+  listJson?: string;
 }
 
 function parseCliArgs(argv: string[]): CliArgs {
@@ -190,13 +236,24 @@ function parseCliArgs(argv: string[]): CliArgs {
     weights: out.weights,
     shards: Number(out.shards),
     index: Number(out.index),
+    project: out.project,
+    listJson: out['list-json'],
   };
 }
 
 function runCli(argv: string[]): void {
   const args = parseCliArgs(argv);
-  const weights = loadWeights(args.weights);
-  const specs = listSpecFiles(args.dir);
+  const weights = loadWeights(args.weights, args.project);
+  const specs = args.listJson
+    ? specsFromListReport(
+        JSON.parse(fs.readFileSync(args.listJson, 'utf-8')) as {
+          suites?: Array<{ file?: string }>;
+        },
+      )
+    : listSpecFiles(args.dir);
+  if (specs.length === 0) {
+    throw new Error('No spec files to partition.');
+  }
 
   // Surface specs missing an explicit weight so authors know to update the
   // manifest — silent defaulting is how imbalance creeps back in.
@@ -215,6 +272,14 @@ function runCli(argv: string[]): void {
     shards: args.shards,
     index: args.index,
   });
+
+  // Every shard logs the whole partition, so an imbalance (or a shard whose
+  // runtime drifted from its estimate) is diagnosable from any one job log.
+  const { totals } = partitionSpecs({ specs, weights, shards: args.shards });
+  process.stderr.write(
+    `[shard-partition] ${specs.length} spec(s) → estimated weight per shard (s): ` +
+      `${totals.map((t, i) => `${i + 1}=${Math.round(t)}`).join(', ')}\n`,
+  );
 
   const dir = args.dir.replace(/[/\\]+$/, '');
   for (const spec of selected) {
