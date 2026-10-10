@@ -72,32 +72,63 @@ function toRepoRelative(filePath: string): string | undefined {
 }
 
 /**
- * Return the set of repo-relative source files in `coverage` that have at least
- * one executed statement — the files a test actually exercised (not merely
+ * Return the raw istanbul paths of every file in `coverage` with at least one
+ * executed statement — the files a test actually exercised (not merely
  * loaded). Istanbul resets counts on a full document load, so for the SPA this
  * reflects everything executed since the last hard navigation; a `page.reload()`
  * mid-test drops coverage accumulated before it (acceptable: over-selection is
  * safe for the surface map, under-selection is the only real risk).
+ *
+ * Runs INSIDE the page (LS-11041): {@link readExecutedPaths} serialises this
+ * function's source into `page.evaluate`, so only the short path list crosses
+ * CDP instead of the whole `window.__coverage__` object (statementMap / fnMap /
+ * branchMap for every instrumented file — ~10s per test of fixture teardown).
+ * It must therefore stay self-contained: no imports, no closure references, and
+ * only syntax the browser runs untranspiled. Exported for unit tests.
  */
-function executedFiles(coverage: IstanbulCoverage | undefined): Set<string> {
+export function executedCoveragePaths(
+  coverage: IstanbulCoverage | undefined | null,
+): string[] {
+  const paths: string[] = [];
+  if (!coverage || typeof coverage !== 'object') return paths;
+  for (const key of Object.keys(coverage)) {
+    const entry = coverage[key];
+    if (!entry || !entry.s || !entry.path) continue;
+    const counts = entry.s;
+    for (const id of Object.keys(counts)) {
+      if (counts[id] > 0) {
+        paths.push(entry.path);
+        break;
+      }
+    }
+  }
+  return paths;
+}
+
+/** Relativise in-page executed paths into a set of repo-relative source files. */
+function toRepoRelativeSet(paths: string[] | undefined): Set<string> {
   const files = new Set<string>();
-  if (!coverage) return files;
-  for (const entry of Object.values(coverage)) {
-    const counts = entry.s ? Object.values(entry.s) : [];
-    if (!counts.some((c) => c > 0)) continue;
-    const rel = entry.path ? toRepoRelative(entry.path) : undefined;
+  for (const p of paths ?? []) {
+    const rel = typeof p === 'string' ? toRepoRelative(p) : undefined;
     if (rel) files.add(rel);
   }
   return files;
 }
 
-/** Read `window.__coverage__` from a page; best-effort, undefined on any error. */
-async function readCoverage(page: Page): Promise<IstanbulCoverage | undefined> {
+/**
+ * Page expression evaluating {@link executedCoveragePaths} against
+ * `window.__coverage__` in the browser. Built once from the function source;
+ * exported so unit tests can prove the serialised source is self-contained.
+ */
+export const EXECUTED_PATHS_EXPRESSION = `(${executedCoveragePaths.toString()})(window.__coverage__)`;
+
+/**
+ * Read the executed-file paths from a page's `window.__coverage__`, filtered
+ * in-page; best-effort, undefined on any error.
+ */
+async function readExecutedPaths(page: Page): Promise<string[] | undefined> {
   try {
-    return await page.evaluate(
-      () =>
-        (window as unknown as { __coverage__?: IstanbulCoverage }).__coverage__,
-    );
+    return await page.evaluate<string[]>(EXECUTED_PATHS_EXPRESSION);
   } catch {
     // Page closed / navigated / crashed — coverage is unavailable, not fatal.
     return undefined;
@@ -141,7 +172,7 @@ export async function snapshotCoverageBaseline(
   page: Page,
 ): Promise<Set<string>> {
   if (!COLLECT_COVERAGE) return new Set();
-  return executedFiles(await readCoverage(page));
+  return toRepoRelativeSet(await readExecutedPaths(page));
 }
 
 /**
@@ -155,7 +186,7 @@ export async function attributePageCoverage(
   baseline: Set<string>,
 ): Promise<void> {
   if (!COLLECT_COVERAGE) return;
-  const after = executedFiles(await readCoverage(page));
+  const after = toRepoRelativeSet(await readExecutedPaths(page));
   const files = [...after].filter((f) => !baseline.has(f));
   if (files.length === 0) return;
   appendFragmentEntry(testInfo, files);
