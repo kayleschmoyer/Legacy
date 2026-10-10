@@ -10,19 +10,25 @@ import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
 
 test.describe('Homepage @smoke', () => {
   test.beforeEach(async ({ page }) => {
+    // Onboarding tutorial auto-opens for users with no leagues and would
+    // intercept pointer events on the page buttons (LS-3854). Mark it complete
+    // for the seeded user before the app boots so it never opens, rather than
+    // probing for the dialog with a timed waitFor (LS-11045). The per-user key
+    // is HomePage's `ls_onboarding_complete_<uid>` gate; the api-isolation
+    // fixture's init script has already seeded `ls_user_profile` by now.
+    await page.addInitScript(() => {
+      const profile = JSON.parse(
+        window.localStorage.getItem('ls_user_profile') ?? 'null',
+      ) as { id?: number } | null;
+      if (profile?.id != null) {
+        window.localStorage.setItem(
+          `ls_onboarding_complete_${profile.id}`,
+          JSON.stringify(true),
+        );
+      }
+    });
     await page.goto('/');
     await page.waitForLoadState('load');
-    // Onboarding tutorial auto-opens for users with no leagues; dismiss it so
-    // it doesn't intercept pointer events on the page buttons (LS-3854).
-    // Use waitFor (not isVisible) — isVisible({ timeout }) is a no-op in Playwright v1.40+.
-    const skipTutorial = page.getByLabel('Skip tutorial');
-    try {
-      await skipTutorial.waitFor({ state: 'visible', timeout: 2000 });
-      await skipTutorial.click();
-      await skipTutorial.waitFor({ state: 'hidden' });
-    } catch {
-      // Tutorial not present — proceed
-    }
   });
 
   test('loads and has a meaningful page title', async ({ page }) => {

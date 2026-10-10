@@ -1181,11 +1181,12 @@ nearExpiryTest.describe('Proactive Token Refresh @critical', () => {
         });
       });
 
+      // The token is inside the proactive-refresh window, so the refresh
+      // fires almost immediately; wait for its failed response directly.
+      const failedRefresh = page.waitForResponse('**/refresh-jwt');
       await page.goto('/about');
       await page.waitForLoadState('load');
-
-      // Give the (near-instant) proactive timer time to fire and fail.
-      await page.waitForTimeout(2000);
+      await failedRefresh;
 
       // A transient (non-401/403) refresh failure must not force a logout —
       // useAuth.tsx only clears tokens on AuthSessionExpiredError (401/403);

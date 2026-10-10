@@ -18,6 +18,7 @@ import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth-enhanced';
 import {
   extractOperationName,
+  extractRequestOperationName,
   unmockedGraphQLFallback,
 } from '../fixtures/shared-mocks';
 import { FIXED_NOW_ISO } from '../mocks/time';
@@ -294,6 +295,28 @@ interface MockConfig {
   teamMembers?: typeof TEAM_1_MEMBERS;
   /** Additional handler, keyed on the lowercased GraphQL operation name; return true if handled. */
   extra?: (operation: string) => { handled: true; body: unknown } | undefined;
+}
+
+/**
+ * Resolves with the next GraphQL request for `operation` (lowercase) whose
+ * variables satisfy `matches` — a web-first stand-in for fixed sleeps after
+ * an interaction that re-queries (LS-11045).
+ */
+function waitForGraphQLRequest(
+  page: Page,
+  operation: string,
+  matches: (variables: Record<string, unknown>) => boolean = () => true,
+) {
+  return page.waitForRequest((request) => {
+    if (!isGraphQLEndpoint(new URL(request.url()))) return false;
+    if (extractRequestOperationName(request).toLowerCase() !== operation) {
+      return false;
+    }
+    const body = request.postDataJSON() as {
+      variables?: Record<string, unknown>;
+    } | null;
+    return matches(body?.variables ?? {});
+  });
 }
 
 async function installGraphQLMocks(page: Page, cfg: MockConfig) {
@@ -941,13 +964,23 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
     await test.step('Search for a player', async () => {
       const searchInput = page.getByPlaceholder(/search players/i);
       await expect(searchInput).toBeVisible();
+      const searchQuery = waitForGraphQLRequest(
+        page,
+        'getplayerswithstats',
+        (variables) => variables.search === 'Mays',
+      );
       await searchInput.fill('Mays');
-      await page.waitForTimeout(500); // debounce
+      await searchQuery;
     });
 
     await test.step('Switch to Pitchers view', async () => {
+      const pitchersQuery = waitForGraphQLRequest(
+        page,
+        'getplayerswithstats',
+        (variables) => variables.position === 'P',
+      );
       await page.getByRole('button', { name: 'Pitchers' }).first().click();
-      await page.waitForTimeout(500);
+      await pitchersQuery;
     });
   });
 
@@ -1266,7 +1299,6 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
     await test.step('Switch to Chat sub-tab', async () => {
       // The "Chat" sub-tab button sits inside the overview panel header
       await page.getByText('Chat').first().click();
-      await page.waitForTimeout(500);
     });
 
     await test.step('Chat textarea is visible', async () => {
@@ -1281,8 +1313,9 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
       });
       await chatInput.fill('Hello league!');
       // Enter sends the message (Shift+Enter inserts newline)
+      const sendMessage = waitForGraphQLRequest(page, 'sendleaguechatmessage');
       await chatInput.press('Enter');
-      await page.waitForTimeout(500);
+      await sendMessage;
     });
   });
 });

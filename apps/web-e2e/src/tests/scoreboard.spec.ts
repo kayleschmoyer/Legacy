@@ -287,11 +287,8 @@ test.describe('Scoreboard — date change triggers new query @regression', () =>
     await picker.fill('2026-04-02');
     await picker.dispatchEvent('change');
 
-    // Wait for the component to re-query.
-    await page.waitForTimeout(300);
-
-    // The second request should carry the new date.
-    expect(capturedDates).toContain('2026-04-02');
+    // The re-query should carry the new date.
+    await expect.poll(() => capturedDates).toContain('2026-04-02');
   });
 });
 
@@ -335,21 +332,18 @@ test.describe('Scoreboard — DateNav arrow buttons @regression', () => {
       });
     });
 
-    await page.goto('/scoreboard');
+    // Start from a known date via ?date= (LS-10648) rather than filling the
+    // picker: a fill raced the page's initial date sync and could revert to
+    // today before the click (LS-11045).
+    await page.goto('/scoreboard?date=2026-04-10');
     await page.waitForLoadState('load');
     await expect(page.getByTestId('scoreboard-heading')).toBeVisible();
-
-    // Set a known starting date via the input first.
     const picker = page.getByTestId('scoreboard-date-picker');
-    await picker.fill('2026-04-10');
-    await picker.dispatchEvent('change');
-    await page.waitForTimeout(300);
+    await expect(picker).toHaveValue('2026-04-10');
 
     // Click Previous day — the outgoing query must carry the preceding date.
     await page.getByRole('button', { name: 'Previous day' }).click();
-    await page.waitForTimeout(300);
-
-    expect(capturedDates).toContain('2026-04-09');
+    await expect.poll(() => capturedDates).toContain('2026-04-09');
   });
 
   test('Next day button is enabled on today so upcoming slates are reachable (LS-10456)', async ({
@@ -405,19 +399,15 @@ test.describe('Scoreboard — DateNav arrow buttons @regression', () => {
       });
     });
 
-    await page.goto('/scoreboard');
+    // Known starting date via ?date= — see the Previous day test (LS-11045).
+    await page.goto('/scoreboard?date=2026-04-10');
     await page.waitForLoadState('load');
     await expect(page.getByTestId('scoreboard-heading')).toBeVisible();
-
     const picker = page.getByTestId('scoreboard-date-picker');
-    await picker.fill('2026-04-10');
-    await picker.dispatchEvent('change');
-    await page.waitForTimeout(300);
+    await expect(picker).toHaveValue('2026-04-10');
 
     await page.getByRole('button', { name: 'Next day' }).click();
-    await page.waitForTimeout(300);
-
-    expect(capturedDates).toContain('2026-04-11');
+    await expect.poll(() => capturedDates).toContain('2026-04-11');
   });
 
   test('a date past the schedule window is clamped with a visible notice (LS-10456)', async ({

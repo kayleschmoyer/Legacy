@@ -326,7 +326,10 @@ adminTest.describe(
         });
 
         await page.getByRole('button', { name: /^decode$/i }).click();
-        // Wait a tick to allow any async fetch that may have been triggered.
+        await expect(page.getByText('Token valid')).toBeVisible();
+        // Justified negative window (LS-11045): "no request was sent" has no
+        // web-first signal to wait on, so give any fetch the decode might have
+        // kicked off a short beat to surface after the result has rendered.
         await page.waitForTimeout(300);
 
         expect(nonStaticUrls).toHaveLength(0);

@@ -9,12 +9,28 @@
  *  - Page content is accessible after loading completes
  */
 
+import type { Locator } from '@playwright/test';
 import { expect, test } from '../fixtures/auth-enhanced';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Wait up to `timeoutMs` for `locator` to attach, resolving either way: these
+ * checks accept pages that never render the optional loading UI. Replaces a
+ * fixed-interval sleep loop with an event-driven wait (LS-11045).
+ */
+async function waitForOptionalAttach(
+  locator: Locator,
+  timeoutMs: number,
+): Promise<void> {
+  await locator
+    .first()
+    .waitFor({ state: 'attached', timeout: timeoutMs })
+    .catch(() => undefined);
+}
 
 // ---------------------------------------------------------------------------
 // 1. aria-busy During Loading
@@ -110,12 +126,7 @@ test.describe('Loading spinner accessibility @regression', () => {
 
     // Wait briefly for the new page's loading UI to render, but allow pages
     // that complete loading without rendering a spinner/status element.
-    const spinnerRenderDeadline = Date.now() + 1500;
-    let spinnerCount = await labeledSpinners.or(statusRegions).count();
-    while (spinnerCount === 0 && Date.now() < spinnerRenderDeadline) {
-      await page.waitForTimeout(100);
-      spinnerCount = await labeledSpinners.or(statusRegions).count();
-    }
+    await waitForOptionalAttach(labeledSpinners.or(statusRegions), 1500);
 
     const labeledSpinnerCount = await labeledSpinners.count();
     const statusRegionCount = await statusRegions.count();
@@ -236,12 +247,8 @@ test.describe('Skeleton state accessibility @regression', () => {
     // Poll briefly during the loading delay window so we don't miss transient
     // skeleton elements. If the page uses a spinner pattern instead of skeletons
     // the assertions below are intentionally skipped — skeletons are not required.
-    const skeletonDeadline = Date.now() + 600;
-    let skeletonCount = await skeletons.count();
-    while (skeletonCount === 0 && Date.now() < skeletonDeadline) {
-      await page.waitForTimeout(100);
-      skeletonCount = await skeletons.count();
-    }
+    await waitForOptionalAttach(skeletons, 600);
+    const skeletonCount = await skeletons.count();
 
     if (skeletonCount > 0) {
       for (let i = 0; i < Math.min(skeletonCount, 5); i++) {

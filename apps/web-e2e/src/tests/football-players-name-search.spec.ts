@@ -171,6 +171,18 @@ async function mockSearchableFootballPlayersWithAccents(
   });
 }
 
+/**
+ * Freeze the page clock so the 300 ms search debounce only elapses when the
+ * test advances it with `page.clock.runFor` — deterministic, unlike a real
+ * sleep sized against the debounce (LS-11045). Call after the initial load.
+ */
+async function pausePageClock(
+  page: import('@playwright/test').Page,
+): Promise<void> {
+  await page.clock.install();
+  await page.clock.pauseAt(Date.now() + 1000);
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 test.describe('NFL player name search @regression', () => {
@@ -189,6 +201,9 @@ test.describe('NFL player name search @regression', () => {
   test('typing fewer than 2 characters does not send a search variable', async ({
     page,
   }) => {
+    await expect(page.getByText('Patrick Mahomes')).toBeVisible();
+    await pausePageClock(page);
+
     // Capture requests to verify the search variable is absent for <2 chars.
     const requestBodies: string[] = [];
     page.on('request', (req) => {
@@ -199,9 +214,19 @@ test.describe('NFL player name search @regression', () => {
 
     const search = page.getByRole('textbox', { name: 'Search players' });
     await search.fill('M');
+    // Run well past the 300 ms debounce so a 'M' search would have fired.
+    await page.clock.runFor(1000);
 
-    // Wait long enough for the 300 ms debounce to fire if it were going to.
-    await page.waitForTimeout(450);
+    // Sentinel: a 2-char search must fire. Any 'M' request would have been
+    // sent before it, so once it lands the captured set is complete.
+    const sentinel = page.waitForRequest(
+      (req) =>
+        req.url().includes('/graphql') &&
+        (req.postData() ?? '').includes('"search":"Ma"'),
+    );
+    await search.fill('Ma');
+    await page.clock.runFor(300);
+    await sentinel;
 
     // Any players-surface request made while 'M' was the input must not carry a
     // search variable (the frontend gate is debouncedSearch.length >= 2).
@@ -220,7 +245,7 @@ test.describe('NFL player name search @regression', () => {
       const parsed = JSON.parse(body) as {
         variables?: { search?: string };
       };
-      expect(parsed.variables?.search).toBeUndefined();
+      expect(parsed.variables?.search).not.toBe('M');
     }
   });
 
@@ -320,17 +345,19 @@ test.describe('NFL player name search — debounce and cursor-reset (LS-7641) @r
       }
     });
 
+    await expect(page.getByText('Patrick Mahomes')).toBeVisible();
+    await pausePageClock(page);
+
     const search = page.getByRole('textbox', { name: 'Search players' });
     await search.fill('Ma');
 
-    // 150 ms in — within the 300 ms debounce window; no search request yet.
-    await page.waitForTimeout(150);
+    // 1 ms short of the 300 ms debounce window; no search request yet.
+    await page.clock.runFor(299);
     expect(searchVariables).toHaveLength(0);
 
-    // After the full debounce window; the search request should now have fired.
-    await page.waitForTimeout(250);
-    expect(searchVariables).toHaveLength(1);
-    expect(searchVariables[0]).toBe('Ma');
+    // The window elapses; the search request should now fire.
+    await page.clock.runFor(1);
+    await expect.poll(() => searchVariables).toEqual(['Ma']);
   });
 
   /**

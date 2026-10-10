@@ -343,8 +343,7 @@ test.describe('Form field accessibility @regression', () => {
       await expect(submitBtn).toBeVisible();
       await expect(submitBtn).toBeEnabled();
       await submitBtn.click();
-      // Give validation a moment to apply
-      await page.waitForTimeout(300);
+      await expect(nameInput).toHaveAttribute('aria-invalid', 'true');
 
       const validationDetails = await evaluateValidationA11y(page);
 
@@ -380,7 +379,7 @@ test.describe('Form field accessibility @regression', () => {
       await expect(submitBtn).toBeVisible();
       await expect(submitBtn).toBeEnabled();
       await submitBtn.click();
-      await page.waitForTimeout(300);
+      await expect(nameInput).toHaveAttribute('aria-invalid', 'true');
 
       const validationDetails = await evaluateValidationA11y(page);
 
@@ -413,7 +412,7 @@ test.describe('Form field accessibility @regression', () => {
       await expect(submitBtn).toBeVisible();
       await expect(submitBtn).toBeEnabled();
       await submitBtn.click();
-      await page.waitForTimeout(300);
+      await expect(nameInput).toHaveAttribute('aria-invalid', 'true');
 
       const validationDetails = await evaluateValidationA11y(page);
       const leagueNameField = validationDetails.find(

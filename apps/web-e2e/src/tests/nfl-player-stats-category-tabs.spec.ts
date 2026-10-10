@@ -550,9 +550,12 @@ test.describe('NFL stats — sport switch to MLB (LS-8566) @regression', () => {
     // The page settles: the URL stays stable and the NFL grid stops querying
     // (the LS-8566 loop re-fired FootballPlayerStatsGrid and stomped the
     // sport param back to nfl).
+    // Justified negative window (LS-11045): "nothing else happens" has no
+    // web-first signal. The loop was effect-driven and re-fired within a
+    // render or two, so a short beat is enough to catch a regression.
     const settledUrl = page.url();
     const settledGridCalls = gridCalls.length;
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(500);
     expect(page.url()).toBe(settledUrl);
     expect(gridCalls.length).toBe(settledGridCalls);
     await expect(page.getByText('Barry Bonds')).toBeVisible();
