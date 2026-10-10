@@ -240,7 +240,7 @@ test.describe('Lineup Editor — GM assigns and benches a player @regression', (
 
     const mutationRequest = page.waitForRequest(
       (req) =>
-        isGraphQLEndpoint(req.url()) &&
+        isGraphQLEndpoint.test(req.url()) &&
         (req.postData() ?? '')
           .toLowerCase()
           .includes('"updateteammemberposition"'),
@@ -277,7 +277,7 @@ test.describe('Lineup Editor — GM assigns and benches a player @regression', (
 
     const mutationRequest = page.waitForRequest(
       (req) =>
-        isGraphQLEndpoint(req.url()) &&
+        isGraphQLEndpoint.test(req.url()) &&
         (req.postData() ?? '')
           .toLowerCase()
           .includes('"updateteammemberposition"'),

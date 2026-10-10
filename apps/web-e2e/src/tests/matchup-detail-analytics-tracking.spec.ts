@@ -84,48 +84,45 @@ const MOCK_TEAMS = [
 ];
 
 async function mockMatchupGraphQL(page: import('@playwright/test').Page) {
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route) => {
-      const op = extractOperationName(route);
+  await page.route(isGraphQLEndpoint, async (route) => {
+    const op = extractOperationName(route);
 
-      if (op === 'GetMatchupById') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getMatchupById: MOCK_MATCHUP } }),
-        });
-      } else if (op === 'GetMatchupsForLeague') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: { getMatchupsForLeague: [MOCK_MATCHUP] },
-          }),
-        });
-      } else if (op === 'GetCurrentWeekForLeague') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getCurrentWeekForLeague: 3 } }),
-        });
-      } else if (op === 'GetUserTeamId') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { userTeamId: 1 } }),
-        });
-      } else if (op === 'GetLeagueTeams') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
-        });
-      } else {
-        await unmockedGraphQLFallback(route);
-      }
-    },
-  );
+    if (op === 'GetMatchupById') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getMatchupById: MOCK_MATCHUP } }),
+      });
+    } else if (op === 'GetMatchupsForLeague') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { getMatchupsForLeague: [MOCK_MATCHUP] },
+        }),
+      });
+    } else if (op === 'GetCurrentWeekForLeague') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getCurrentWeekForLeague: 3 } }),
+      });
+    } else if (op === 'GetUserTeamId') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { userTeamId: 1 } }),
+      });
+    } else if (op === 'GetLeagueTeams') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
+      });
+    } else {
+      await unmockedGraphQLFallback(route);
+    }
+  });
 }
 
 /**

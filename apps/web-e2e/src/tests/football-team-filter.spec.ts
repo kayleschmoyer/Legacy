@@ -40,27 +40,24 @@ const EMPTY_PLAYERS_RESPONSE = {
 };
 
 async function mockFootballPlayers(page: import('@playwright/test').Page) {
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route) => {
-      const op = extractOperationName(route).toLowerCase();
-      // The desktop grid fires FootballPlayerStatsGrid; the narrow-viewport
-      // card feed fires FootballPlayers (LS-9366). Serve both.
-      if (op === 'footballplayers' || op === 'footballplayerstatsgrid') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(EMPTY_PLAYERS_RESPONSE),
-        });
-      } else {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: {} }),
-        });
-      }
-    },
-  );
+  await page.route(isGraphQLEndpoint, async (route) => {
+    const op = extractOperationName(route).toLowerCase();
+    // The desktop grid fires FootballPlayerStatsGrid; the narrow-viewport
+    // card feed fires FootballPlayers (LS-9366). Serve both.
+    if (op === 'footballplayers' || op === 'footballplayerstatsgrid') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(EMPTY_PLAYERS_RESPONSE),
+      });
+    } else {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: {} }),
+      });
+    }
+  });
 }
 
 // ── Tests: Free Agents filter (LS-6493) ─────────────────────────────────────
@@ -83,7 +80,7 @@ test.describe('FootballTeamFilter — Free Agents filter (LS-6493) @regression',
   }) => {
     const requestPromise = page.waitForRequest(
       (req) =>
-        isGraphQLEndpoint(new URL(req.url())) &&
+        isGraphQLEndpoint.test(req.url()) &&
         (() => {
           try {
             const body = JSON.parse(req.postData() ?? '{}') as {

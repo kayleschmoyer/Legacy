@@ -133,117 +133,114 @@ async function setupGraphQL(
     onUpdateDraftSettings,
   } = opts;
 
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route, request) => {
-      const body = request.postDataJSON() as {
-        operationName?: string;
-        variables?: { input?: Record<string, unknown> };
+  await page.route(isGraphQLEndpoint, async (route, request) => {
+    const body = request.postDataJSON() as {
+      operationName?: string;
+      variables?: { input?: Record<string, unknown> };
+    };
+    const op = body.operationName ?? '';
+
+    if (op === 'GetLeagueById') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { league } }),
+      });
+      return;
+    }
+    if (op === 'GetLeagueTeams') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
+      });
+      return;
+    }
+    if (op === 'GetPositionsForLeague') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { leaguePositions: [] } }),
+      });
+      return;
+    }
+    if (op === 'GetUserTeamId') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { userTeamId: 1 } }),
+      });
+      return;
+    }
+    if (op === 'GetMatchupsForLeague') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getMatchupsForLeague: [] } }),
+      });
+      return;
+    }
+    if (op === 'GetCurrentWeekForLeague') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getCurrentWeekForLeague: null } }),
+      });
+      return;
+    }
+    if (op === 'GetLeagueDraft') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getLeagueDraft: draft } }),
+      });
+      return;
+    }
+    if (op === 'GetDraftTeamOrder') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getDraftTeamOrder: [] } }),
+      });
+      return;
+    }
+    if (op === 'GetUserLeagues') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { userLeagues: [league] } }),
+      });
+      return;
+    }
+    if (op === 'UpdateLeagueSettings') {
+      const input = body.variables?.input ?? {};
+      const result = onUpdateLeagueSettings?.(input) ?? {
+        ...league,
+        ...input,
       };
-      const op = body.operationName ?? '';
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { updateLeagueSettings: result } }),
+      });
+      return;
+    }
+    if (op === 'UpdateDraftSettings') {
+      const input = body.variables?.input ?? {};
+      const result = onUpdateDraftSettings?.(input) ?? {
+        ...draft,
+        ...input,
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { updateDraftSettings: result } }),
+      });
+      return;
+    }
 
-      if (op === 'GetLeagueById') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { league } }),
-        });
-        return;
-      }
-      if (op === 'GetLeagueTeams') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
-        });
-        return;
-      }
-      if (op === 'GetPositionsForLeague') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { leaguePositions: [] } }),
-        });
-        return;
-      }
-      if (op === 'GetUserTeamId') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { userTeamId: 1 } }),
-        });
-        return;
-      }
-      if (op === 'GetMatchupsForLeague') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getMatchupsForLeague: [] } }),
-        });
-        return;
-      }
-      if (op === 'GetCurrentWeekForLeague') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getCurrentWeekForLeague: null } }),
-        });
-        return;
-      }
-      if (op === 'GetLeagueDraft') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getLeagueDraft: draft } }),
-        });
-        return;
-      }
-      if (op === 'GetDraftTeamOrder') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getDraftTeamOrder: [] } }),
-        });
-        return;
-      }
-      if (op === 'GetUserLeagues') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { userLeagues: [league] } }),
-        });
-        return;
-      }
-      if (op === 'UpdateLeagueSettings') {
-        const input = body.variables?.input ?? {};
-        const result = onUpdateLeagueSettings?.(input) ?? {
-          ...league,
-          ...input,
-        };
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { updateLeagueSettings: result } }),
-        });
-        return;
-      }
-      if (op === 'UpdateDraftSettings') {
-        const input = body.variables?.input ?? {};
-        const result = onUpdateDraftSettings?.(input) ?? {
-          ...draft,
-          ...input,
-        };
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { updateDraftSettings: result } }),
-        });
-        return;
-      }
-
-      await unmockedGraphQLFallback(route);
-    },
-  );
+    await unmockedGraphQLFallback(route);
+  });
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -42,44 +42,41 @@ const MOCK_USER_DATA = {
 // ── GraphQL Mock Setup ────────────────────────────────────────────────────────
 
 async function setupProfileGraphQL(page: import('@playwright/test').Page) {
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route, request) => {
-      const body = request.postDataJSON() as { operationName?: string };
+  await page.route(isGraphQLEndpoint, async (route, request) => {
+    const body = request.postDataJSON() as { operationName?: string };
 
-      if (body.operationName === 'GetUserById') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: MOCK_USER_DATA }),
-        });
-        return;
-      }
+    if (body.operationName === 'GetUserById') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: MOCK_USER_DATA }),
+      });
+      return;
+    }
 
-      if (body.operationName === 'UpdateUserAvatar') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              updateUserAvatar: {
-                __typename: 'User',
-                id: 1,
-                avatarUrl: 'https://example.com/avatar.png',
-              },
+    if (body.operationName === 'UpdateUserAvatar') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            updateUserAvatar: {
+              __typename: 'User',
+              id: 1,
+              avatarUrl: 'https://example.com/avatar.png',
             },
-          }),
-        });
-        return;
-      }
+          },
+        }),
+      });
+      return;
+    }
 
-      // Cascade unhandled operations (e.g. the ambient MyIdentities query the
-      // ProfileSettingsPage fires on load) to the _apiIsolation baseline
-      // fixture instead of swallowing them with empty data, which would crash
-      // the page (LS-7960).
-      await unmockedGraphQLFallback(route);
-    },
-  );
+    // Cascade unhandled operations (e.g. the ambient MyIdentities query the
+    // ProfileSettingsPage fires on load) to the _apiIsolation baseline
+    // fixture instead of swallowing them with empty data, which would crash
+    // the page (LS-7960).
+    await unmockedGraphQLFallback(route);
+  });
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -123,30 +120,27 @@ test.describe('Profile Settings Page @smoke', () => {
     // registered matching route first, so this spy sees UpdateUsername and
     // falls back to the shared mock for everything else.
     let updateUsernameCalls = 0;
-    await page.route(
-      (url) => isGraphQLEndpoint(url),
-      async (route, request) => {
-        const body = request.postDataJSON() as { operationName?: string };
-        if (body.operationName === 'UpdateUsername') {
-          updateUsernameCalls += 1;
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                updateUsername: {
-                  __typename: 'User',
-                  id: 1,
-                  username: 'ab',
-                },
+    await page.route(isGraphQLEndpoint, async (route, request) => {
+      const body = request.postDataJSON() as { operationName?: string };
+      if (body.operationName === 'UpdateUsername') {
+        updateUsernameCalls += 1;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              updateUsername: {
+                __typename: 'User',
+                id: 1,
+                username: 'ab',
               },
-            }),
-          });
-          return;
-        }
-        await route.fallback();
-      },
-    );
+            },
+          }),
+        });
+        return;
+      }
+      await route.fallback();
+    });
     await settingsPage.profile.goto();
 
     await settingsPage.profile.editUsername('ab');
@@ -277,44 +271,41 @@ async function setupAvatarGraphQL(
   page: import('@playwright/test').Page,
 ): Promise<Array<string | null>> {
   const sent: Array<string | null> = [];
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route, request) => {
-      const body = request.postDataJSON() as {
-        operationName?: string;
-        variables?: { avatarUrl?: string | null };
-      };
+  await page.route(isGraphQLEndpoint, async (route, request) => {
+    const body = request.postDataJSON() as {
+      operationName?: string;
+      variables?: { avatarUrl?: string | null };
+    };
 
-      if (body.operationName === 'GetUserById') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: MOCK_USER_DATA }),
-        });
-        return;
-      }
+    if (body.operationName === 'GetUserById') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: MOCK_USER_DATA }),
+      });
+      return;
+    }
 
-      if (body.operationName === 'UpdateUserAvatar') {
-        sent.push(body.variables?.avatarUrl ?? null);
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              updateUserAvatar: {
-                __typename: 'User',
-                id: 1,
-                avatarUrl: body.variables?.avatarUrl ?? null,
-              },
+    if (body.operationName === 'UpdateUserAvatar') {
+      sent.push(body.variables?.avatarUrl ?? null);
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            updateUserAvatar: {
+              __typename: 'User',
+              id: 1,
+              avatarUrl: body.variables?.avatarUrl ?? null,
             },
-          }),
-        });
-        return;
-      }
+          },
+        }),
+      });
+      return;
+    }
 
-      await unmockedGraphQLFallback(route);
-    },
-  );
+    await unmockedGraphQLFallback(route);
+  });
   return sent;
 }
 
@@ -410,58 +401,55 @@ async function setupProfileGraphQLWithIdentities(
   page: import('@playwright/test').Page,
   identities = MOCK_IDENTITIES_GOOGLE_CANONICAL,
 ) {
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route, request) => {
-      const body = request.postDataJSON() as { operationName?: string };
+  await page.route(isGraphQLEndpoint, async (route, request) => {
+    const body = request.postDataJSON() as { operationName?: string };
 
-      if (body.operationName === 'GetUserById') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: MOCK_USER_DATA }),
-        });
-        return;
-      }
+    if (body.operationName === 'GetUserById') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: MOCK_USER_DATA }),
+      });
+      return;
+    }
 
-      if (body.operationName === 'MyIdentities') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { myIdentities: identities } }),
-        });
-        return;
-      }
+    if (body.operationName === 'MyIdentities') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { myIdentities: identities } }),
+      });
+      return;
+    }
 
-      if (body.operationName === 'SetCanonicalEmail') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              setCanonicalEmail: {
-                __typename: 'SetCanonicalEmailResult',
-                changed: true,
-                user: {
-                  __typename: 'User',
-                  id: 1,
-                  email: 'testuser@discord.example.com',
-                  username: 'testuser',
-                  avatarUrl: null,
-                  accessLevel: 'none',
-                  subscriptionTier: null,
-                  themePreference: null,
-                },
+    if (body.operationName === 'SetCanonicalEmail') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            setCanonicalEmail: {
+              __typename: 'SetCanonicalEmailResult',
+              changed: true,
+              user: {
+                __typename: 'User',
+                id: 1,
+                email: 'testuser@discord.example.com',
+                username: 'testuser',
+                avatarUrl: null,
+                accessLevel: 'none',
+                subscriptionTier: null,
+                themePreference: null,
               },
             },
-          }),
-        });
-        return;
-      }
+          },
+        }),
+      });
+      return;
+    }
 
-      await unmockedGraphQLFallback(route);
-    },
-  );
+    await unmockedGraphQLFallback(route);
+  });
 }
 
 test.describe('Profile Settings Page — Linked Identities (LS-7825) @regression', () => {
@@ -509,58 +497,55 @@ test.describe('Profile Settings Page — Linked Identities (LS-7825) @regression
     settingsPage,
   }) => {
     let mutationCalled = false;
-    await page.route(
-      (url) => isGraphQLEndpoint(url),
-      async (route, request) => {
-        const body = request.postDataJSON() as {
-          operationName?: string;
-          variables?: { identityId?: number };
-        };
+    await page.route(isGraphQLEndpoint, async (route, request) => {
+      const body = request.postDataJSON() as {
+        operationName?: string;
+        variables?: { identityId?: number };
+      };
 
-        if (body.operationName === 'GetUserById') {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: MOCK_USER_DATA }),
-          });
-          return;
-        }
+      if (body.operationName === 'GetUserById') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: MOCK_USER_DATA }),
+        });
+        return;
+      }
 
-        if (body.operationName === 'MyIdentities') {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: { myIdentities: MOCK_IDENTITIES_MULTI },
-            }),
-          });
-          return;
-        }
+      if (body.operationName === 'MyIdentities') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { myIdentities: MOCK_IDENTITIES_MULTI },
+          }),
+        });
+        return;
+      }
 
-        if (body.operationName === 'SetCanonicalEmail') {
-          mutationCalled = true;
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                setCanonicalEmail: {
-                  __typename: 'SetCanonicalEmailResult',
-                  changed: true,
-                  user: {
-                    ...MOCK_USER_DATA.user,
-                    email: 'testuser@discord.example.com',
-                  },
+      if (body.operationName === 'SetCanonicalEmail') {
+        mutationCalled = true;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              setCanonicalEmail: {
+                __typename: 'SetCanonicalEmailResult',
+                changed: true,
+                user: {
+                  ...MOCK_USER_DATA.user,
+                  email: 'testuser@discord.example.com',
                 },
               },
-            }),
-          });
-          return;
-        }
+            },
+          }),
+        });
+        return;
+      }
 
-        await unmockedGraphQLFallback(route);
-      },
-    );
+      await unmockedGraphQLFallback(route);
+    });
 
     await settingsPage.profile.goto();
     // EditButton is a Tamagui styled() component, which does not forward
@@ -603,37 +588,34 @@ async function setupDisconnectFlow(
     });
   });
 
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route, request) => {
-      const body = request.postDataJSON() as { operationName?: string };
+  await page.route(isGraphQLEndpoint, async (route, request) => {
+    const body = request.postDataJSON() as { operationName?: string };
 
-      if (body.operationName === 'GetUserById') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: MOCK_USER_DATA }),
-        });
-        return;
-      }
+    if (body.operationName === 'GetUserById') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: MOCK_USER_DATA }),
+      });
+      return;
+    }
 
-      if (body.operationName === 'MyIdentities') {
-        // After a successful unlink the refetch no longer returns discord.
-        const identities =
-          state.unlinkCalls > 0 && unlink.status < 400
-            ? MOCK_IDENTITIES_MULTI.filter((i) => i.provider !== 'discord')
-            : MOCK_IDENTITIES_MULTI;
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { myIdentities: identities } }),
-        });
-        return;
-      }
+    if (body.operationName === 'MyIdentities') {
+      // After a successful unlink the refetch no longer returns discord.
+      const identities =
+        state.unlinkCalls > 0 && unlink.status < 400
+          ? MOCK_IDENTITIES_MULTI.filter((i) => i.provider !== 'discord')
+          : MOCK_IDENTITIES_MULTI;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { myIdentities: identities } }),
+      });
+      return;
+    }
 
-      await unmockedGraphQLFallback(route);
-    },
-  );
+    await unmockedGraphQLFallback(route);
+  });
 
   return state;
 }

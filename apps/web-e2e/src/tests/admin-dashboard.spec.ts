@@ -69,70 +69,66 @@ const MOCK_USERS = [
 
 /** Sets up GraphQL mocks for the Admin page */
 async function mockAdminGraphQL(page: import('@playwright/test').Page) {
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route) => {
-      // Match on the exact operation name (not broad postData substrings,
-      // which can collide — e.g. "getuserscount" contains "getusers").
-      const op = extractOperationName(route).toLowerCase();
-      let variables: { search?: unknown } = {};
-      try {
-        variables =
-          (
-            JSON.parse(route.request().postData() ?? '') as {
-              variables?: { search?: unknown };
-            }
-          ).variables ?? {};
-      } catch {
-        variables = {};
-      }
-      const search =
-        typeof variables.search === 'string' ? variables.search : '';
-      const matchedUsers = filterUsers(MOCK_USERS, search);
+  await page.route(isGraphQLEndpoint, async (route) => {
+    // Match on the exact operation name (not broad postData substrings,
+    // which can collide — e.g. "getuserscount" contains "getusers").
+    const op = extractOperationName(route).toLowerCase();
+    let variables: { search?: unknown } = {};
+    try {
+      variables =
+        (
+          JSON.parse(route.request().postData() ?? '') as {
+            variables?: { search?: unknown };
+          }
+        ).variables ?? {};
+    } catch {
+      variables = {};
+    }
+    const search = typeof variables.search === 'string' ? variables.search : '';
+    const matchedUsers = filterUsers(MOCK_USERS, search);
 
-      if (op === 'getuserscount') {
-        // GetUsersCount feeds the "Total Users" stat / search-result count.
-        // Honor the search variable so /admin/users count reflects the
-        // filtered set.
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { usersCount: matchedUsers.length } }),
-        });
-      } else if (op === 'getallusers' || op === 'admingetusers') {
-        // Both AdminGetUsers and GetAllUsers (the recent-users list on /admin
-        // and the server-side-searched list on /admin/users) resolve to the
-        // same { users } shape. GetAllUsers was previously unmocked, falling
-        // through to the API isolation catch-all (recorded as an unmocked-op
-        // test error + empty data) — the primary admin-dashboard flake source
-        // (LS-7703). matchedUsers honors the GetAllUsers `search` variable.
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: { users: matchedUsers },
-          }),
-        });
-      } else if (op === 'impersonateuser') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              impersonateUser: {
-                __typename: 'AuthPayload',
-                token: 'mock-jwt-token',
-              },
+    if (op === 'getuserscount') {
+      // GetUsersCount feeds the "Total Users" stat / search-result count.
+      // Honor the search variable so /admin/users count reflects the
+      // filtered set.
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { usersCount: matchedUsers.length } }),
+      });
+    } else if (op === 'getallusers' || op === 'admingetusers') {
+      // Both AdminGetUsers and GetAllUsers (the recent-users list on /admin
+      // and the server-side-searched list on /admin/users) resolve to the
+      // same { users } shape. GetAllUsers was previously unmocked, falling
+      // through to the API isolation catch-all (recorded as an unmocked-op
+      // test error + empty data) — the primary admin-dashboard flake source
+      // (LS-7703). matchedUsers honors the GetAllUsers `search` variable.
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { users: matchedUsers },
+        }),
+      });
+    } else if (op === 'impersonateuser') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            impersonateUser: {
+              __typename: 'AuthPayload',
+              token: 'mock-jwt-token',
             },
-          }),
-        });
-      } else {
-        // Fall through to the baseline _apiIsolation fixture for ambient
-        // queries (getUnreadNotificationCount, etc.)
-        await unmockedGraphQLFallback(route);
-      }
-    },
-  );
+          },
+        }),
+      });
+    } else {
+      // Fall through to the baseline _apiIsolation fixture for ambient
+      // queries (getUnreadNotificationCount, etc.)
+      await unmockedGraphQLFallback(route);
+    }
+  });
   // Flip the current user to admin via the shared entitlement fixture (LS-8058).
   // Registered after the admin route so its GetUserById handler runs first
   // (Playwright LIFO); every other admin op cascades back to the handler above.

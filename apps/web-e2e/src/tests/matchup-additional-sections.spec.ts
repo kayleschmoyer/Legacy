@@ -195,110 +195,106 @@ async function mockMatchupGraphQL(
     playoffProjections?: unknown[];
   },
 ) {
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route) => {
-      switch (extractOperationName(route)) {
-        case 'GetMatchupById':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { getMatchupById: MOCK_MATCHUP } }),
-          });
-          break;
-        case 'GetMatchupsForLeague':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: { getMatchupsForLeague: [MOCK_MATCHUP] },
-            }),
-          });
-          break;
-        case 'GetCurrentWeekForLeague':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { getCurrentWeekForLeague: 5 } }),
-          });
-          break;
-        case 'GetUserTeamId':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { userTeamId: null } }),
-          });
-          break;
-        case 'GetLeagueTeams':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
-          });
-          break;
-        case 'GetLeagueById':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { league: MOCK_LEAGUE } }),
-          });
-          break;
-        case 'GetMatchupPlayers':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { getMatchupPlayers: [] } }),
-          });
-          break;
-        case 'MatchupScores':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: { matchupScores: additionalSectionsData.matchupScores },
-            }),
-          });
-          break;
-        case 'GetTeamMatchupHistory':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                getTeamMatchupHistory:
-                  additionalSectionsData.teamMatchupHistory,
-              },
-            }),
-          });
-          break;
-        case 'GetLeagueStandings':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                getLeagueStandings: additionalSectionsData.leagueStandings,
-              },
-            }),
-          });
-          break;
-        case 'GetPlayoffProjections':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                getPlayoffProjections:
-                  additionalSectionsData.playoffProjections ?? [],
-              },
-            }),
-          });
-          break;
-        default:
-          await unmockedGraphQLFallback(route);
-      }
-    },
-  );
+  await page.route(isGraphQLEndpoint, async (route) => {
+    switch (extractOperationName(route)) {
+      case 'GetMatchupById':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { getMatchupById: MOCK_MATCHUP } }),
+        });
+        break;
+      case 'GetMatchupsForLeague':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { getMatchupsForLeague: [MOCK_MATCHUP] },
+          }),
+        });
+        break;
+      case 'GetCurrentWeekForLeague':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { getCurrentWeekForLeague: 5 } }),
+        });
+        break;
+      case 'GetUserTeamId':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { userTeamId: null } }),
+        });
+        break;
+      case 'GetLeagueTeams':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
+        });
+        break;
+      case 'GetLeagueById':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { league: MOCK_LEAGUE } }),
+        });
+        break;
+      case 'GetMatchupPlayers':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { getMatchupPlayers: [] } }),
+        });
+        break;
+      case 'MatchupScores':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { matchupScores: additionalSectionsData.matchupScores },
+          }),
+        });
+        break;
+      case 'GetTeamMatchupHistory':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              getTeamMatchupHistory: additionalSectionsData.teamMatchupHistory,
+            },
+          }),
+        });
+        break;
+      case 'GetLeagueStandings':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              getLeagueStandings: additionalSectionsData.leagueStandings,
+            },
+          }),
+        });
+        break;
+      case 'GetPlayoffProjections':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              getPlayoffProjections:
+                additionalSectionsData.playoffProjections ?? [],
+            },
+          }),
+        });
+        break;
+      default:
+        await unmockedGraphQLFallback(route);
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------

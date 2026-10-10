@@ -1,5 +1,6 @@
 import { expect, test } from '../fixtures/auth-enhanced';
 import { mockLeague } from '../mocks/graphql/league.mocks';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 import { FIXED_NOW_ISO } from '../mocks/time';
 
 interface GraphQLRequest {
@@ -167,47 +168,36 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
     const graphqlRequests: GraphQLRequest[] = [];
     const graphqlResponses: GraphQLResponse[] = [];
 
-    await page.route(
-      (url) => {
-        const urlString = url.toString();
-        return (
-          urlString.includes('/graphql') &&
-          !urlString.includes('/@fs/') &&
-          !urlString.includes('.ts') &&
-          !urlString.includes('.js')
-        );
-      },
-      async (route) => {
-        const request = route.request();
-        const requestBody = request.postData();
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const request = route.request();
+      const requestBody = request.postData();
 
-        if (requestBody) {
-          try {
-            const body = JSON.parse(requestBody) as GraphQLRequest;
-            const mockResponse = buildMockResponse(body);
+      if (requestBody) {
+        try {
+          const body = JSON.parse(requestBody) as GraphQLRequest;
+          const mockResponse = buildMockResponse(body);
 
-            if (mockResponse === null) {
-              // Unknown operation — fall through to the _apiIsolation baseline fixture
-              await route.fallback();
-              return;
-            }
-
-            graphqlRequests.push(body);
-            graphqlResponses.push(mockResponse);
-
-            await route.fulfill({
-              status: 200,
-              contentType: 'application/json',
-              body: JSON.stringify(mockResponse),
-            });
-          } catch {
+          if (mockResponse === null) {
+            // Unknown operation — fall through to the _apiIsolation baseline fixture
             await route.fallback();
+            return;
           }
-        } else {
+
+          graphqlRequests.push(body);
+          graphqlResponses.push(mockResponse);
+
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(mockResponse),
+          });
+        } catch {
           await route.fallback();
         }
-      },
-    );
+      } else {
+        await route.fallback();
+      }
+    });
 
     return { graphqlRequests, graphqlResponses };
   }
@@ -268,59 +258,48 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
 
     // Set up hermetic GraphQL route that captures the InitializeDraft mutation
     // (the "Start Draft" button triggers InitializeDraft, not StartDraft)
-    await page.route(
-      (url) => {
-        const urlString = url.toString();
-        return (
-          urlString.includes('/graphql') &&
-          !urlString.includes('/@fs/') &&
-          !urlString.includes('.ts') &&
-          !urlString.includes('.js')
-        );
-      },
-      async (route) => {
-        const request = route.request();
-        const postData = request.postData();
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const request = route.request();
+      const postData = request.postData();
 
-        if (postData) {
-          try {
-            const body = JSON.parse(postData) as GraphQLRequest;
+      if (postData) {
+        try {
+          const body = JSON.parse(postData) as GraphQLRequest;
 
-            // Check if this is the InitializeDraft mutation
-            if (
-              body.query?.includes('initializeDraft') ||
-              body.operationName === 'InitializeDraft'
-            ) {
-              draftMutation = body;
-            }
-
-            const mockResponse = buildMockResponse(body);
-
-            if (mockResponse === null) {
-              await route.fallback();
-              return;
-            }
-
-            if (
-              body.query?.includes('initializeDraft') ||
-              body.operationName === 'InitializeDraft'
-            ) {
-              draftMutationResp = mockResponse;
-            }
-
-            await route.fulfill({
-              status: 200,
-              contentType: 'application/json',
-              body: JSON.stringify(mockResponse),
-            });
-          } catch {
-            await route.fallback();
+          // Check if this is the InitializeDraft mutation
+          if (
+            body.query?.includes('initializeDraft') ||
+            body.operationName === 'InitializeDraft'
+          ) {
+            draftMutation = body;
           }
-        } else {
+
+          const mockResponse = buildMockResponse(body);
+
+          if (mockResponse === null) {
+            await route.fallback();
+            return;
+          }
+
+          if (
+            body.query?.includes('initializeDraft') ||
+            body.operationName === 'InitializeDraft'
+          ) {
+            draftMutationResp = mockResponse;
+          }
+
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(mockResponse),
+          });
+        } catch {
           await route.fallback();
         }
-      },
-    );
+      } else {
+        await route.fallback();
+      }
+    });
 
     // Navigate to commissioner tab where the Start Draft button lives
     await page.goto(leagueUrl);
@@ -378,65 +357,54 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
     page,
   }) => {
     // Intercept and mock a GraphQL error for startDraft, mock everything else
-    await page.route(
-      (url) => {
-        const urlString = url.toString();
-        return (
-          urlString.includes('/graphql') &&
-          !urlString.includes('/@fs/') &&
-          !urlString.includes('.ts') &&
-          !urlString.includes('.js')
-        );
-      },
-      async (route) => {
-        const request = route.request();
-        const postData = request.postData();
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const request = route.request();
+      const postData = request.postData();
 
-        if (postData) {
-          try {
-            const body = JSON.parse(postData) as GraphQLRequest;
+      if (postData) {
+        try {
+          const body = JSON.parse(postData) as GraphQLRequest;
 
-            // If this is the InitializeDraft mutation, return an error
-            if (
-              body.query?.includes('initializeDraft') ||
-              body.operationName === 'InitializeDraft'
-            ) {
-              await route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify({
-                  errors: [
-                    {
-                      message: 'Test error: Draft queue URL not configured',
-                      locations: [{ line: 1, column: 1 }],
-                      path: ['initializeDraft'],
-                    },
-                  ],
-                  data: null,
-                }),
-              });
-              return;
-            }
-
-            // All other operations get normal mock responses
-            const mockResponse = buildMockResponse(body);
-            if (mockResponse === null) {
-              await route.fallback();
-              return;
-            }
+          // If this is the InitializeDraft mutation, return an error
+          if (
+            body.query?.includes('initializeDraft') ||
+            body.operationName === 'InitializeDraft'
+          ) {
             await route.fulfill({
               status: 200,
               contentType: 'application/json',
-              body: JSON.stringify(mockResponse),
+              body: JSON.stringify({
+                errors: [
+                  {
+                    message: 'Test error: Draft queue URL not configured',
+                    locations: [{ line: 1, column: 1 }],
+                    path: ['initializeDraft'],
+                  },
+                ],
+                data: null,
+              }),
             });
-          } catch {
-            await route.fallback();
+            return;
           }
-        } else {
+
+          // All other operations get normal mock responses
+          const mockResponse = buildMockResponse(body);
+          if (mockResponse === null) {
+            await route.fallback();
+            return;
+          }
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(mockResponse),
+          });
+        } catch {
           await route.fallback();
         }
-      },
-    );
+      } else {
+        await route.fallback();
+      }
+    });
 
     await page.goto(leagueUrl);
     await page.waitForLoadState('networkidle');
@@ -482,57 +450,46 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
     }
     const graphqlOperations: GraphQLOperation[] = [];
 
-    await page.route(
-      (url) => {
-        const urlString = url.toString();
-        return (
-          urlString.includes('/graphql') &&
-          !urlString.includes('/@fs/') &&
-          !urlString.includes('.ts') &&
-          !urlString.includes('.js')
-        );
-      },
-      async (route) => {
-        const request = route.request();
-        const postData = request.postData();
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const request = route.request();
+      const postData = request.postData();
 
-        if (postData) {
-          try {
-            const body = JSON.parse(postData) as GraphQLRequest;
-            graphqlOperations.push({
-              type: 'request',
-              operation: body.operationName || 'Unknown',
-              variables: body.variables,
-              timestamp: Date.now(),
-            });
+      if (postData) {
+        try {
+          const body = JSON.parse(postData) as GraphQLRequest;
+          graphqlOperations.push({
+            type: 'request',
+            operation: body.operationName || 'Unknown',
+            variables: body.variables,
+            timestamp: Date.now(),
+          });
 
-            const mockResponse = buildMockResponse(body);
+          const mockResponse = buildMockResponse(body);
 
-            if (mockResponse === null) {
-              await route.fallback();
-              return;
-            }
-
-            graphqlOperations.push({
-              type: 'response',
-              operation: body.operationName || 'Unknown',
-              data: mockResponse.data,
-              timestamp: Date.now(),
-            });
-
-            await route.fulfill({
-              status: 200,
-              contentType: 'application/json',
-              body: JSON.stringify(mockResponse),
-            });
-          } catch {
+          if (mockResponse === null) {
             await route.fallback();
+            return;
           }
-        } else {
+
+          graphqlOperations.push({
+            type: 'response',
+            operation: body.operationName || 'Unknown',
+            data: mockResponse.data,
+            timestamp: Date.now(),
+          });
+
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(mockResponse),
+          });
+        } catch {
           await route.fallback();
         }
-      },
-    );
+      } else {
+        await route.fallback();
+      }
+    });
 
     await page.goto(leagueUrl);
     await page.waitForLoadState('networkidle');

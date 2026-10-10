@@ -106,73 +106,70 @@ async function mockMatchupGraphQL(
 ) {
   const matchup = buildMatchup(overrides);
 
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route) => {
-      // Match on the exact GraphQL operation name (not a broad postData
-      // substring) so a future operation whose name overlaps one of these
-      // cannot be accidentally intercepted.
-      const op = extractOperationName(route);
+  await page.route(isGraphQLEndpoint, async (route) => {
+    // Match on the exact GraphQL operation name (not a broad postData
+    // substring) so a future operation whose name overlaps one of these
+    // cannot be accidentally intercepted.
+    const op = extractOperationName(route);
 
-      if (op === 'GetMatchupById') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getMatchupById: matchup } }),
-        });
-      } else if (op === 'GetMatchupsForLeague') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getMatchupsForLeague: [matchup] } }),
-        });
-      } else if (op === 'GetCurrentWeekForLeague') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getCurrentWeekForLeague: 3 } }),
-        });
-      } else if (op === 'GetUserTeamId') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { userTeamId: 1 } }),
-        });
-      } else if (op === 'GetLeagueTeams') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
-        });
-      } else if (op === 'GetMatchupRecap') {
-        // Completed matchups render the premium-gated MatchupRecapPanel, which
-        // fires GetMatchupRecap. Return a null recap so the panel renders
-        // nothing (it is out of scope for this suite) without tripping the
-        // hermetic API-isolation guard on an unmocked operation.
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              getMatchupById: {
-                __typename: 'Matchup',
-                id: MATCHUP_ID,
-                weekNumber: 3,
-                status: matchup.status,
-                team1Id: 1,
-                team2Id: 2,
-                team1Score: matchup.team1Score,
-                team2Score: matchup.team2Score,
-                recap: null,
-              },
+    if (op === 'GetMatchupById') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getMatchupById: matchup } }),
+      });
+    } else if (op === 'GetMatchupsForLeague') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getMatchupsForLeague: [matchup] } }),
+      });
+    } else if (op === 'GetCurrentWeekForLeague') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getCurrentWeekForLeague: 3 } }),
+      });
+    } else if (op === 'GetUserTeamId') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { userTeamId: 1 } }),
+      });
+    } else if (op === 'GetLeagueTeams') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
+      });
+    } else if (op === 'GetMatchupRecap') {
+      // Completed matchups render the premium-gated MatchupRecapPanel, which
+      // fires GetMatchupRecap. Return a null recap so the panel renders
+      // nothing (it is out of scope for this suite) without tripping the
+      // hermetic API-isolation guard on an unmocked operation.
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            getMatchupById: {
+              __typename: 'Matchup',
+              id: MATCHUP_ID,
+              weekNumber: 3,
+              status: matchup.status,
+              team1Id: 1,
+              team2Id: 2,
+              team1Score: matchup.team1Score,
+              team2Score: matchup.team2Score,
+              recap: null,
             },
-          }),
-        });
-      } else {
-        await unmockedGraphQLFallback(route);
-      }
-    },
-  );
+          },
+        }),
+      });
+    } else {
+      await unmockedGraphQLFallback(route);
+    }
+  });
 }
 
 /**

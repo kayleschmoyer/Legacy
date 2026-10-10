@@ -157,7 +157,7 @@ test.describe('Roster — player-locked error surfacing @regression', () => {
 
     const mutationRequest = page.waitForRequest(
       (req) =>
-        isGraphQLEndpoint(req.url()) &&
+        isGraphQLEndpoint.test(req.url()) &&
         (req.postData() ?? '')
           .toLowerCase()
           .includes('"updateteammemberposition"'),

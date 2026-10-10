@@ -138,28 +138,25 @@ async function evaluateValidationA11y(page: import('@playwright/test').Page) {
 
 /** Set up mocks for the league creation page GraphQL mutations */
 async function setupLeagueCreationMock(page: import('@playwright/test').Page) {
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route) => {
-      const operation = extractOperationName(route).toLowerCase();
-      if (operation === 'createleagueandteams') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              createLeagueAndTeams: {
-                __typename: 'CreateLeagueAndTeamsPayload',
-                league: { __typename: 'League', id: 99, name: 'Test League' },
-              },
+  await page.route(isGraphQLEndpoint, async (route) => {
+    const operation = extractOperationName(route).toLowerCase();
+    if (operation === 'createleagueandteams') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            createLeagueAndTeams: {
+              __typename: 'CreateLeagueAndTeamsPayload',
+              league: { __typename: 'League', id: 99, name: 'Test League' },
             },
-          }),
-        });
-      } else {
-        await route.fallback();
-      }
-    },
-  );
+          },
+        }),
+      });
+    } else {
+      await route.fallback();
+    }
+  });
 }
 
 test.describe('Form field accessibility @regression', () => {
@@ -465,44 +462,41 @@ test.describe('Form field accessibility @regression', () => {
     test('profile settings form fields have accessible labels', async ({
       page,
     }) => {
-      await page.route(
-        (url) => isGraphQLEndpoint(url),
-        async (route, request) => {
-          const body = request.postDataJSON() as { operationName?: string };
-          if (body.operationName === 'GetUserById') {
-            await route.fulfill({
-              status: 200,
-              contentType: 'application/json',
-              body: JSON.stringify({
-                data: {
-                  user: {
-                    __typename: 'User',
-                    id: 1,
-                    username: 'testuser',
-                    email: 'testuser@example.com',
-                    avatarUrl: null,
-                    accessLevel: 'none',
-                  },
-                },
-              }),
-            });
-            return;
-          }
-          if (body.operationName === 'MyIdentities') {
-            await route.fulfill({
-              status: 200,
-              contentType: 'application/json',
-              body: JSON.stringify({ data: { myIdentities: [] } }),
-            });
-            return;
-          }
+      await page.route(isGraphQLEndpoint, async (route, request) => {
+        const body = request.postDataJSON() as { operationName?: string };
+        if (body.operationName === 'GetUserById') {
           await route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify({ data: {} }),
+            body: JSON.stringify({
+              data: {
+                user: {
+                  __typename: 'User',
+                  id: 1,
+                  username: 'testuser',
+                  email: 'testuser@example.com',
+                  avatarUrl: null,
+                  accessLevel: 'none',
+                },
+              },
+            }),
           });
-        },
-      );
+          return;
+        }
+        if (body.operationName === 'MyIdentities') {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ data: { myIdentities: [] } }),
+          });
+          return;
+        }
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: {} }),
+        });
+      });
       // form inputs are revealed by clicking the inline Edit affordance on the
       // username row. Trigger Edit mode so the editable Input is in the DOM
       // before we audit form-field accessibility.
@@ -540,12 +534,9 @@ test.describe('Form field accessibility @regression', () => {
     test('profile settings form fields are present and labeled', async ({
       page,
     }) => {
-      await page.route(
-        (url) => isGraphQLEndpoint(url),
-        async (route) => {
-          await route.fallback();
-        },
-      );
+      await page.route(isGraphQLEndpoint, async (route) => {
+        await route.fallback();
+      });
 
       await page.goto('/baseball/preferences');
       await page.waitForLoadState('networkidle');

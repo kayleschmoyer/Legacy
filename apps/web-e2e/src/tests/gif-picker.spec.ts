@@ -23,6 +23,7 @@ import {
 } from '../fixtures/shared-mocks';
 import { agoIso } from '../mocks/time';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
+import { hostMatcher } from '../utils/route-matchers';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -253,36 +254,28 @@ async function mockGiphy(
   page: import('@playwright/test').Page,
   opts: { empty?: boolean } = {},
 ): Promise<void> {
-  await page.route(
-    (url) => url.hostname === 'api.giphy.com',
-    async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(
-          opts.empty
-            ? { data: [], meta: { status: 200 } }
-            : MOCK_GIPHY_RESPONSE,
-        ),
-      });
-    },
-  );
+  await page.route(hostMatcher('api.giphy.com'), async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        opts.empty ? { data: [], meta: { status: 200 } } : MOCK_GIPHY_RESPONSE,
+      ),
+    });
+  });
 
   // Serve the GIF thumbnails themselves so the <img> elements load
   // successfully and the buttons stay in their "Send GIF:" state. Tests that
   // exercise the broken-thumbnail fallback register their own media.giphy.com
   // route *after* this one, which takes precedence (Playwright matches routes
   // in LIFO order).
-  await page.route(
-    (url) => url.hostname === 'media.giphy.com',
-    async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'image/gif',
-        body: ONE_BY_ONE_GIF,
-      });
-    },
-  );
+  await page.route(hostMatcher('media.giphy.com'), async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'image/gif',
+      body: ONE_BY_ONE_GIF,
+    });
+  });
 }
 
 /**
@@ -449,12 +442,9 @@ test.describe('GIF Picker — broken thumbnail fallback @regression', () => {
     await mockGraphQL(page);
     await mockGiphy(page);
     // Make every Giphy media thumbnail fail (simulates CDN/CORS failure).
-    await page.route(
-      (url) => url.hostname === 'media.giphy.com',
-      async (route) => {
-        await route.fulfill({ status: 404, body: '' });
-      },
-    );
+    await page.route(hostMatcher('media.giphy.com'), async (route) => {
+      await route.fulfill({ status: 404, body: '' });
+    });
     await goToLeagueChatTab(page, leaguePage);
 
     await leaguePage.button(/open gif picker/i).tap();

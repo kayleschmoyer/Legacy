@@ -153,125 +153,122 @@ async function setupGraphQL(
 
   const newLeague = makeNewLeague();
 
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route, request) => {
-      const body = request.postDataJSON() as {
-        operationName?: string;
-        variables?: Record<string, unknown>;
-      };
-      const op = body.operationName ?? '';
+  await page.route(isGraphQLEndpoint, async (route, request) => {
+    const body = request.postDataJSON() as {
+      operationName?: string;
+      variables?: Record<string, unknown>;
+    };
+    const op = body.operationName ?? '';
 
-      if (op === 'GetLeagueById') {
-        const requestedId =
-          body.variables?.['leagueId'] ?? body.variables?.['id'];
-        const leagueData =
-          requestedId !== undefined && Number(requestedId) === newLeague.id
-            ? newLeague
-            : league;
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { league: leagueData } }),
-        });
-        return;
+    if (op === 'GetLeagueById') {
+      const requestedId =
+        body.variables?.['leagueId'] ?? body.variables?.['id'];
+      const leagueData =
+        requestedId !== undefined && Number(requestedId) === newLeague.id
+          ? newLeague
+          : league;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { league: leagueData } }),
+      });
+      return;
+    }
+    if (op === 'GetLeagueTeams') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
+      });
+      return;
+    }
+    if (op === 'GetPositionsForLeague') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { leaguePositions: [] } }),
+      });
+      return;
+    }
+    if (op === 'GetUserTeamId') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { userTeamId: 1 } }),
+      });
+      return;
+    }
+    if (op === 'GetMatchupsForLeague') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getMatchupsForLeague: matchups } }),
+      });
+      return;
+    }
+    if (op === 'GetCurrentWeekForLeague') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getCurrentWeekForLeague: null } }),
+      });
+      return;
+    }
+    if (op === 'GetLeagueDraft') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            getLeagueDraft: { __typename: 'Draft', draftMode: 'live' },
+          },
+        }),
+      });
+      return;
+    }
+    if (op === 'GetDraftTeamOrder') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getDraftTeamOrder: [] } }),
+      });
+      return;
+    }
+    if (op === 'GetUserLeagues') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { userLeagues: [league] } }),
+      });
+      return;
+    }
+    if (op === 'GetLeagueScoringProfile') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { leagueScoringProfile: null } }),
+      });
+      return;
+    }
+    if (op === 'RenewLeague') {
+      if (renewLeagueDelay) {
+        await new Promise<void>((resolve) =>
+          setTimeout(resolve, renewLeagueDelay),
+        );
       }
-      if (op === 'GetLeagueTeams') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
-        });
-        return;
-      }
-      if (op === 'GetPositionsForLeague') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { leaguePositions: [] } }),
-        });
-        return;
-      }
-      if (op === 'GetUserTeamId') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { userTeamId: 1 } }),
-        });
-        return;
-      }
-      if (op === 'GetMatchupsForLeague') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getMatchupsForLeague: matchups } }),
-        });
-        return;
-      }
-      if (op === 'GetCurrentWeekForLeague') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getCurrentWeekForLeague: null } }),
-        });
-        return;
-      }
-      if (op === 'GetLeagueDraft') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              getLeagueDraft: { __typename: 'Draft', draftMode: 'live' },
-            },
-          }),
-        });
-        return;
-      }
-      if (op === 'GetDraftTeamOrder') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getDraftTeamOrder: [] } }),
-        });
-        return;
-      }
-      if (op === 'GetUserLeagues') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { userLeagues: [league] } }),
-        });
-        return;
-      }
-      if (op === 'GetLeagueScoringProfile') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { leagueScoringProfile: null } }),
-        });
-        return;
-      }
-      if (op === 'RenewLeague') {
-        if (renewLeagueDelay) {
-          await new Promise<void>((resolve) =>
-            setTimeout(resolve, renewLeagueDelay),
-          );
-        }
-        const result = onRenewLeague?.() ?? makeNewLeague();
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { renewLeague: result } }),
-        });
-        return;
-      }
+      const result = onRenewLeague?.() ?? makeNewLeague();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { renewLeague: result } }),
+      });
+      return;
+    }
 
-      // Fall through to the baseline _apiIsolation fixture for ambient
-      // queries (getUnreadNotificationCount, getUserById, etc.)
-      await unmockedGraphQLFallback(route);
-    },
-  );
+    // Fall through to the baseline _apiIsolation fixture for ambient
+    // queries (getUnreadNotificationCount, getUserById, etc.)
+    await unmockedGraphQLFallback(route);
+  });
 }
 
 /** Wait for the NextStepControl to be visible. */

@@ -36,38 +36,35 @@ test.describe('Draft Status Web UI Tests @critical', () => {
     let draftStatus: 'not-started' | 'queued' | 'in-progress' | 'completed' =
       'not-started';
 
-    await page.route(
-      (url) => url.toString().includes('/graphql'),
-      async (route) => {
-        const operation = extractOperationName(route).toLowerCase();
+    await page.route(/\/graphql/, async (route) => {
+      const operation = extractOperationName(route).toLowerCase();
 
-        if (operation === 'initializedraft') {
-          draftStatus = 'queued';
-          void route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                initializeDraft: mockDraft({
-                  status: 'queued',
-                  leagueId: testLeagueId,
-                }),
-              },
-            }),
-          });
-        } else if (operation === 'getleaguebyid') {
-          // Return league with current (possibly mutated) draftStatus
-          void route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(leagueByIdResponse({ draftStatus })),
-          });
-        } else {
-          // Let other operations cascade to the auth fixture's baseline mocks
-          await route.fallback();
-        }
-      },
-    );
+      if (operation === 'initializedraft') {
+        draftStatus = 'queued';
+        void route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              initializeDraft: mockDraft({
+                status: 'queued',
+                leagueId: testLeagueId,
+              }),
+            },
+          }),
+        });
+      } else if (operation === 'getleaguebyid') {
+        // Return league with current (possibly mutated) draftStatus
+        void route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(leagueByIdResponse({ draftStatus })),
+        });
+      } else {
+        // Let other operations cascade to the auth fixture's baseline mocks
+        await route.fallback();
+      }
+    });
 
     // Navigate to the league page before each test
     await page.goto(leagueUrl);

@@ -10,6 +10,8 @@
 
 import type { Page, Route } from '@playwright/test';
 
+import { GRAPHQL_ENDPOINT } from '../../utils/route-matchers';
+
 /**
  * Default fallback for unmocked GraphQL operations: cascade to the next
  * `page.route` handler in Playwright's LIFO chain (typically the
@@ -22,18 +24,12 @@ export async function unmockedGraphQLFallback(route: Route): Promise<void> {
 
 /**
  * Match GraphQL fetch calls but not Vite HMR / source-map requests that
- * happen to contain `/graphql` in their URL. Identical to the predicate
- * that used to live in every spec file.
+ * happen to contain `/graphql` in their URL. A RegExp rather than a function
+ * so Playwright can match it browser-side and let static assets bypass
+ * interception (LS-11043). Pass it straight to `page.route(isGraphQLEndpoint, …)`;
+ * to test a URL directly use `isGraphQLEndpoint.test(url)`.
  */
-export function isGraphQLEndpoint(url: URL): boolean {
-  const s = url.toString();
-  return (
-    s.includes('/graphql') &&
-    !s.includes('/@fs/') &&
-    !s.includes('.ts') &&
-    !s.includes('.js')
-  );
-}
+export const isGraphQLEndpoint = GRAPHQL_ENDPOINT;
 
 export interface GraphQLRequest {
   operationName: string;

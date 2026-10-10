@@ -14,6 +14,7 @@ import {
   tierUserByIdResponse,
 } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
+import { pathEndsWithMatcher } from '../utils/route-matchers';
 import { E2E_SIGNING_SECRET, signE2EJwt } from '../utils/jwt';
 import { DESKTOP_VIEWPORT } from '../utils/viewport';
 
@@ -1067,18 +1068,15 @@ test.describe('Malformed/Invalid JWT Cookie Handling @critical', () => {
       // default behavior it would treat this as a valid, refreshable token.
       // Override the endpoint here to simulate the real backend's signature
       // verification rejecting it.
-      await page.route(
-        (url) => url.pathname.endsWith('/refresh-jwt'),
-        async (route) => {
-          await route.fulfill({
-            status: 401,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              error: 'Invalid token signature (simulated)',
-            }),
-          });
-        },
-      );
+      await page.route(pathEndsWithMatcher('/refresh-jwt'), async (route) => {
+        await route.fulfill({
+          status: 401,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            error: 'Invalid token signature (simulated)',
+          }),
+        });
+      });
 
       await page.goto('/');
       await page.waitForLoadState('load');

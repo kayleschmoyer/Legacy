@@ -5,6 +5,8 @@
  * websocket-auth-errors.spec.ts to avoid duplication.
  */
 
+import { isGraphQLEndpoint } from '../../mocks/graphql/router';
+
 // ── WebSocket URL injection ──────────────────────────────────────────────────
 
 /**
@@ -36,15 +38,8 @@ export async function injectWebSocketUrl(
 // ── GraphQL route helper ─────────────────────────────────────────────────────
 
 /**
- * Returns true for GraphQL API URLs, excluding Vite virtual module URLs and
- * static asset requests that happen to contain "/graphql" in the path.
+ * Matches GraphQL API URLs, excluding Vite virtual module URLs and static
+ * asset requests that happen to contain "/graphql" in the path. Alias of the
+ * shared RegExp matcher so static assets bypass interception (LS-11043).
  */
-export function isGraphQL(url: URL): boolean {
-  const s = url.toString();
-  return (
-    s.includes('/graphql') &&
-    !s.includes('/@fs/') &&
-    !s.includes('.ts') &&
-    !s.includes('.js')
-  );
-}
+export const isGraphQL = isGraphQLEndpoint;

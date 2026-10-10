@@ -30,6 +30,7 @@ import {
   useTier,
 } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
+import { pathEndsWithMatcher } from '../utils/route-matchers';
 
 const unauthorizedGraphQLBody = JSON.stringify({
   errors: [
@@ -44,16 +45,13 @@ const unauthorizedGraphQLBody = JSON.stringify({
  * definitively-invalidated server-side session (not merely an expired
  * clock), which is what makes the client give up and log out. */
 async function rejectRefreshJwt(page: Page) {
-  await page.route(
-    (url) => url.pathname.endsWith('/refresh-jwt'),
-    async (route) => {
-      await route.fulfill({
-        status: 401,
-        contentType: 'application/json',
-        body: JSON.stringify({ error: 'Session expired' }),
-      });
-    },
-  );
+  await page.route(pathEndsWithMatcher('/refresh-jwt'), async (route) => {
+    await route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'Session expired' }),
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -75,16 +73,13 @@ test.describe('401 during an authenticated API call @regression', () => {
     // server-side) and the refresh endpoint refuses to mint a new token —
     // the combination the Apollo error link treats as a definitive
     // rejection, not a transient hiccup.
-    await page.route(
-      (url) => isGraphQLEndpoint(url),
-      async (route) => {
-        await route.fulfill({
-          status: 401,
-          contentType: 'application/json',
-          body: unauthorizedGraphQLBody,
-        });
-      },
-    );
+    await page.route(isGraphQLEndpoint, async (route) => {
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: unauthorizedGraphQLBody,
+      });
+    });
     await rejectRefreshJwt(page);
 
     // Navigate to a page that fires a GraphQL query while "still logged in".
@@ -112,22 +107,19 @@ test.describe('401 during an authenticated API call @regression', () => {
     );
 
     let firstAttempt = true;
-    await page.route(
-      (url) => isGraphQLEndpoint(url),
-      async (route) => {
-        if (firstAttempt) {
-          firstAttempt = false;
-          await route.fulfill({
-            status: 401,
-            contentType: 'application/json',
-            body: unauthorizedGraphQLBody,
-          });
-          return;
-        }
-        // Let the retried request fall through to the fixture's baseline mocks.
-        await route.fallback();
-      },
-    );
+    await page.route(isGraphQLEndpoint, async (route) => {
+      if (firstAttempt) {
+        firstAttempt = false;
+        await route.fulfill({
+          status: 401,
+          contentType: 'application/json',
+          body: unauthorizedGraphQLBody,
+        });
+        return;
+      }
+      // Let the retried request fall through to the fixture's baseline mocks.
+      await route.fallback();
+    });
 
     // /management fires a GraphQL query (unlike /about, which renders
     // without one) so the 401-then-retry path is actually exercised.

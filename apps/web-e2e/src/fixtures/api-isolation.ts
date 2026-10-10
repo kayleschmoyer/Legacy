@@ -6,6 +6,7 @@ import {
   resolveBaselineResponse,
 } from './shared-mocks';
 import { E2E_SIGNING_SECRET, E2EJwtUtil, signE2EJwt } from '../utils/jwt';
+import { apiIsolationMatcher } from '../utils/route-matchers';
 
 /**
  * API isolation — intercept ALL requests that leave the static file server.
@@ -54,13 +55,12 @@ export function signTestJwt(overrides: Record<string, unknown> = {}): string {
 /** The port our static file server listens on — the ONLY port we allow through. */
 const E2E_PORT_STR = String(process.env.E2E_PORT || 4280);
 
-/** Returns true when a URL targets our static file server (should NOT be intercepted). */
-function isStaticServerRequest(url: URL): boolean {
-  const host = url.hostname;
-  const isLocalhost =
-    host === 'localhost' || host === '127.0.0.1' || host === '::1';
-  return isLocalhost && url.port === E2E_PORT_STR;
-}
+/**
+ * Matches every URL that does NOT target our static file server. A RegExp
+ * (not a function) so Playwright can match it browser-side and static assets
+ * skip interception entirely (LS-11043).
+ */
+const NON_STATIC_SERVER_REQUEST = apiIsolationMatcher(E2E_PORT_STR);
 
 /**
  * Minimal mock of the Google Identity Services (GSI) library.
@@ -140,30 +140,27 @@ export async function withApiIsolation(
   // Intercept every request that is NOT fetching a static asset from our
   // E2E server (port 4280).  This catches localhost:5000 (GraphQL),
   // localhost:5001 (OAuth proxy), external CDNs, AWS endpoints, etc.
-  await page.route(
-    (url) => !isStaticServerRequest(url),
-    async (route) => {
-      try {
-        await routeRequest(route, page, unmockedOps);
-      } catch (error) {
-        // A handler invocation (most likely the refresh-jwt branch's
-        // `await page.context().cookies()`) can still be mid-flight when the
-        // test ends and the browser context tears down. The `unrouteAll()`
-        // call in the teardown below only stops NEW dispatches — it cannot
-        // cancel one already in progress — so a request that slips in during
-        // the gap between test-end and unrouteAll still throws here. That
-        // failure isn't attributable to any specific test, so Playwright's
-        // `--retries` doesn't retry it and the whole job fails outright
-        // (LS-10019, same bug class as LS-9742). There is no test left to
-        // observe the response either way, so swallow only the teardown-race
-        // error and let anything else propagate as a real bug.
-        const message = error instanceof Error ? error.message : String(error);
-        if (!/test ended/i.test(message)) {
-          throw error;
-        }
+  await page.route(NON_STATIC_SERVER_REQUEST, async (route) => {
+    try {
+      await routeRequest(route, page, unmockedOps);
+    } catch (error) {
+      // A handler invocation (most likely the refresh-jwt branch's
+      // `await page.context().cookies()`) can still be mid-flight when the
+      // test ends and the browser context tears down. The `unrouteAll()`
+      // call in the teardown below only stops NEW dispatches — it cannot
+      // cancel one already in progress — so a request that slips in during
+      // the gap between test-end and unrouteAll still throws here. That
+      // failure isn't attributable to any specific test, so Playwright's
+      // `--retries` doesn't retry it and the whole job fails outright
+      // (LS-10019, same bug class as LS-9742). There is no test left to
+      // observe the response either way, so swallow only the teardown-race
+      // error and let anything else propagate as a real bug.
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/test ended/i.test(message)) {
+        throw error;
       }
-    },
-  );
+    }
+  });
 
   await use();
 

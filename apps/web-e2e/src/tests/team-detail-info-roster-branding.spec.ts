@@ -19,6 +19,7 @@ import {
   unmockedGraphQLFallback,
 } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
+import { hostMatcher, pathIncludesMatcher } from '../utils/route-matchers';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -32,8 +33,7 @@ const MOCK_IMAGE_BASE64 =
  */
 async function mockExternalImages(page: import('@playwright/test').Page) {
   await page.route(
-    (url) =>
-      url.hostname === 'example.com' || url.hostname === 'cdn.example.com',
+    hostMatcher('example.com', 'cdn.example.com'),
     async (route) => {
       await route.fulfill({
         status: 200,
@@ -582,36 +582,33 @@ test.describe('Team Detail – branding actions (GM) @regression', () => {
   }) => {
     await setupGraphQL(page, { userTeamId: 1 });
 
-    await page.route(
-      (url) => url.pathname.includes('/images/upload'),
-      async (route) => {
-        if (route.request().method() === 'OPTIONS') {
-          await route.fulfill({
-            status: 204,
-            headers: {
-              'Access-Control-Allow-Origin':
-                (await route.request().allHeaders())['origin'] ?? '*',
-              'Access-Control-Allow-Credentials': 'true',
-              'Access-Control-Allow-Methods': 'POST, OPTIONS',
-              'Access-Control-Allow-Headers': 'Content-Type, X-CSRF-Token',
-            },
-          });
-          return;
-        }
+    await page.route(pathIncludesMatcher('/images/upload'), async (route) => {
+      if (route.request().method() === 'OPTIONS') {
         await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
+          status: 204,
           headers: {
             'Access-Control-Allow-Origin':
               (await route.request().allHeaders())['origin'] ?? '*',
             'Access-Control-Allow-Credentials': 'true',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, X-CSRF-Token',
           },
-          body: JSON.stringify({
-            url: 'http://insecure.example.com/logo.png',
-          }),
         });
-      },
-    );
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: {
+          'Access-Control-Allow-Origin':
+            (await route.request().allHeaders())['origin'] ?? '*',
+          'Access-Control-Allow-Credentials': 'true',
+        },
+        body: JSON.stringify({
+          url: 'http://insecure.example.com/logo.png',
+        }),
+      });
+    });
 
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
@@ -694,41 +691,38 @@ test.describe('Team Detail – branding actions (GM) @regression', () => {
   }) => {
     await setupGraphQL(page, { userTeamId: 1 });
 
-    await page.route(
-      (url) => url.pathname.includes('/images/upload'),
-      async (route) => {
-        // Cross-origin POST with a non-simple Content-Type (image/png)
-        // triggers a real CORS preflight — answer OPTIONS with CORS headers
-        // so the browser proceeds to send the actual POST. The real fetch
-        // uses credentials: 'include', so the origin must be echoed back
-        // (not '*') and Allow-Credentials set, or the browser blocks the
-        // response after a successful network round-trip.
-        const origin = (await route.request().allHeaders())['origin'] ?? '*';
-        const corsHeaders = {
-          'Access-Control-Allow-Origin': origin,
-          'Access-Control-Allow-Credentials': 'true',
-        };
-        if (route.request().method() === 'OPTIONS') {
-          await route.fulfill({
-            status: 204,
-            headers: {
-              ...corsHeaders,
-              'Access-Control-Allow-Methods': 'POST, OPTIONS',
-              'Access-Control-Allow-Headers': 'Content-Type, X-CSRF-Token',
-            },
-          });
-          return;
-        }
+    await page.route(pathIncludesMatcher('/images/upload'), async (route) => {
+      // Cross-origin POST with a non-simple Content-Type (image/png)
+      // triggers a real CORS preflight — answer OPTIONS with CORS headers
+      // so the browser proceeds to send the actual POST. The real fetch
+      // uses credentials: 'include', so the origin must be echoed back
+      // (not '*') and Allow-Credentials set, or the browser blocks the
+      // response after a successful network round-trip.
+      const origin = (await route.request().allHeaders())['origin'] ?? '*';
+      const corsHeaders = {
+        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Credentials': 'true',
+      };
+      if (route.request().method() === 'OPTIONS') {
         await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          headers: corsHeaders,
-          body: JSON.stringify({
-            url: 'https://cdn.example.com/uploaded-logo.png',
-          }),
+          status: 204,
+          headers: {
+            ...corsHeaders,
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, X-CSRF-Token',
+          },
         });
-      },
-    );
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: corsHeaders,
+        body: JSON.stringify({
+          url: 'https://cdn.example.com/uploaded-logo.png',
+        }),
+      });
+    });
 
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
@@ -777,17 +771,14 @@ test.describe('Team Detail – branding actions (GM) @regression', () => {
     await setupGraphQL(page, { userTeamId: 1 });
 
     let uploadCalled = false;
-    await page.route(
-      (url) => url.pathname.includes('/images/upload'),
-      async (route) => {
-        uploadCalled = true;
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ url: 'https://cdn.example.com/x.png' }),
-        });
-      },
-    );
+    await page.route(pathIncludesMatcher('/images/upload'), async (route) => {
+      uploadCalled = true;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ url: 'https://cdn.example.com/x.png' }),
+      });
+    });
 
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
@@ -811,17 +802,14 @@ test.describe('Team Detail – branding actions (GM) @regression', () => {
     await setupGraphQL(page, { userTeamId: 1 });
 
     let uploadCalled = false;
-    await page.route(
-      (url) => url.pathname.includes('/images/upload'),
-      async (route) => {
-        uploadCalled = true;
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ url: 'https://cdn.example.com/x.png' }),
-        });
-      },
-    );
+    await page.route(pathIncludesMatcher('/images/upload'), async (route) => {
+      uploadCalled = true;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ url: 'https://cdn.example.com/x.png' }),
+      });
+    });
 
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
@@ -875,35 +863,32 @@ test.describe('Team Detail – branding actions (GM) @regression', () => {
   }) => {
     await setupGraphQL(page, { userTeamId: 1 });
 
-    await page.route(
-      (url) => url.pathname.includes('/images/upload'),
-      async (route) => {
-        const origin = (await route.request().allHeaders())['origin'] ?? '*';
-        const corsHeaders = {
-          'Access-Control-Allow-Origin': origin,
-          'Access-Control-Allow-Credentials': 'true',
-        };
-        if (route.request().method() === 'OPTIONS') {
-          await route.fulfill({
-            status: 204,
-            headers: {
-              ...corsHeaders,
-              'Access-Control-Allow-Methods': 'POST, OPTIONS',
-              'Access-Control-Allow-Headers': 'Content-Type, X-CSRF-Token',
-            },
-          });
-          return;
-        }
+    await page.route(pathIncludesMatcher('/images/upload'), async (route) => {
+      const origin = (await route.request().allHeaders())['origin'] ?? '*';
+      const corsHeaders = {
+        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Credentials': 'true',
+      };
+      if (route.request().method() === 'OPTIONS') {
         await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          headers: corsHeaders,
-          body: JSON.stringify({
-            url: 'https://cdn.example.com/uploaded-banner.png',
-          }),
+          status: 204,
+          headers: {
+            ...corsHeaders,
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, X-CSRF-Token',
+          },
         });
-      },
-    );
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: corsHeaders,
+        body: JSON.stringify({
+          url: 'https://cdn.example.com/uploaded-banner.png',
+        }),
+      });
+    });
 
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
@@ -947,36 +932,33 @@ test.describe('Team Detail – branding actions (GM) @regression', () => {
   }) => {
     await setupGraphQL(page, { userTeamId: 1, errorBranding: true });
 
-    await page.route(
-      (url) => url.pathname.includes('/images/upload'),
-      async (route) => {
-        if (route.request().method() === 'OPTIONS') {
-          await route.fulfill({
-            status: 204,
-            headers: {
-              'Access-Control-Allow-Origin':
-                (await route.request().allHeaders())['origin'] ?? '*',
-              'Access-Control-Allow-Credentials': 'true',
-              'Access-Control-Allow-Methods': 'POST, OPTIONS',
-              'Access-Control-Allow-Headers': 'Content-Type, X-CSRF-Token',
-            },
-          });
-          return;
-        }
+    await page.route(pathIncludesMatcher('/images/upload'), async (route) => {
+      if (route.request().method() === 'OPTIONS') {
         await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
+          status: 204,
           headers: {
             'Access-Control-Allow-Origin':
               (await route.request().allHeaders())['origin'] ?? '*',
             'Access-Control-Allow-Credentials': 'true',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, X-CSRF-Token',
           },
-          body: JSON.stringify({
-            url: 'https://cdn.example.com/new-logo.png',
-          }),
         });
-      },
-    );
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: {
+          'Access-Control-Allow-Origin':
+            (await route.request().allHeaders())['origin'] ?? '*',
+          'Access-Control-Allow-Credentials': 'true',
+        },
+        body: JSON.stringify({
+          url: 'https://cdn.example.com/new-logo.png',
+        }),
+      });
+    });
 
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
@@ -1006,34 +988,31 @@ test.describe('Team Detail – branding actions (GM) @regression', () => {
   }) => {
     await setupGraphQL(page, { userTeamId: 1 });
 
-    await page.route(
-      (url) => url.pathname.includes('/images/upload'),
-      async (route) => {
-        if (route.request().method() === 'OPTIONS') {
-          await route.fulfill({
-            status: 204,
-            headers: {
-              'Access-Control-Allow-Origin':
-                (await route.request().allHeaders())['origin'] ?? '*',
-              'Access-Control-Allow-Credentials': 'true',
-              'Access-Control-Allow-Methods': 'POST, OPTIONS',
-              'Access-Control-Allow-Headers': 'Content-Type, X-CSRF-Token',
-            },
-          });
-          return;
-        }
+    await page.route(pathIncludesMatcher('/images/upload'), async (route) => {
+      if (route.request().method() === 'OPTIONS') {
         await route.fulfill({
-          status: 500,
-          contentType: 'application/json',
+          status: 204,
           headers: {
             'Access-Control-Allow-Origin':
               (await route.request().allHeaders())['origin'] ?? '*',
             'Access-Control-Allow-Credentials': 'true',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, X-CSRF-Token',
           },
-          body: JSON.stringify({ error: 'Storage backend unavailable' }),
         });
-      },
-    );
+        return;
+      }
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        headers: {
+          'Access-Control-Allow-Origin':
+            (await route.request().allHeaders())['origin'] ?? '*',
+          'Access-Control-Allow-Credentials': 'true',
+        },
+        body: JSON.stringify({ error: 'Storage backend unavailable' }),
+      });
+    });
 
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');

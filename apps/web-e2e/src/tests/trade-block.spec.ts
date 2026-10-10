@@ -130,120 +130,117 @@ async function setupGraphQL(
     onSetTradeBlock,
   } = opts;
 
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route, request) => {
-      const body = request.postDataJSON() as { operationName?: string };
-      const op = body.operationName ?? '';
+  await page.route(isGraphQLEndpoint, async (route, request) => {
+    const body = request.postDataJSON() as { operationName?: string };
+    const op = body.operationName ?? '';
 
-      if (op === 'GetLeagueById') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { league } }),
-        });
-        return;
-      }
-      if (op === 'GetLeagueTradeBlock') {
-        if (tradeBlockError) {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: null,
-              errors: [{ message: 'Failed to load trade block' }],
-            }),
-          });
-          return;
-        }
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { leagueTradeBlock: tradeBlock } }),
-        });
-        return;
-      }
-      if (op === 'SetTradeBlock') {
-        const result = onSetTradeBlock?.() ?? { success: true };
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { setTradeBlock: result } }),
-        });
-        return;
-      }
-      if (op === 'GetLeagueTeams') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { leagueTeams: [] } }),
-        });
-        return;
-      }
-      if (op === 'GetPositionsForLeague') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { leaguePositions: [] } }),
-        });
-        return;
-      }
-      if (op === 'GetUserTeamId') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { userTeamId: 1 } }),
-        });
-        return;
-      }
-      if (op === 'GetMatchupsForLeague') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getMatchupsForLeague: [] } }),
-        });
-        return;
-      }
-      if (op === 'GetCurrentWeekForLeague') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getCurrentWeekForLeague: null } }),
-        });
-        return;
-      }
-      if (op === 'GetLeagueDraft') {
+    if (op === 'GetLeagueById') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { league } }),
+      });
+      return;
+    }
+    if (op === 'GetLeagueTradeBlock') {
+      if (tradeBlockError) {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            data: {
-              getLeagueDraft: { __typename: 'Draft', draftMode: 'live' },
-            },
+            data: null,
+            errors: [{ message: 'Failed to load trade block' }],
           }),
         });
         return;
       }
-      if (op === 'GetDraftTeamOrder') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getDraftTeamOrder: [] } }),
-        });
-        return;
-      }
-      if (op === 'GetUserLeagues') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { userLeagues: [league] } }),
-        });
-        return;
-      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { leagueTradeBlock: tradeBlock } }),
+      });
+      return;
+    }
+    if (op === 'SetTradeBlock') {
+      const result = onSetTradeBlock?.() ?? { success: true };
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { setTradeBlock: result } }),
+      });
+      return;
+    }
+    if (op === 'GetLeagueTeams') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { leagueTeams: [] } }),
+      });
+      return;
+    }
+    if (op === 'GetPositionsForLeague') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { leaguePositions: [] } }),
+      });
+      return;
+    }
+    if (op === 'GetUserTeamId') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { userTeamId: 1 } }),
+      });
+      return;
+    }
+    if (op === 'GetMatchupsForLeague') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getMatchupsForLeague: [] } }),
+      });
+      return;
+    }
+    if (op === 'GetCurrentWeekForLeague') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getCurrentWeekForLeague: null } }),
+      });
+      return;
+    }
+    if (op === 'GetLeagueDraft') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            getLeagueDraft: { __typename: 'Draft', draftMode: 'live' },
+          },
+        }),
+      });
+      return;
+    }
+    if (op === 'GetDraftTeamOrder') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getDraftTeamOrder: [] } }),
+      });
+      return;
+    }
+    if (op === 'GetUserLeagues') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { userLeagues: [league] } }),
+      });
+      return;
+    }
 
-      await unmockedGraphQLFallback(route);
-    },
-  );
+    await unmockedGraphQLFallback(route);
+  });
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -408,19 +405,16 @@ test.describe('Trade Block Management @regression', () => {
     });
 
     // Additionally intercept to capture variables
-    await page.route(
-      (url) => isGraphQLEndpoint(url),
-      async (route, request) => {
-        const body = request.postDataJSON() as {
-          operationName?: string;
-          variables?: Record<string, unknown>;
-        };
-        if (body.operationName === 'SetTradeBlock') {
-          mutationCalls.push(body.variables ?? {});
-        }
-        await route.fallback();
-      },
-    );
+    await page.route(isGraphQLEndpoint, async (route, request) => {
+      const body = request.postDataJSON() as {
+        operationName?: string;
+        variables?: Record<string, unknown>;
+      };
+      if (body.operationName === 'SetTradeBlock') {
+        mutationCalls.push(body.variables ?? {});
+      }
+      await route.fallback();
+    });
 
     await tradesPage.gotoTrades(1);
 

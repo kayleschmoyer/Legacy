@@ -41,21 +41,18 @@ const EMPTY_FOOTBALL_RESPONSE = {
 };
 
 async function mockFootballPlayers(page: import('@playwright/test').Page) {
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route) => {
-      const op = extractOperationName(route).toLowerCase();
-      if (op === 'footballplayers') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(EMPTY_FOOTBALL_RESPONSE),
-        });
-      } else {
-        await route.fallback();
-      }
-    },
-  );
+  await page.route(isGraphQLEndpoint, async (route) => {
+    const op = extractOperationName(route).toLowerCase();
+    if (op === 'footballplayers') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(EMPTY_FOOTBALL_RESPONSE),
+      });
+    } else {
+      await route.fallback();
+    }
+  });
 }
 
 // ── Football context ──────────────────────────────────────────────────────────

@@ -92,97 +92,94 @@ const MOCK_POSITIONS = [
 ];
 
 async function setupGraphQL(page: import('@playwright/test').Page) {
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route, request) => {
-      const body = request.postDataJSON() as {
-        operationName?: string;
-      };
-      const op = body.operationName ?? '';
+  await page.route(isGraphQLEndpoint, async (route, request) => {
+    const body = request.postDataJSON() as {
+      operationName?: string;
+    };
+    const op = body.operationName ?? '';
 
-      if (op === 'GetTeamMembers') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { teamMembers: MOCK_TEAM_MEMBERS } }),
-        });
-        return;
-      }
-      if (op === 'GetTeamById') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: { team: makeTeam({ managerId: null }) },
-          }),
-        });
-        return;
-      }
-      if (op === 'GetLeagueTeams') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { leagueTeams: [makeTeam()] } }),
-        });
-        return;
-      }
-      if (op === 'GetUserTeamId') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { userTeamId: TEAM_ID + 999 } }),
-        });
-        return;
-      }
-      if (op === 'GetLeagueById') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              league: {
-                __typename: 'League',
-                id: LEAGUE_ID,
-                userMembership: {
-                  teamId: TEAM_ID + 999,
-                  permissionLevel: 'member',
-                },
-              },
-            },
-          }),
-        });
-        return;
-      }
-      if (op === 'GetViewerMembership') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              viewerMembership: {
-                __typename: 'LeagueMember',
-                leagueId: LEAGUE_ID,
-                userId: 1,
+    if (op === 'GetTeamMembers') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { teamMembers: MOCK_TEAM_MEMBERS } }),
+      });
+      return;
+    }
+    if (op === 'GetTeamById') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { team: makeTeam({ managerId: null }) },
+        }),
+      });
+      return;
+    }
+    if (op === 'GetLeagueTeams') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { leagueTeams: [makeTeam()] } }),
+      });
+      return;
+    }
+    if (op === 'GetUserTeamId') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { userTeamId: TEAM_ID + 999 } }),
+      });
+      return;
+    }
+    if (op === 'GetLeagueById') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            league: {
+              __typename: 'League',
+              id: LEAGUE_ID,
+              userMembership: {
                 teamId: TEAM_ID + 999,
                 permissionLevel: 'member',
               },
             },
-          }),
-        });
-        return;
-      }
-      if (op === 'GetPositionsForLeague') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { leaguePositions: MOCK_POSITIONS } }),
-        });
-        return;
-      }
+          },
+        }),
+      });
+      return;
+    }
+    if (op === 'GetViewerMembership') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            viewerMembership: {
+              __typename: 'LeagueMember',
+              leagueId: LEAGUE_ID,
+              userId: 1,
+              teamId: TEAM_ID + 999,
+              permissionLevel: 'member',
+            },
+          },
+        }),
+      });
+      return;
+    }
+    if (op === 'GetPositionsForLeague') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { leaguePositions: MOCK_POSITIONS } }),
+      });
+      return;
+    }
 
-      await unmockedGraphQLFallback(route);
-    },
-  );
+    await unmockedGraphQLFallback(route);
+  });
 }
 
 test.describe('Roster Section @regression', () => {

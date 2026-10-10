@@ -25,7 +25,7 @@
  */
 
 import type { WebSocketRoute } from '@playwright/test';
-import { injectWebSocketUrl } from './helpers/websocket-test-utils';
+import { injectWebSocketUrl, isGraphQL } from './helpers/websocket-test-utils';
 import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth-enhanced';
 import {
@@ -142,18 +142,6 @@ function mockMatchup(
  */
 function wsNotification(data: Record<string, unknown>): string {
   return JSON.stringify({ type: 'notification', data });
-}
-
-// ── GraphQL route helper ───────────────────────────────────────────────────────
-
-function isGraphQL(url: URL): boolean {
-  const s = url.toString();
-  return (
-    s.includes('/graphql') &&
-    !s.includes('/@fs/') &&
-    !s.includes('.ts') &&
-    !s.includes('.js')
-  );
 }
 
 interface SetupOptions {

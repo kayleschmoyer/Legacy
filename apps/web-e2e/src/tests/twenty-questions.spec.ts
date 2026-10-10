@@ -59,93 +59,58 @@ async function setupTwentyQuestionsMocks(
   const { guessCorrect = true } = options;
   let questionsAsked = 0;
 
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route) => {
-      const op = extractOperationName(route).toLowerCase();
+  await page.route(isGraphQLEndpoint, async (route) => {
+    const op = extractOperationName(route).toLowerCase();
 
-      if (op === 'twentyquestionsactivegame') {
-        // No active game on mount — show entry screen fresh.
-        void route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { twentyQuestionsActiveGame: null } }),
-        });
-      } else if (op === 'twentyquestionsstart') {
-        void route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: { twentyQuestionsStart: makeGameState() },
-          }),
-        });
-      } else if (op === 'twentyquestionsask') {
-        questionsAsked += 1;
+    if (op === 'twentyquestionsactivegame') {
+      // No active game on mount — show entry screen fresh.
+      void route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { twentyQuestionsActiveGame: null } }),
+      });
+    } else if (op === 'twentyquestionsstart') {
+      void route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { twentyQuestionsStart: makeGameState() },
+        }),
+      });
+    } else if (op === 'twentyquestionsask') {
+      questionsAsked += 1;
+      void route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            twentyQuestionsAsk: makeGameState({
+              questionsUsed: questionsAsked,
+              questions: [
+                {
+                  questionNumber: questionsAsked,
+                  category: 'position',
+                  parameter: '{"position":"C"}',
+                  answer: true,
+                  isGuess: false,
+                  guessPlayer: null,
+                },
+              ],
+            }),
+          },
+        }),
+      });
+    } else if (op === 'twentyquestionsguess') {
+      if (guessCorrect) {
         void route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
             data: {
-              twentyQuestionsAsk: makeGameState({
+              twentyQuestionsGuess: makeGameState({
+                status: 'won',
                 questionsUsed: questionsAsked,
-                questions: [
-                  {
-                    questionNumber: questionsAsked,
-                    category: 'position',
-                    parameter: '{"position":"C"}',
-                    answer: true,
-                    isGuess: false,
-                    guessPlayer: null,
-                  },
-                ],
-              }),
-            },
-          }),
-        });
-      } else if (op === 'twentyquestionsguess') {
-        if (guessCorrect) {
-          void route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                twentyQuestionsGuess: makeGameState({
-                  status: 'won',
-                  questionsUsed: questionsAsked,
-                  tokensEarned: TOKENS_EARNED,
-                  targetPlayer: {
-                    id: CORRECT_PLAYER_ID,
-                    firstName: CORRECT_PLAYER_FIRST,
-                    lastName: CORRECT_PLAYER_LAST,
-                    eligiblePositions: ['C'],
-                  },
-                }),
-              },
-            }),
-          });
-        } else {
-          // Wrong guess — server returns the same active game state
-          void route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                twentyQuestionsGuess: makeGameState({
-                  questionsUsed: questionsAsked,
-                }),
-              },
-            }),
-          });
-        }
-      } else if (op === 'twentyquestionsabandon') {
-        void route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              twentyQuestionsAbandon: makeGameState({
-                status: 'abandoned',
-                questionsUsed: questionsAsked,
+                tokensEarned: TOKENS_EARNED,
                 targetPlayer: {
                   id: CORRECT_PLAYER_ID,
                   firstName: CORRECT_PLAYER_FIRST,
@@ -156,28 +121,60 @@ async function setupTwentyQuestionsMocks(
             },
           }),
         });
-      } else if (op === 'searchplayersfortwentyquestions') {
+      } else {
+        // Wrong guess — server returns the same active game state
         void route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
             data: {
-              searchPlayers: [
-                {
-                  __typename: 'Player',
-                  id: CORRECT_PLAYER_ID,
-                  firstName: CORRECT_PLAYER_FIRST,
-                  lastName: CORRECT_PLAYER_LAST,
-                },
-              ],
+              twentyQuestionsGuess: makeGameState({
+                questionsUsed: questionsAsked,
+              }),
             },
           }),
         });
-      } else {
-        await unmockedGraphQLFallback(route);
       }
-    },
-  );
+    } else if (op === 'twentyquestionsabandon') {
+      void route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            twentyQuestionsAbandon: makeGameState({
+              status: 'abandoned',
+              questionsUsed: questionsAsked,
+              targetPlayer: {
+                id: CORRECT_PLAYER_ID,
+                firstName: CORRECT_PLAYER_FIRST,
+                lastName: CORRECT_PLAYER_LAST,
+                eligiblePositions: ['C'],
+              },
+            }),
+          },
+        }),
+      });
+    } else if (op === 'searchplayersfortwentyquestions') {
+      void route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            searchPlayers: [
+              {
+                __typename: 'Player',
+                id: CORRECT_PLAYER_ID,
+                firstName: CORRECT_PLAYER_FIRST,
+                lastName: CORRECT_PLAYER_LAST,
+              },
+            ],
+          },
+        }),
+      });
+    } else {
+      await unmockedGraphQLFallback(route);
+    }
+  });
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────

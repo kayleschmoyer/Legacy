@@ -426,39 +426,35 @@ async function setupMocks(
     careerArcBody = BATTER_CAREER_ARC,
   } = opts;
 
-  await page.route(
-    (url) =>
-      url.toString().includes('/graphql') && !url.toString().includes('/@fs/'),
-    async (route) => {
-      const operation = extractOperationName(route).toLowerCase();
+  await page.route(/^(?!.*\/@fs\/).*\/graphql/, async (route) => {
+    const operation = extractOperationName(route).toLowerCase();
 
-      if (operation === 'getplayercareerarc') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(careerArcBody),
-        });
-      } else if (operation === 'getallplayerseasonstats') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(seasonStatsBody),
-        });
-      } else if (
-        operation === 'getcareerbattingstats' ||
-        operation === 'getallplayers' ||
-        operation === 'getplayerswithstats'
-      ) {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(STATS_TABLE_RESPONSE),
-        });
-      } else {
-        await unmockedGraphQLFallback(route);
-      }
-    },
-  );
+    if (operation === 'getplayercareerarc') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(careerArcBody),
+      });
+    } else if (operation === 'getallplayerseasonstats') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(seasonStatsBody),
+      });
+    } else if (
+      operation === 'getcareerbattingstats' ||
+      operation === 'getallplayers' ||
+      operation === 'getplayerswithstats'
+    ) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(STATS_TABLE_RESPONSE),
+      });
+    } else {
+      await unmockedGraphQLFallback(route);
+    }
+  });
 }
 
 // ── Tests: Player bio display ───────────────────────────────────────────────

@@ -452,39 +452,35 @@ async function setupMocks(
     careerArcBody = PITCHER_CAREER_ARC,
   } = opts;
 
-  await page.route(
-    (url) =>
-      url.toString().includes('/graphql') && !url.toString().includes('/@fs/'),
-    async (route) => {
-      const op = extractOperationName(route).toLowerCase();
+  await page.route(/^(?!.*\/@fs\/).*\/graphql/, async (route) => {
+    const op = extractOperationName(route).toLowerCase();
 
-      if (op === 'getplayercareerarc') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(careerArcBody),
-        });
-      } else if (op === 'getallplayerseasonstats') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(seasonStatsBody),
-        });
-      } else if (
-        op === 'getcareerbattingstats' ||
-        op === 'getallplayers' ||
-        op === 'getplayerswithstats'
-      ) {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(STATS_TABLE_RESPONSE),
-        });
-      } else {
-        await unmockedGraphQLFallback(route);
-      }
-    },
-  );
+    if (op === 'getplayercareerarc') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(careerArcBody),
+      });
+    } else if (op === 'getallplayerseasonstats') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(seasonStatsBody),
+      });
+    } else if (
+      op === 'getcareerbattingstats' ||
+      op === 'getallplayers' ||
+      op === 'getplayerswithstats'
+    ) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(STATS_TABLE_RESPONSE),
+      });
+    } else {
+      await unmockedGraphQLFallback(route);
+    }
+  });
 }
 
 /** Navigate to the player detail modal and switch to Career Arc tab. */

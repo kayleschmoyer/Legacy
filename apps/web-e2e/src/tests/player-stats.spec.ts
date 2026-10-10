@@ -274,26 +274,15 @@ test.describe('Player Statistics Page @regression', () => {
     playersPage,
   }) => {
     // Navigate to page and intercept network requests to simulate slow loading
-    await page.route(
-      (url) => {
-        const s = url.toString();
-        return (
-          s.includes('/graphql') &&
-          !s.includes('/@fs/') &&
-          !s.includes('.ts') &&
-          !s.includes('.js')
-        );
-      },
-      async (route) => {
-        // Delay the response to test loading state
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: {} }),
-        });
-      },
-    );
+    await page.route(isGraphQLEndpoint, async (route) => {
+      // Delay the response to test loading state
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: {} }),
+      });
+    });
 
     await playersPage.gotoStats();
 

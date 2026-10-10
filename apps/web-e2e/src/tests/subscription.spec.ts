@@ -464,7 +464,7 @@ test.describe('Subscription upgrade flow @critical', () => {
     // stripePricesDone resolves once we've confirmed actual price IDs landed in
     // the browser — this guarantees they're in the Apollo cache before we click.
     const stripePricesDone = page.waitForResponse(async (response) => {
-      if (!isGraphQLEndpoint(new URL(response.url()))) return false;
+      if (!isGraphQLEndpoint.test(response.url())) return false;
       const body: unknown = await response.json().catch(() => null);
       return (
         typeof body === 'object' &&
@@ -480,7 +480,7 @@ test.describe('Subscription upgrade flow @critical', () => {
     // polling needed and no risk of missing the request.
     const checkoutSent = page.waitForRequest(
       (req) =>
-        isGraphQLEndpoint(new URL(req.url())) &&
+        isGraphQLEndpoint.test(req.url()) &&
         (req.postData()?.toLowerCase() ?? '').includes('createcheckoutsession'),
       { timeout: 10_000 },
     );

@@ -169,76 +169,73 @@ const MOCK_STANDINGS = [
 async function mockFootballMatchupGraphQL(
   page: import('@playwright/test').Page,
 ) {
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route) => {
-      const op = extractOperationName(route);
+  await page.route(isGraphQLEndpoint, async (route) => {
+    const op = extractOperationName(route);
 
-      if (op === 'GetMatchupById') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getMatchupById: MOCK_MATCHUP } }),
-        });
-      } else if (op === 'GetMatchupsForLeague') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: { getMatchupsForLeague: MOCK_MATCHUPS_FOR_LEAGUE },
-          }),
-        });
-      } else if (op === 'GetCurrentWeekForLeague') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getCurrentWeekForLeague: 3 } }),
-        });
-      } else if (op === 'GetUserTeamId') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { userTeamId: TEAM1_ID } }),
-        });
-      } else if (op === 'GetLeagueTeams') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
-        });
-      } else if (op === 'GetLeagueById') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { league: MOCK_LEAGUE } }),
-        });
-      } else if (op === 'GetLeagueStandings') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: { getLeagueStandings: MOCK_STANDINGS },
-          }),
-        });
-      } else if (op === 'MatchupScores') {
-        // Football-only live-scoring query fired by MatchupAdditionalSections;
-        // an empty list is a valid, minimal response for this header-only test.
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { matchupScores: [] } }),
-        });
-      } else if (op === 'GetTeamMatchupHistory') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getTeamMatchupHistory: [] } }),
-        });
-      } else {
-        await unmockedGraphQLFallback(route);
-      }
-    },
-  );
+    if (op === 'GetMatchupById') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getMatchupById: MOCK_MATCHUP } }),
+      });
+    } else if (op === 'GetMatchupsForLeague') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { getMatchupsForLeague: MOCK_MATCHUPS_FOR_LEAGUE },
+        }),
+      });
+    } else if (op === 'GetCurrentWeekForLeague') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getCurrentWeekForLeague: 3 } }),
+      });
+    } else if (op === 'GetUserTeamId') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { userTeamId: TEAM1_ID } }),
+      });
+    } else if (op === 'GetLeagueTeams') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
+      });
+    } else if (op === 'GetLeagueById') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { league: MOCK_LEAGUE } }),
+      });
+    } else if (op === 'GetLeagueStandings') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { getLeagueStandings: MOCK_STANDINGS },
+        }),
+      });
+    } else if (op === 'MatchupScores') {
+      // Football-only live-scoring query fired by MatchupAdditionalSections;
+      // an empty list is a valid, minimal response for this header-only test.
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { matchupScores: [] } }),
+      });
+    } else if (op === 'GetTeamMatchupHistory') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getTeamMatchupHistory: [] } }),
+      });
+    } else {
+      await unmockedGraphQLFallback(route);
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------

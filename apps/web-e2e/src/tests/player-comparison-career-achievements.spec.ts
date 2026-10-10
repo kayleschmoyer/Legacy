@@ -223,53 +223,50 @@ function makeMockPlayersResponse(players = MOCK_PLAYERS) {
 
 /** Sets up GraphQL mocks for the Player Comparison page. */
 async function mockGraphQL(page: import('@playwright/test').Page) {
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route) => {
-      const op = extractOperationName(route).toLowerCase();
+  await page.route(isGraphQLEndpoint, async (route) => {
+    const op = extractOperationName(route).toLowerCase();
 
-      if (op === 'getplayerswithstats') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(makeMockPlayersResponse()),
-        });
-      } else if (op === 'getallplayerseasonstats') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              player: { eligiblePositions: [], firstName: '', lastName: '' },
-              playerSeasonBatting: [],
-              playerSeasonPitching: [],
-              playerSeasonFielding: [],
+    if (op === 'getplayerswithstats') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(makeMockPlayersResponse()),
+      });
+    } else if (op === 'getallplayerseasonstats') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            player: { eligiblePositions: [], firstName: '', lastName: '' },
+            playerSeasonBatting: [],
+            playerSeasonPitching: [],
+            playerSeasonFielding: [],
+          },
+        }),
+      });
+    } else if (op === 'getmysubscription') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            mySubscription: {
+              __typename: 'SubscriptionInfo',
+              status: 'active',
+              tier: 'premium',
+              currentPeriodEnd: '2026-12-31T00:00:00.000Z',
+              cancelAtPeriodEnd: false,
+              trialEndsAt: null,
+              gracePeriodEndsAt: null,
             },
-          }),
-        });
-      } else if (op === 'getmysubscription') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              mySubscription: {
-                __typename: 'SubscriptionInfo',
-                status: 'active',
-                tier: 'premium',
-                currentPeriodEnd: '2026-12-31T00:00:00.000Z',
-                cancelAtPeriodEnd: false,
-                trialEndsAt: null,
-                gracePeriodEndsAt: null,
-              },
-            },
-          }),
-        });
-      } else {
-        await unmockedGraphQLFallback(route);
-      }
-    },
-  );
+          },
+        }),
+      });
+    } else {
+      await unmockedGraphQLFallback(route);
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -56,121 +56,118 @@ async function setupDisclosureMocks(
   const { guessCorrect = true } = options;
   let clueIndex = 0;
 
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route) => {
-      const operation = extractOperationName(route).toLowerCase();
+  await page.route(isGraphQLEndpoint, async (route) => {
+    const operation = extractOperationName(route).toLowerCase();
 
-      if (operation === 'activedisclosuregame') {
-        // Resume check fired on mount (LS-4816). No in-progress game →
-        // the idle screen shows "Start Game" with no Resume CTA.
-        // Match the quoted operationName to avoid matching other payloads.
-        void route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: { activeDisclosureGame: null },
-          }),
-        });
-      } else if (operation === 'startdisclosuregame') {
-        void route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              startDisclosureGame: {
-                __typename: 'StartDisclosureGameResult',
-                sessionId: SESSION_ID,
-                totalClues: TOTAL_CLUES,
-              },
+    if (operation === 'activedisclosuregame') {
+      // Resume check fired on mount (LS-4816). No in-progress game →
+      // the idle screen shows "Start Game" with no Resume CTA.
+      // Match the quoted operationName to avoid matching other payloads.
+      void route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { activeDisclosureGame: null },
+        }),
+      });
+    } else if (operation === 'startdisclosuregame') {
+      void route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            startDisclosureGame: {
+              __typename: 'StartDisclosureGameResult',
+              sessionId: SESSION_ID,
+              totalClues: TOTAL_CLUES,
             },
-          }),
-        });
-      } else if (operation === 'nextclue') {
-        clueIndex += 1;
-        const isLast = clueIndex >= TOTAL_CLUES;
-        void route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: { nextClue: makeClue(clueIndex, isLast) },
-          }),
-        });
-      } else if (operation === 'submitguess') {
-        if (guessCorrect) {
-          void route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                submitGuess: {
-                  __typename: 'DisclosureGuessResult',
-                  correct: true,
-                  score: 900,
-                  correctPlayerId: null,
-                  cluesUsed: clueIndex,
-                },
-              },
-            }),
-          });
-        } else {
-          void route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                submitGuess: {
-                  __typename: 'DisclosureGuessResult',
-                  correct: false,
-                  score: 0,
-                  correctPlayerId: null,
-                  cluesUsed: clueIndex,
-                },
-              },
-            }),
-          });
-        }
-      } else if (operation === 'giveupdisclosuregame') {
+          },
+        }),
+      });
+    } else if (operation === 'nextclue') {
+      clueIndex += 1;
+      const isLast = clueIndex >= TOTAL_CLUES;
+      void route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { nextClue: makeClue(clueIndex, isLast) },
+        }),
+      });
+    } else if (operation === 'submitguess') {
+      if (guessCorrect) {
         void route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
             data: {
-              giveUpDisclosureGame: {
-                __typename: 'GiveUpDisclosureGameResult',
-                correctPlayerId: CORRECT_PLAYER_ID,
+              submitGuess: {
+                __typename: 'DisclosureGuessResult',
+                correct: true,
+                score: 900,
+                correctPlayerId: null,
+                cluesUsed: clueIndex,
               },
-            },
-          }),
-        });
-      } else if (operation === 'searchplayersfordisclosure') {
-        void route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              searchPlayers: [
-                {
-                  __typename: 'Player',
-                  id: CORRECT_PLAYER_ID,
-                  firstName: 'Babe',
-                  lastName: 'Ruth',
-                },
-                {
-                  __typename: 'Player',
-                  id: 456,
-                  firstName: 'Mickey',
-                  lastName: 'Mantle',
-                },
-              ],
             },
           }),
         });
       } else {
-        await unmockedGraphQLFallback(route);
+        void route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              submitGuess: {
+                __typename: 'DisclosureGuessResult',
+                correct: false,
+                score: 0,
+                correctPlayerId: null,
+                cluesUsed: clueIndex,
+              },
+            },
+          }),
+        });
       }
-    },
-  );
+    } else if (operation === 'giveupdisclosuregame') {
+      void route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            giveUpDisclosureGame: {
+              __typename: 'GiveUpDisclosureGameResult',
+              correctPlayerId: CORRECT_PLAYER_ID,
+            },
+          },
+        }),
+      });
+    } else if (operation === 'searchplayersfordisclosure') {
+      void route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            searchPlayers: [
+              {
+                __typename: 'Player',
+                id: CORRECT_PLAYER_ID,
+                firstName: 'Babe',
+                lastName: 'Ruth',
+              },
+              {
+                __typename: 'Player',
+                id: 456,
+                firstName: 'Mickey',
+                lastName: 'Mantle',
+              },
+            ],
+          },
+        }),
+      });
+    } else {
+      await unmockedGraphQLFallback(route);
+    }
+  });
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -306,84 +303,81 @@ test.describe('Progressive Disclosure Game @minigame', () => {
     // that returns isLastClue: true to trigger the lost path.
     let clueIndex = 0;
 
-    await page.route(
-      (url) => isGraphQLEndpoint(url),
-      async (route) => {
-        const operation = extractOperationName(route).toLowerCase();
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const operation = extractOperationName(route).toLowerCase();
 
-        if (operation === 'activedisclosuregame') {
-          // Resume check fired on mount (LS-4816). No in-progress game.
-          // Match the quoted operationName to avoid matching other payloads.
-          void route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: { activeDisclosureGame: null },
-            }),
-          });
-        } else if (operation === 'startdisclosuregame') {
-          void route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                startDisclosureGame: {
-                  __typename: 'StartDisclosureGameResult',
-                  sessionId: SESSION_ID,
-                  totalClues: TOTAL_CLUES,
+      if (operation === 'activedisclosuregame') {
+        // Resume check fired on mount (LS-4816). No in-progress game.
+        // Match the quoted operationName to avoid matching other payloads.
+        void route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { activeDisclosureGame: null },
+          }),
+        });
+      } else if (operation === 'startdisclosuregame') {
+        void route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              startDisclosureGame: {
+                __typename: 'StartDisclosureGameResult',
+                sessionId: SESSION_ID,
+                totalClues: TOTAL_CLUES,
+              },
+            },
+          }),
+        });
+      } else if (operation === 'nextclue') {
+        clueIndex += 1;
+        const isLast = clueIndex >= TOTAL_CLUES;
+        void route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { nextClue: makeClue(clueIndex, isLast) },
+          }),
+        });
+      } else if (operation === 'submitguess') {
+        // Wrong guess after all clues revealed — server signals isLastClue
+        void route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              submitGuess: {
+                __typename: 'DisclosureGuessResult',
+                correct: false,
+                score: 0,
+                correctPlayerId: CORRECT_PLAYER_ID,
+                cluesUsed: TOTAL_CLUES,
+              },
+            },
+          }),
+        });
+      } else if (operation === 'searchplayersfordisclosure') {
+        void route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              searchPlayers: [
+                {
+                  __typename: 'Player',
+                  id: CORRECT_PLAYER_ID,
+                  firstName: 'Babe',
+                  lastName: 'Ruth',
                 },
-              },
-            }),
-          });
-        } else if (operation === 'nextclue') {
-          clueIndex += 1;
-          const isLast = clueIndex >= TOTAL_CLUES;
-          void route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: { nextClue: makeClue(clueIndex, isLast) },
-            }),
-          });
-        } else if (operation === 'submitguess') {
-          // Wrong guess after all clues revealed — server signals isLastClue
-          void route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                submitGuess: {
-                  __typename: 'DisclosureGuessResult',
-                  correct: false,
-                  score: 0,
-                  correctPlayerId: CORRECT_PLAYER_ID,
-                  cluesUsed: TOTAL_CLUES,
-                },
-              },
-            }),
-          });
-        } else if (operation === 'searchplayersfordisclosure') {
-          void route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                searchPlayers: [
-                  {
-                    __typename: 'Player',
-                    id: CORRECT_PLAYER_ID,
-                    firstName: 'Babe',
-                    lastName: 'Ruth',
-                  },
-                ],
-              },
-            }),
-          });
-        } else {
-          await unmockedGraphQLFallback(route);
-        }
-      },
-    );
+              ],
+            },
+          }),
+        });
+      } else {
+        await unmockedGraphQLFallback(route);
+      }
+    });
 
     await page.goto(GAME_URL);
     await page.waitForLoadState('networkidle');

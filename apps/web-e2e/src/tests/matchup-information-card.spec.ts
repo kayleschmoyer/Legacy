@@ -101,55 +101,52 @@ async function mockMatchupGraphQL(
   matchupOverrides: Partial<typeof MOCK_MATCHUP> = {},
 ) {
   const matchup = { ...MOCK_MATCHUP, ...matchupOverrides };
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route) => {
-      // Match on the exact GraphQL operation name (not a substring of the raw
-      // body) so a future operation whose name contains one of these as a
-      // substring can't be silently intercepted.
-      switch (extractOperationName(route)) {
-        case 'GetMatchupById':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { getMatchupById: matchup } }),
-          });
-          break;
-        case 'GetMatchupsForLeague':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: { getMatchupsForLeague: [matchup] },
-            }),
-          });
-          break;
-        case 'GetCurrentWeekForLeague':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { getCurrentWeekForLeague: 3 } }),
-          });
-          break;
-        case 'GetUserTeamId':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { userTeamId: 1 } }),
-          });
-          break;
-        case 'GetLeagueTeams':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
-          });
-          break;
-        default:
-          await unmockedGraphQLFallback(route);
-      }
-    },
-  );
+  await page.route(isGraphQLEndpoint, async (route) => {
+    // Match on the exact GraphQL operation name (not a substring of the raw
+    // body) so a future operation whose name contains one of these as a
+    // substring can't be silently intercepted.
+    switch (extractOperationName(route)) {
+      case 'GetMatchupById':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { getMatchupById: matchup } }),
+        });
+        break;
+      case 'GetMatchupsForLeague':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { getMatchupsForLeague: [matchup] },
+          }),
+        });
+        break;
+      case 'GetCurrentWeekForLeague':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { getCurrentWeekForLeague: 3 } }),
+        });
+        break;
+      case 'GetUserTeamId':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { userTeamId: 1 } }),
+        });
+        break;
+      case 'GetLeagueTeams':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
+        });
+        break;
+      default:
+        await unmockedGraphQLFallback(route);
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------

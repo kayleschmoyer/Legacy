@@ -161,143 +161,140 @@ const MOCK_MATCHUP_PLAYERS = [
 ];
 
 async function mockMatchupGraphQL(page: import('@playwright/test').Page) {
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route) => {
-      switch (extractOperationName(route)) {
-        case 'GetMatchupById':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { getMatchupById: MOCK_MATCHUP } }),
-          });
-          break;
-        case 'GetMatchupsForLeague':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: { getMatchupsForLeague: [MOCK_MATCHUP] },
-            }),
-          });
-          break;
-        case 'GetCurrentWeekForLeague':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { getCurrentWeekForLeague: 5 } }),
-          });
-          break;
-        case 'GetUserTeamId':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { userTeamId: null } }),
-          });
-          break;
-        case 'GetLeagueTeams':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
-          });
-          break;
-        case 'GetLeagueById':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { league: MOCK_LEAGUE } }),
-          });
-          break;
-        case 'GetMatchupPlayers':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: { getMatchupPlayers: MOCK_MATCHUP_PLAYERS },
-            }),
-          });
-          break;
-        case 'GetPositionsForLeague':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { leaguePositions: MOCK_POSITIONS } }),
-          });
-          break;
-        case 'GetLeagueScoringProfile':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { leagueScoringProfile: null } }),
-          });
-          break;
-        case 'MatchupScores':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { matchupScores: [] } }),
-          });
-          break;
-        case 'GetTeamMatchupHistory':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { getTeamMatchupHistory: [] } }),
-          });
-          break;
-        case 'GetLeagueStandings':
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { getLeagueStandings: [] } }),
-          });
-          break;
-        case 'FootballPlayer': {
-          // FootballPlayerDetailModal fires `useFootballPlayerQuery`
-          // ("FootballPlayer", FootballPlayerHeader/DetailExtras fragments) —
-          // a distinct operation from the "GetFootballPlayer" query used
-          // elsewhere in the app. Mirrors the fixture already proven in
-          // football-matchup-tab.spec.ts's 'footballplayer' mock.
-          const postData = route.request().postData() ?? '{}';
-          const requestedId = (
-            JSON.parse(postData) as { variables?: { id?: number } }
-          ).variables?.id;
-          const match = MOCK_MATCHUP_PLAYERS.find(
-            (mp) => mp.playerId === requestedId,
-          );
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                footballPlayer: match
-                  ? {
-                      __typename: 'FootballPlayer',
-                      id: match.playerId,
-                      firstName: match.player.firstName,
-                      lastName: match.player.lastName,
-                      position: 'QB',
-                      isDst: false,
-                      nflTeam: 'KC',
-                      pfrId: null,
-                      headshotUrl: null,
-                      previousTeams: null,
-                      projectedFantasyPoints: null,
-                      adpRank: null,
-                      careerStats: null,
-                    }
-                  : null,
-              },
-            }),
-          });
-          break;
-        }
-        default:
-          await unmockedGraphQLFallback(route);
+  await page.route(isGraphQLEndpoint, async (route) => {
+    switch (extractOperationName(route)) {
+      case 'GetMatchupById':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { getMatchupById: MOCK_MATCHUP } }),
+        });
+        break;
+      case 'GetMatchupsForLeague':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { getMatchupsForLeague: [MOCK_MATCHUP] },
+          }),
+        });
+        break;
+      case 'GetCurrentWeekForLeague':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { getCurrentWeekForLeague: 5 } }),
+        });
+        break;
+      case 'GetUserTeamId':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { userTeamId: null } }),
+        });
+        break;
+      case 'GetLeagueTeams':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
+        });
+        break;
+      case 'GetLeagueById':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { league: MOCK_LEAGUE } }),
+        });
+        break;
+      case 'GetMatchupPlayers':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { getMatchupPlayers: MOCK_MATCHUP_PLAYERS },
+          }),
+        });
+        break;
+      case 'GetPositionsForLeague':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { leaguePositions: MOCK_POSITIONS } }),
+        });
+        break;
+      case 'GetLeagueScoringProfile':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { leagueScoringProfile: null } }),
+        });
+        break;
+      case 'MatchupScores':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { matchupScores: [] } }),
+        });
+        break;
+      case 'GetTeamMatchupHistory':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { getTeamMatchupHistory: [] } }),
+        });
+        break;
+      case 'GetLeagueStandings':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { getLeagueStandings: [] } }),
+        });
+        break;
+      case 'FootballPlayer': {
+        // FootballPlayerDetailModal fires `useFootballPlayerQuery`
+        // ("FootballPlayer", FootballPlayerHeader/DetailExtras fragments) —
+        // a distinct operation from the "GetFootballPlayer" query used
+        // elsewhere in the app. Mirrors the fixture already proven in
+        // football-matchup-tab.spec.ts's 'footballplayer' mock.
+        const postData = route.request().postData() ?? '{}';
+        const requestedId = (
+          JSON.parse(postData) as { variables?: { id?: number } }
+        ).variables?.id;
+        const match = MOCK_MATCHUP_PLAYERS.find(
+          (mp) => mp.playerId === requestedId,
+        );
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              footballPlayer: match
+                ? {
+                    __typename: 'FootballPlayer',
+                    id: match.playerId,
+                    firstName: match.player.firstName,
+                    lastName: match.player.lastName,
+                    position: 'QB',
+                    isDst: false,
+                    nflTeam: 'KC',
+                    pfrId: null,
+                    headshotUrl: null,
+                    previousTeams: null,
+                    projectedFantasyPoints: null,
+                    adpRank: null,
+                    careerStats: null,
+                  }
+                : null,
+            },
+          }),
+        });
+        break;
       }
-    },
-  );
+      default:
+        await unmockedGraphQLFallback(route);
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------

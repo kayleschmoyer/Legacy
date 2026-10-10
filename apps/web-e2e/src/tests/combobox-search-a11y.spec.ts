@@ -59,41 +59,38 @@ const SEARCH_INPUT_SELECTOR = [
 ].join(', ');
 
 async function mockPlayersGraphQL(page: import('@playwright/test').Page) {
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route) => {
-      const operation = extractOperationName(route).toLowerCase();
+  await page.route(isGraphQLEndpoint, async (route) => {
+    const operation = extractOperationName(route).toLowerCase();
 
-      if (operation === 'getallplayers') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { players: MOCK_PLAYERS } }),
-        });
-      } else if (operation === 'getplayerswithstats') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { playersWithStats: MOCK_PLAYERS } }),
-        });
-        // All three SearchPlayersFor* operations select the same `searchPlayers`
-        // field, so this payload answers each correctly. The pre-LS-9794 substring
-        // matched all three; listing them preserves that without the ambiguity.
-      } else if (
-        operation === 'searchplayersfordisclosure' ||
-        operation === 'searchplayersfordraft' ||
-        operation === 'searchplayersfortwentyquestions'
-      ) {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { searchPlayers: MOCK_PLAYERS } }),
-        });
-      } else {
-        await route.fallback();
-      }
-    },
-  );
+    if (operation === 'getallplayers') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { players: MOCK_PLAYERS } }),
+      });
+    } else if (operation === 'getplayerswithstats') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { playersWithStats: MOCK_PLAYERS } }),
+      });
+      // All three SearchPlayersFor* operations select the same `searchPlayers`
+      // field, so this payload answers each correctly. The pre-LS-9794 substring
+      // matched all three; listing them preserves that without the ambiguity.
+    } else if (
+      operation === 'searchplayersfordisclosure' ||
+      operation === 'searchplayersfordraft' ||
+      operation === 'searchplayersfortwentyquestions'
+    ) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { searchPlayers: MOCK_PLAYERS } }),
+      });
+    } else {
+      await route.fallback();
+    }
+  });
 }
 
 /** Locate the primary search input on the page. Returns the first match. */

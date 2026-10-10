@@ -106,91 +106,88 @@ const POSITION_BONUS_FEATURE_NAME = 'Position-Scoped Scoring Bonuses';
 async function mockFootballCommissionerPage(
   page: import('@playwright/test').Page,
 ): Promise<void> {
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route, request) => {
-      const body = request.postDataJSON() as { operationName?: string };
-      const op = body.operationName ?? '';
+  await page.route(isGraphQLEndpoint, async (route, request) => {
+    const body = request.postDataJSON() as { operationName?: string };
+    const op = body.operationName ?? '';
 
-      if (op === 'GetLeagueById') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              league: {
-                __typename: 'League',
-                id: 1,
-                name: 'Test Football League',
-                owner: 1,
-                sport: 'football',
-                defensiveFormat: 'dst',
-                draftStatus: 'not-started',
-                numberOfTeams: 4,
-                isPublic: false,
-                inviteCode: 'TEST1234',
-                userMembership: { teamId: 1 },
-                frozenAt: null,
-              },
+    if (op === 'GetLeagueById') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            league: {
+              __typename: 'League',
+              id: 1,
+              name: 'Test Football League',
+              owner: 1,
+              sport: 'football',
+              defensiveFormat: 'dst',
+              draftStatus: 'not-started',
+              numberOfTeams: 4,
+              isPublic: false,
+              inviteCode: 'TEST1234',
+              userMembership: { teamId: 1 },
+              frozenAt: null,
             },
-          }),
-        });
-        return;
-      }
-      if (op === 'GetLeagueTeams') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { leagueTeams: [] } }),
-        });
-        return;
-      }
-      if (op === 'GetLeagueScoringProfile') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              leagueScoringProfile: {
-                __typename: 'ScoringConfig',
-                profileId: 1,
-                profileName: 'Standard',
-                stats: [
-                  {
-                    __typename: 'ScoringRule',
-                    multiplier: 0.04,
+          },
+        }),
+      });
+      return;
+    }
+    if (op === 'GetLeagueTeams') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { leagueTeams: [] } }),
+      });
+      return;
+    }
+    if (op === 'GetLeagueScoringProfile') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            leagueScoringProfile: {
+              __typename: 'ScoringConfig',
+              profileId: 1,
+              profileName: 'Standard',
+              stats: [
+                {
+                  __typename: 'ScoringRule',
+                  multiplier: 0.04,
+                  defaultMultiplier: 0.04,
+                  isOverride: false,
+                  isEnabled: true,
+                  definition: {
+                    __typename: 'ScoringStatDefinition',
+                    id: 1,
+                    statKey: 'pass_yds',
+                    statGroup: 'passing',
+                    displayName: 'Passing Yards',
+                    description: null,
+                    sourceColumn: 'passingYards',
                     defaultMultiplier: 0.04,
-                    isOverride: false,
-                    isEnabled: true,
-                    definition: {
-                      __typename: 'ScoringStatDefinition',
-                      id: 1,
-                      statKey: 'pass_yds',
-                      statGroup: 'passing',
-                      displayName: 'Passing Yards',
-                      description: null,
-                      sourceColumn: 'passingYards',
-                      defaultMultiplier: 0.04,
-                      minMultiplier: 0,
-                      maxMultiplier: 1,
-                      stepSize: 0.01,
-                      isRequired: false,
-                      enforcePositive: false,
-                      enforceNegative: false,
-                    },
+                    minMultiplier: 0,
+                    maxMultiplier: 1,
+                    stepSize: 0.01,
+                    isRequired: false,
+                    enforcePositive: false,
+                    enforceNegative: false,
                   },
-                ],
-                multiplierGroups: [],
-              },
+                },
+              ],
+              multiplierGroups: [],
             },
-          }),
-        });
-        return;
-      }
+          },
+        }),
+      });
+      return;
+    }
 
-      await unmockedGraphQLFallback(route);
-    },
-  );
+    await unmockedGraphQLFallback(route);
+  });
 }
 
 /** Expand the "Scoring" accordion on the commissioner tab. */

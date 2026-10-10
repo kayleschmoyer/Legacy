@@ -513,61 +513,58 @@ async function mockGraphQL(
     }
   >,
 ) {
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route) => {
-      const body = route.request().postData() ?? '';
-      const op = extractOperationName(route).toLowerCase();
+  await page.route(isGraphQLEndpoint, async (route) => {
+    const body = route.request().postData() ?? '';
+    const op = extractOperationName(route).toLowerCase();
 
-      if (op === 'getplayerswithstats') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(makeMockPlayersResponse()),
-        });
-      } else if (op === 'getcomparisonseasonstats') {
-        // Extract the per-slot variables (id0/has0 … id3/has3) from the request.
-        let variables: Record<string, unknown> = {};
-        try {
-          const parsed = JSON.parse(body) as {
-            variables?: Record<string, unknown>;
-          };
-          variables = parsed.variables ?? {};
-        } catch {
-          // Leave variables empty — yields a response with no slots.
-        }
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(
-            makeMockComparisonSeasonStatsResponse(variables, seasonOverrides),
-          ),
-        });
-      } else if (op === 'getmysubscription') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              mySubscription: {
-                __typename: 'SubscriptionInfo',
-                status: 'active',
-                tier: 'premium',
-                currentPeriodEnd: '2026-12-31T00:00:00.000Z',
-                cancelAtPeriodEnd: false,
-                trialEndsAt: null,
-                gracePeriodEndsAt: null,
-              },
-            },
-          }),
-        });
-      } else {
-        // Fall through to the baseline _apiIsolation fixture for ambient
-        // queries (getUnreadNotificationCount, getUserById, etc.)
-        await unmockedGraphQLFallback(route);
+    if (op === 'getplayerswithstats') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(makeMockPlayersResponse()),
+      });
+    } else if (op === 'getcomparisonseasonstats') {
+      // Extract the per-slot variables (id0/has0 … id3/has3) from the request.
+      let variables: Record<string, unknown> = {};
+      try {
+        const parsed = JSON.parse(body) as {
+          variables?: Record<string, unknown>;
+        };
+        variables = parsed.variables ?? {};
+      } catch {
+        // Leave variables empty — yields a response with no slots.
       }
-    },
-  );
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          makeMockComparisonSeasonStatsResponse(variables, seasonOverrides),
+        ),
+      });
+    } else if (op === 'getmysubscription') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            mySubscription: {
+              __typename: 'SubscriptionInfo',
+              status: 'active',
+              tier: 'premium',
+              currentPeriodEnd: '2026-12-31T00:00:00.000Z',
+              cancelAtPeriodEnd: false,
+              trialEndsAt: null,
+              gracePeriodEndsAt: null,
+            },
+          },
+        }),
+      });
+    } else {
+      // Fall through to the baseline _apiIsolation fixture for ambient
+      // queries (getUnreadNotificationCount, getUserById, etc.)
+      await unmockedGraphQLFallback(route);
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------

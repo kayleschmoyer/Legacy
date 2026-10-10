@@ -96,37 +96,34 @@ async function routeGoogleLoginSuccess(page: Page): Promise<void> {
  * baseline fallback (LS-7960) instead of swallowing it with empty data.
  */
 async function routeProfileSettingsGraphQL(page: Page): Promise<void> {
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route, request) => {
-      const body = request.postDataJSON() as { operationName?: string };
+  await page.route(isGraphQLEndpoint, async (route, request) => {
+    const body = request.postDataJSON() as { operationName?: string };
 
-      if (body.operationName === 'GetUserById') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              __typename: 'Query',
-              user: {
-                __typename: 'User',
-                id: 1,
-                username: 'testuser',
-                email: 'user@test.com',
-                avatarUrl: null,
-                accessLevel: 'none',
-                subscriptionTier: null,
-                themePreference: null,
-              },
+    if (body.operationName === 'GetUserById') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            __typename: 'Query',
+            user: {
+              __typename: 'User',
+              id: 1,
+              username: 'testuser',
+              email: 'user@test.com',
+              avatarUrl: null,
+              accessLevel: 'none',
+              subscriptionTier: null,
+              themePreference: null,
             },
-          }),
-        });
-        return;
-      }
+          },
+        }),
+      });
+      return;
+    }
 
-      await unmockedGraphQLFallback(route);
-    },
-  );
+    await unmockedGraphQLFallback(route);
+  });
 }
 
 // ---------------------------------------------------------------------------

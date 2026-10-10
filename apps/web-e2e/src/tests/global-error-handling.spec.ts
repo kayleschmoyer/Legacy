@@ -129,19 +129,16 @@ test.describe('GraphQL error states on pages @regression', () => {
   test('player stats page shows error message when query fails @regression', async ({
     page,
   }) => {
-    await page.route(
-      (url) => isGraphQLEndpoint(url),
-      async (route) => {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            errors: [{ message: 'Internal server error' }],
-            data: null,
-          }),
-        });
-      },
-    );
+    await page.route(isGraphQLEndpoint, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          errors: [{ message: 'Internal server error' }],
+          data: null,
+        }),
+      });
+    });
 
     await page.goto('/players/stats');
     // Page should display an error state — Apollo error boundary renders
@@ -152,19 +149,16 @@ test.describe('GraphQL error states on pages @regression', () => {
   test('league discovery page shows error when query fails @regression', async ({
     page,
   }) => {
-    await page.route(
-      (url) => isGraphQLEndpoint(url),
-      async (route) => {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            errors: [{ message: 'Database connection error' }],
-            data: null,
-          }),
-        });
-      },
-    );
+    await page.route(isGraphQLEndpoint, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          errors: [{ message: 'Database connection error' }],
+          data: null,
+        }),
+      });
+    });
 
     await page.goto('/baseball/leagues');
     await expect(
@@ -178,19 +172,16 @@ test.describe('GraphQL error states on pages @regression', () => {
   test('players directory shows error message when query fails @regression', async ({
     page,
   }) => {
-    await page.route(
-      (url) => isGraphQLEndpoint(url),
-      async (route) => {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            errors: [{ message: 'Query timeout' }],
-            data: null,
-          }),
-        });
-      },
-    );
+    await page.route(isGraphQLEndpoint, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          errors: [{ message: 'Query timeout' }],
+          data: null,
+        }),
+      });
+    });
 
     await page.goto('/players');
     await expect(
@@ -208,16 +199,13 @@ test.describe('Network error handling @regression', () => {
   test('toast appears when GraphQL endpoint returns 500 @regression', async ({
     page,
   }) => {
-    await page.route(
-      (url) => isGraphQLEndpoint(url),
-      async (route) => {
-        await route.fulfill({
-          status: 500,
-          contentType: 'application/json',
-          body: JSON.stringify({ message: 'Internal Server Error' }),
-        });
-      },
-    );
+    await page.route(isGraphQLEndpoint, async (route) => {
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: 'Internal Server Error' }),
+      });
+    });
 
     await page.goto('/players/stats');
 

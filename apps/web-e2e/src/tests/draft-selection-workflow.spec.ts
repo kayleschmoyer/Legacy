@@ -12,6 +12,7 @@ import {
   mockDraftPlayer,
   userTeamIdResponse,
 } from '../mocks/graphql';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 import { DESKTOP_VIEWPORT } from '../utils/viewport';
 
 /**
@@ -105,304 +106,293 @@ async function setupDraftRoute(
 
   const capturedMutations: GraphQLBody[] = [];
 
-  await page.route(
-    (url) => {
-      const s = url.toString();
-      return (
-        s.includes('/graphql') &&
-        !s.includes('/@fs/') &&
-        !s.includes('.ts') &&
-        !s.includes('.js')
-      );
-    },
-    async (route) => {
-      const postData = route.request().postData();
-      if (!postData) {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            errors: [{ message: '[E2E] Missing POST body' }],
-            data: null,
-          }),
-        });
-        return;
-      }
+  await page.route(isGraphQLEndpoint, async (route) => {
+    const postData = route.request().postData();
+    if (!postData) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          errors: [{ message: '[E2E] Missing POST body' }],
+          data: null,
+        }),
+      });
+      return;
+    }
 
-      let body: GraphQLBody;
-      try {
-        body = JSON.parse(postData) as GraphQLBody;
-      } catch {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            errors: [{ message: '[E2E] Invalid JSON' }],
-            data: null,
-          }),
-        });
-        return;
-      }
+    let body: GraphQLBody;
+    try {
+      body = JSON.parse(postData) as GraphQLBody;
+    } catch {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          errors: [{ message: '[E2E] Invalid JSON' }],
+          data: null,
+        }),
+      });
+      return;
+    }
 
-      const op = body.operationName ?? '';
+    const op = body.operationName ?? '';
 
-      // Draft queries — use exact operationName matching
-      // The live draft board uses GetLiveDraftLeagueDraft which calls
-      // the getLeagueDraft resolver — the response data key must be
-      // "getLeagueDraft", not "getDraft".
-      if (
-        op === 'GetDraft' ||
-        op === 'GetLiveDraftLeagueDraft' ||
-        op === 'GetLeagueDraft'
-      ) {
-        const draft = {
-          __typename: 'Draft',
-          id: 1,
-          leagueId: TEST_LEAGUE_ID,
-          status: draftStatus,
-          currentRound: 1,
-          currentPick: 1,
-          totalRounds: 25,
-          draftMode: 'live',
-          draftOrder: 'snake',
-          selectionMethod: 'standard',
-          playerPool: 'all',
-          pickTimeLimitSeconds: 60,
-          scheduledAt: null,
-        };
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getLeagueDraft: draft } }),
-        });
-        return;
-      }
+    // Draft queries — use exact operationName matching
+    // The live draft board uses GetLiveDraftLeagueDraft which calls
+    // the getLeagueDraft resolver — the response data key must be
+    // "getLeagueDraft", not "getDraft".
+    if (
+      op === 'GetDraft' ||
+      op === 'GetLiveDraftLeagueDraft' ||
+      op === 'GetLeagueDraft'
+    ) {
+      const draft = {
+        __typename: 'Draft',
+        id: 1,
+        leagueId: TEST_LEAGUE_ID,
+        status: draftStatus,
+        currentRound: 1,
+        currentPick: 1,
+        totalRounds: 25,
+        draftMode: 'live',
+        draftOrder: 'snake',
+        selectionMethod: 'standard',
+        playerPool: 'all',
+        pickTimeLimitSeconds: 60,
+        scheduledAt: null,
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getLeagueDraft: draft } }),
+      });
+      return;
+    }
 
-      if (op === 'GetCurrentDraftPick') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(
-            getCurrentDraftPickResponse(
-              isMyPick
-                ? {
-                    teamId: 1,
-                    round: 1,
-                    pickNumber: 1,
-                    overallPick: 1,
-                    isComplete: false,
-                  }
-                : {
-                    teamId: 2,
-                    round: 1,
-                    pickNumber: 2,
-                    overallPick: 2,
-                    isComplete: false,
-                  },
-            ),
-          ),
-        });
-        return;
-      }
-
-      if (op === 'GetDraftPicks') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(
-            getDraftPicksResponse(
-              pickHistory.map((p) => ({
-                id: p.id,
-                round: p.round,
-                pickNumber: p.pickNumber,
-                overallPick: p.overallPick,
-                teamId: p.teamId,
-                playerId: p.playerId,
-                player: {
-                  id: p.playerId,
-                  firstName: p.playerName.split(' ')[0],
-                  lastName: p.playerName.split(' ').slice(1).join(' '),
+    if (op === 'GetCurrentDraftPick') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          getCurrentDraftPickResponse(
+            isMyPick
+              ? {
+                  teamId: 1,
+                  round: 1,
+                  pickNumber: 1,
+                  overallPick: 1,
+                  isComplete: false,
+                }
+              : {
+                  teamId: 2,
+                  round: 1,
+                  pickNumber: 2,
+                  overallPick: 2,
+                  isComplete: false,
                 },
-              })),
-            ),
           ),
-        });
-        return;
-      }
+        ),
+      });
+      return;
+    }
 
-      if (op === 'GetAvailableDraftPlayers') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(getAvailableDraftPlayersResponse(players)),
-        });
-        return;
-      }
-
-      if (op === 'MakeDraftPick') {
-        capturedMutations.push(body);
-        const playerId = (body.variables?.playerId as number) ?? 100;
-        const player = players.find((p) => p.id === playerId);
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(
-            makeDraftPickResponse({
-              id: pickHistory.length + 1,
-              round: 1,
-              pickNumber: pickHistory.length + 1,
-              overallPick: pickHistory.length + 1,
-              teamId: 1,
-              playerId,
-              player: player
-                ? {
-                    id: player.id,
-                    firstName: player.firstName,
-                    lastName: player.lastName,
-                  }
-                : { id: playerId, firstName: 'Unknown', lastName: 'Player' },
-            }),
+    if (op === 'GetDraftPicks') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          getDraftPicksResponse(
+            pickHistory.map((p) => ({
+              id: p.id,
+              round: p.round,
+              pickNumber: p.pickNumber,
+              overallPick: p.overallPick,
+              teamId: p.teamId,
+              playerId: p.playerId,
+              player: {
+                id: p.playerId,
+                firstName: p.playerName.split(' ')[0],
+                lastName: p.playerName.split(' ').slice(1).join(' '),
+              },
+            })),
           ),
-        });
-        return;
-      }
+        ),
+      });
+      return;
+    }
 
-      if (op === 'GetDraftTeamOrder') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              getDraftTeamOrder: [
-                { teamId: 1, teamName: 'Team 1', draftOrder: 1 },
-                { teamId: 2, teamName: 'Team 2', draftOrder: 2 },
-              ],
-            },
+    if (op === 'GetAvailableDraftPlayers') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(getAvailableDraftPlayersResponse(players)),
+      });
+      return;
+    }
+
+    if (op === 'MakeDraftPick') {
+      capturedMutations.push(body);
+      const playerId = (body.variables?.playerId as number) ?? 100;
+      const player = players.find((p) => p.id === playerId);
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          makeDraftPickResponse({
+            id: pickHistory.length + 1,
+            round: 1,
+            pickNumber: pickHistory.length + 1,
+            overallPick: pickHistory.length + 1,
+            teamId: 1,
+            playerId,
+            player: player
+              ? {
+                  id: player.id,
+                  firstName: player.firstName,
+                  lastName: player.lastName,
+                }
+              : { id: playerId, firstName: 'Unknown', lastName: 'Player' },
           }),
-        });
-        return;
-      }
+        ),
+      });
+      return;
+    }
 
-      if (op === 'GetDraftTeamAutoPickStatuses') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: { getDraftTeamAutoPickStatuses: [] },
-          }),
-        });
-        return;
-      }
+    if (op === 'GetDraftTeamOrder') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            getDraftTeamOrder: [
+              { teamId: 1, teamName: 'Team 1', draftOrder: 1 },
+              { teamId: 2, teamName: 'Team 2', draftOrder: 2 },
+            ],
+          },
+        }),
+      });
+      return;
+    }
 
-      if (op === 'GetMyDraftQueue') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getMyDraftQueue: [] } }),
-        });
-        return;
-      }
+    if (op === 'GetDraftTeamAutoPickStatuses') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { getDraftTeamAutoPickStatuses: [] },
+        }),
+      });
+      return;
+    }
 
-      if (op === 'GetDraftRecommendations') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getDraftRecommendations: [] } }),
-        });
-        return;
-      }
+    if (op === 'GetMyDraftQueue') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getMyDraftQueue: [] } }),
+      });
+      return;
+    }
 
-      if (op === 'GetMyDraftTeamAutoPick') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getMyDraftTeamAutoPick: false } }),
-        });
-        return;
-      }
+    if (op === 'GetDraftRecommendations') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getDraftRecommendations: [] } }),
+      });
+      return;
+    }
 
-      // League queries (needed for page chrome)
-      if (op === 'GetLeagueById' || op === 'GetLeague') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(leagueByIdResponse({ draftStatus })),
-        });
-        return;
-      }
+    if (op === 'GetMyDraftTeamAutoPick') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getMyDraftTeamAutoPick: false } }),
+      });
+      return;
+    }
 
-      if (op === 'GetLeagueTeams') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(leagueTeamsResponse()),
-        });
-        return;
-      }
+    // League queries (needed for page chrome)
+    if (op === 'GetLeagueById' || op === 'GetLeague') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(leagueByIdResponse({ draftStatus })),
+      });
+      return;
+    }
 
-      if (op === 'GetLeaguePositions') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(leaguePositionsResponse()),
-        });
-        return;
-      }
+    if (op === 'GetLeagueTeams') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(leagueTeamsResponse()),
+      });
+      return;
+    }
 
-      if (op === 'GetUserTeamId') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(userTeamIdResponse()),
-        });
-        return;
-      }
+    if (op === 'GetLeaguePositions') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(leaguePositionsResponse()),
+      });
+      return;
+    }
 
-      if (op === 'GetLeagueScoringProfile') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(leagueScoringProfileResponse()),
-        });
-        return;
-      }
+    if (op === 'GetUserTeamId') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(userTeamIdResponse()),
+      });
+      return;
+    }
 
-      // GetUserById (and the premium check that gates EliteDraftBoard) is
-      // served by the shared premium-by-default baseline (LS-8058); the ad-hoc
-      // premium mock was removed in favor of that single source of truth.
+    if (op === 'GetLeagueScoringProfile') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(leagueScoringProfileResponse()),
+      });
+      return;
+    }
 
-      if (op === 'GetUserLeagues') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { userLeagues: [] } }),
-        });
-        return;
-      }
+    // GetUserById (and the premium check that gates EliteDraftBoard) is
+    // served by the shared premium-by-default baseline (LS-8058); the ad-hoc
+    // premium mock was removed in favor of that single source of truth.
 
-      if (op === 'GetTeamMembers') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { teamMembers: [] } }),
-        });
-        return;
-      }
+    if (op === 'GetUserLeagues') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { userLeagues: [] } }),
+      });
+      return;
+    }
 
-      if (op === 'NudgeExpiredDraftPick') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { nudgeExpiredDraftPick: true } }),
-        });
-        return;
-      }
+    if (op === 'GetTeamMembers') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { teamMembers: [] } }),
+      });
+      return;
+    }
 
-      // Fall through to the baseline _apiIsolation fixture for ambient
-      // queries (getUnreadNotificationCount, getUserById, etc.)
-      await unmockedGraphQLFallback(route);
-    },
-  );
+    if (op === 'NudgeExpiredDraftPick') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { nudgeExpiredDraftPick: true } }),
+      });
+      return;
+    }
+
+    // Fall through to the baseline _apiIsolation fixture for ambient
+    // queries (getUnreadNotificationCount, getUserById, etc.)
+    await unmockedGraphQLFallback(route);
+  });
 
   return { capturedMutations };
 }
@@ -526,43 +516,32 @@ test.describe('Draft Selection Workflow @regression', () => {
     await setupDraftRoute(page, { isMyPick: true });
 
     // Override with error route — registered after base route so it takes priority
-    await page.route(
-      (url) => {
-        const s = url.toString();
-        return (
-          s.includes('/graphql') &&
-          !s.includes('/@fs/') &&
-          !s.includes('.ts') &&
-          !s.includes('.js')
-        );
-      },
-      async (route) => {
-        const postData = route.request().postData();
-        if (!postData) {
-          await route.fallback();
-          return;
-        }
-
-        const body = JSON.parse(postData) as GraphQLBody;
-        const op = body.operationName ?? '';
-
-        if (op === 'MakeDraftPick') {
-          // Return error for the pick mutation
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              errors: [{ message: 'Player has already been drafted' }],
-              data: null,
-            }),
-          });
-          return;
-        }
-
-        // For all other operations, delegate to the base route (setupDraftRoute)
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const postData = route.request().postData();
+      if (!postData) {
         await route.fallback();
-      },
-    );
+        return;
+      }
+
+      const body = JSON.parse(postData) as GraphQLBody;
+      const op = body.operationName ?? '';
+
+      if (op === 'MakeDraftPick') {
+        // Return error for the pick mutation
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [{ message: 'Player has already been drafted' }],
+            data: null,
+          }),
+        });
+        return;
+      }
+
+      // For all other operations, delegate to the base route (setupDraftRoute)
+      await route.fallback();
+    });
 
     await draftPage.gotoLeague(TEST_LEAGUE_ID);
     await draftPage.expectBoardVisible();

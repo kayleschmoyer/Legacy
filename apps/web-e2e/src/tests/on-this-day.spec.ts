@@ -108,46 +108,42 @@ async function mockOnThisDay(
     entriesError = false,
   } = options;
 
-  await page.route(
-    (url) =>
-      url.toString().includes('/graphql') && !url.toString().includes('/@fs/'),
-    async (route) => {
-      const operation = extractOperationName(route).toLowerCase();
+  await page.route(/^(?!.*\/@fs\/).*\/graphql/, async (route) => {
+    const operation = extractOperationName(route).toLowerCase();
 
-      // The pre-LS-9794 form was
-      // `postData.includes('getonthisday') && !postData.includes('events')`:
-      // the negated guard existed only to stop the broad substring from also
-      // swallowing GetOnThisDayEvents. Exact equality excludes that operation
-      // by construction, so the guard is redundant and is dropped rather than
-      // translated. GetOnThisDayEvents is handled by its own branch below.
-      if (operation === 'getonthisday') {
-        if (entriesError) {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: { onThisDay: null },
-              errors: [{ message: 'Failed to load historical data' }],
-            }),
-          });
-        } else {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { onThisDay: entries } }),
-          });
-        }
-      } else if (operation === 'getonthisdayevents') {
+    // The pre-LS-9794 form was
+    // `postData.includes('getonthisday') && !postData.includes('events')`:
+    // the negated guard existed only to stop the broad substring from also
+    // swallowing GetOnThisDayEvents. Exact equality excludes that operation
+    // by construction, so the guard is redundant and is dropped rather than
+    // translated. GetOnThisDayEvents is handled by its own branch below.
+    if (operation === 'getonthisday') {
+      if (entriesError) {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ data: { onThisDayEvents: events } }),
+          body: JSON.stringify({
+            data: { onThisDay: null },
+            errors: [{ message: 'Failed to load historical data' }],
+          }),
         });
       } else {
-        await route.fallback();
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { onThisDay: entries } }),
+        });
       }
-    },
-  );
+    } else if (operation === 'getonthisdayevents') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { onThisDayEvents: events } }),
+      });
+    } else {
+      await route.fallback();
+    }
+  });
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────

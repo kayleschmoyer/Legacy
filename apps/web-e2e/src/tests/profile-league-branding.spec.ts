@@ -43,85 +43,82 @@ async function setupProfileGraphQL(
 ) {
   const mutationCalls: { operationName: string; variables: unknown }[] = [];
 
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route, request) => {
-      const body = request.postDataJSON() as {
-        operationName?: string;
-        variables?: unknown;
-      };
+  await page.route(isGraphQLEndpoint, async (route, request) => {
+    const body = request.postDataJSON() as {
+      operationName?: string;
+      variables?: unknown;
+    };
 
-      if (body.operationName === 'GetUserById') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: MOCK_USER_DATA }),
+    if (body.operationName === 'GetUserById') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: MOCK_USER_DATA }),
+      });
+      return;
+    }
+
+    if (body.operationName === 'MyIdentities') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { myIdentities: [] } }),
+      });
+      return;
+    }
+
+    if (body.operationName === 'UpdateUserAvatar') {
+      if (opts.interceptMutations) {
+        mutationCalls.push({
+          operationName: body.operationName,
+          variables: body.variables,
         });
-        return;
       }
-
-      if (body.operationName === 'MyIdentities') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { myIdentities: [] } }),
-        });
-        return;
-      }
-
-      if (body.operationName === 'UpdateUserAvatar') {
-        if (opts.interceptMutations) {
-          mutationCalls.push({
-            operationName: body.operationName,
-            variables: body.variables,
-          });
-        }
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              updateUserAvatar: {
-                __typename: 'User',
-                id: 1,
-                avatarUrl: 'https://example.com/avatar.png',
-              },
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            updateUserAvatar: {
+              __typename: 'User',
+              id: 1,
+              avatarUrl: 'https://example.com/avatar.png',
             },
-          }),
-        });
-        return;
-      }
+          },
+        }),
+      });
+      return;
+    }
 
-      if (body.operationName === 'UpdateUsername') {
-        if (opts.interceptMutations) {
-          mutationCalls.push({
-            operationName: body.operationName,
-            variables: body.variables,
-          });
-        }
-        const vars = body.variables as { username?: string } | undefined;
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              updateUsername: {
-                __typename: 'User',
-                id: 1,
-                username: vars?.username ?? 'testuser',
-              },
+    if (body.operationName === 'UpdateUsername') {
+      if (opts.interceptMutations) {
+        mutationCalls.push({
+          operationName: body.operationName,
+          variables: body.variables,
+        });
+      }
+      const vars = body.variables as { username?: string } | undefined;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            updateUsername: {
+              __typename: 'User',
+              id: 1,
+              username: vars?.username ?? 'testuser',
             },
-          }),
-        });
-        return;
-      }
+          },
+        }),
+      });
+      return;
+    }
 
-      // Cascade unhandled operations (e.g. the ambient MyIdentities query the
-      // ProfileSettingsPage fires on load) to the _apiIsolation baseline fixture
-      // instead of swallowing them with empty data, which would crash the page.
-      await unmockedGraphQLFallback(route);
-    },
-  );
+    // Cascade unhandled operations (e.g. the ambient MyIdentities query the
+    // ProfileSettingsPage fires on load) to the _apiIsolation baseline fixture
+    // instead of swallowing them with empty data, which would crash the page.
+    await unmockedGraphQLFallback(route);
+  });
 
   return { mutationCalls };
 }

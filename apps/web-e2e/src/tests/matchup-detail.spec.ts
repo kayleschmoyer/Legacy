@@ -93,48 +93,45 @@ const MOCK_TEAMS = [
 const MOCK_MATCHUPS_FOR_LEAGUE = [MOCK_MATCHUP];
 
 async function mockMatchupGraphQL(page: import('@playwright/test').Page) {
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route) => {
-      const op = extractOperationName(route);
+  await page.route(isGraphQLEndpoint, async (route) => {
+    const op = extractOperationName(route);
 
-      if (op === 'GetMatchupById') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getMatchupById: MOCK_MATCHUP } }),
-        });
-      } else if (op === 'GetMatchupsForLeague') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: { getMatchupsForLeague: MOCK_MATCHUPS_FOR_LEAGUE },
-          }),
-        });
-      } else if (op === 'GetCurrentWeekForLeague') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getCurrentWeekForLeague: 3 } }),
-        });
-      } else if (op === 'GetUserTeamId') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { userTeamId: 1 } }),
-        });
-      } else if (op === 'GetLeagueTeams') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
-        });
-      } else {
-        await unmockedGraphQLFallback(route);
-      }
-    },
-  );
+    if (op === 'GetMatchupById') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getMatchupById: MOCK_MATCHUP } }),
+      });
+    } else if (op === 'GetMatchupsForLeague') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { getMatchupsForLeague: MOCK_MATCHUPS_FOR_LEAGUE },
+        }),
+      });
+    } else if (op === 'GetCurrentWeekForLeague') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getCurrentWeekForLeague: 3 } }),
+      });
+    } else if (op === 'GetUserTeamId') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { userTeamId: 1 } }),
+      });
+    } else if (op === 'GetLeagueTeams') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
+      });
+    } else {
+      await unmockedGraphQLFallback(route);
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -253,23 +250,20 @@ test.describe('Matchup Detail – loading state @regression', () => {
     await mockMatchupGraphQL(page);
 
     // Delay route for the matchup query (higher priority — registered last)
-    await page.route(
-      (url) => isGraphQLEndpoint(url),
-      async (route) => {
-        const operation = extractOperationName(route).toLowerCase();
-        if (operation === 'getmatchupbyid' || operation === 'getmatchuprecap') {
-          // Hold the response until we've asserted the loading state
-          await matchupGate;
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { getMatchupById: MOCK_MATCHUP } }),
-          });
-        } else {
-          await unmockedGraphQLFallback(route);
-        }
-      },
-    );
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const operation = extractOperationName(route).toLowerCase();
+      if (operation === 'getmatchupbyid' || operation === 'getmatchuprecap') {
+        // Hold the response until we've asserted the loading state
+        await matchupGate;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { getMatchupById: MOCK_MATCHUP } }),
+        });
+      } else {
+        await unmockedGraphQLFallback(route);
+      }
+    });
 
     // web-only timing: gate the skeleton before the mocked query resolves
     await page.goto(MATCHUP_URL, { waitUntil: 'commit' });

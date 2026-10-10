@@ -228,176 +228,173 @@ async function mockMatchupGraphQL(
 ) {
   const { isPremium = false, currentMatchup = WEEK3_MATCHUP } = opts;
 
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route) => {
-      const postData = route.request().postData() ?? '';
-      // LS-9866: exact equality on the extracted operation name. The old
-      // `catch` arm fell back to the whole lowercased POST body, which made
-      // every `includes()` below a query-TEXT test — that is how
-      // `includes('matchupbyid')` reached GetMatchupRecap on #7513, since that
-      // operation selects the `getMatchupById` root field while its NAME
-      // contains no such string. extractOperationName() parses the body and
-      // falls back to the `?ref=` parameter instead of the raw text.
-      const opName = extractOperationName(route).toLowerCase();
+  await page.route(isGraphQLEndpoint, async (route) => {
+    const postData = route.request().postData() ?? '';
+    // LS-9866: exact equality on the extracted operation name. The old
+    // `catch` arm fell back to the whole lowercased POST body, which made
+    // every `includes()` below a query-TEXT test — that is how
+    // `includes('matchupbyid')` reached GetMatchupRecap on #7513, since that
+    // operation selects the `getMatchupById` root field while its NAME
+    // contains no such string. extractOperationName() parses the body and
+    // falls back to the `?ref=` parameter instead of the raw text.
+    const opName = extractOperationName(route).toLowerCase();
 
-      if (opName === 'getmatchupbyid') {
-        // Parse the matchupId from variables to return the right matchup
-        let requestedId: number | null = null;
-        try {
-          const body = JSON.parse(postData) as { variables?: { id?: number } };
-          requestedId = body.variables?.id ?? null;
-        } catch {
-          // fall through
-        }
-
-        // LS-9868: prefer `currentMatchup` whenever its id matches the
-        // requested id, rather than falling back to it only when `.find()`
-        // misses. `currentMatchup` defaults to WEEK3_MATCHUP (already the
-        // same object present in ALL_MATCHUPS), so this is a no-op for every
-        // test that doesn't pass an override — but a test overriding
-        // `currentMatchup` (e.g. to a completed-status matchup) for the same
-        // id that's also present in ALL_MATCHUPS previously never actually
-        // exercised that override, since `.find()` always found the
-        // ALL_MATCHUPS entry first.
-        const found =
-          currentMatchup.id === String(requestedId)
-            ? currentMatchup
-            : (ALL_MATCHUPS.find((m) => m.id === String(requestedId)) ??
-              currentMatchup);
-
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getMatchupById: found } }),
-        });
-      } else if (opName === 'getmatchupsforleague') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: { getMatchupsForLeague: ALL_MATCHUPS },
-          }),
-        });
-      } else if (opName === 'getmatchupsbyweek') {
-        let weekNumber: number | null = null;
-        try {
-          const body = JSON.parse(postData) as {
-            variables?: { weekNumber?: number };
-          };
-          weekNumber = body.variables?.weekNumber ?? null;
-        } catch {
-          // fall through
-        }
-        const weekMatchups = ALL_MATCHUPS.filter(
-          (m) => m.weekNumber === weekNumber,
-        );
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: { getMatchupsByWeek: weekMatchups },
-          }),
-        });
-      } else if (opName === 'getcurrentweekforleague') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { getCurrentWeekForLeague: 3 } }),
-        });
-      } else if (opName === 'getuserteamid') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { userTeamId: 1 } }),
-        });
-        // LS-9866: 'leagueteams' also matched GetLeagueTeamsForDM, which is
-        // declared in the .graphql corpus but issued by no app code.
-      } else if (opName === 'getleagueteams') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
-        });
-        // LS-9866: 'matchupplayers' also matched the UndoMatchupPlayerSwap
-        // mutation (roster editor only — never fired by week navigation), whose
-        // response shape this getMatchupPlayers payload never fit anyway.
-      } else if (opName === 'getmatchupplayers') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: { getMatchupPlayers: MOCK_MATCHUP_PLAYERS },
-          }),
-        });
-      } else if (opName === 'getmatchupwinprobability') {
-        // LS-5907: win probability is now a server-gated field — the panel
-        // renders only what this query returns, mirroring what the real
-        // resolver would produce for an entitled vs. non-entitled caller.
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              getMatchupById: isPremium
-                ? {
-                    __typename: 'Matchup',
-                    id: String(MATCHUP_ID_WEEK3),
-                    winProbability: {
-                      __typename: 'MatchupWinProbability',
-                      team1WinProbability: 0.62,
-                      team2WinProbability: 0.38,
-                      tiesProbability: 0,
-                      team1ProjectedScore: 100.5,
-                      team2ProjectedScore: 88.25,
-                      simulationCount: 5000,
-                    },
-                  }
-                : {
-                    __typename: 'Matchup',
-                    id: String(MATCHUP_ID_WEEK3),
-                    winProbability: null,
-                  },
-            },
-          }),
-        });
-      } else if (opName === 'getmatchuprecap') {
-        // LS-9868: MatchupRecapPanel renders for completed-status matchups
-        // and fires GetMatchupRecap regardless of entitlement (PremiumGate
-        // always mounts its children) — mirrors the established pattern in
-        // games-remaining-visualization.spec.ts. A null recap keeps the
-        // panel's narrative content out of scope for this suite while
-        // satisfying the hermetic API-isolation guard.
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: { getMatchupById: { ...currentMatchup, recap: null } },
-          }),
-        });
-      } else if (opName === 'getmysubscription') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              mySubscription: isPremium
-                ? {
-                    __typename: 'Subscription',
-                    id: 1,
-                    status: 'active',
-                    tier: 'premium',
-                  }
-                : null,
-            },
-          }),
-        });
-      } else {
-        // Let unknown operations fall back to the baseline mocks
-        await unmockedGraphQLFallback(route);
+    if (opName === 'getmatchupbyid') {
+      // Parse the matchupId from variables to return the right matchup
+      let requestedId: number | null = null;
+      try {
+        const body = JSON.parse(postData) as { variables?: { id?: number } };
+        requestedId = body.variables?.id ?? null;
+      } catch {
+        // fall through
       }
-    },
-  );
+
+      // LS-9868: prefer `currentMatchup` whenever its id matches the
+      // requested id, rather than falling back to it only when `.find()`
+      // misses. `currentMatchup` defaults to WEEK3_MATCHUP (already the
+      // same object present in ALL_MATCHUPS), so this is a no-op for every
+      // test that doesn't pass an override — but a test overriding
+      // `currentMatchup` (e.g. to a completed-status matchup) for the same
+      // id that's also present in ALL_MATCHUPS previously never actually
+      // exercised that override, since `.find()` always found the
+      // ALL_MATCHUPS entry first.
+      const found =
+        currentMatchup.id === String(requestedId)
+          ? currentMatchup
+          : (ALL_MATCHUPS.find((m) => m.id === String(requestedId)) ??
+            currentMatchup);
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getMatchupById: found } }),
+      });
+    } else if (opName === 'getmatchupsforleague') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { getMatchupsForLeague: ALL_MATCHUPS },
+        }),
+      });
+    } else if (opName === 'getmatchupsbyweek') {
+      let weekNumber: number | null = null;
+      try {
+        const body = JSON.parse(postData) as {
+          variables?: { weekNumber?: number };
+        };
+        weekNumber = body.variables?.weekNumber ?? null;
+      } catch {
+        // fall through
+      }
+      const weekMatchups = ALL_MATCHUPS.filter(
+        (m) => m.weekNumber === weekNumber,
+      );
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { getMatchupsByWeek: weekMatchups },
+        }),
+      });
+    } else if (opName === 'getcurrentweekforleague') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getCurrentWeekForLeague: 3 } }),
+      });
+    } else if (opName === 'getuserteamid') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { userTeamId: 1 } }),
+      });
+      // LS-9866: 'leagueteams' also matched GetLeagueTeamsForDM, which is
+      // declared in the .graphql corpus but issued by no app code.
+    } else if (opName === 'getleagueteams') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
+      });
+      // LS-9866: 'matchupplayers' also matched the UndoMatchupPlayerSwap
+      // mutation (roster editor only — never fired by week navigation), whose
+      // response shape this getMatchupPlayers payload never fit anyway.
+    } else if (opName === 'getmatchupplayers') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { getMatchupPlayers: MOCK_MATCHUP_PLAYERS },
+        }),
+      });
+    } else if (opName === 'getmatchupwinprobability') {
+      // LS-5907: win probability is now a server-gated field — the panel
+      // renders only what this query returns, mirroring what the real
+      // resolver would produce for an entitled vs. non-entitled caller.
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            getMatchupById: isPremium
+              ? {
+                  __typename: 'Matchup',
+                  id: String(MATCHUP_ID_WEEK3),
+                  winProbability: {
+                    __typename: 'MatchupWinProbability',
+                    team1WinProbability: 0.62,
+                    team2WinProbability: 0.38,
+                    tiesProbability: 0,
+                    team1ProjectedScore: 100.5,
+                    team2ProjectedScore: 88.25,
+                    simulationCount: 5000,
+                  },
+                }
+              : {
+                  __typename: 'Matchup',
+                  id: String(MATCHUP_ID_WEEK3),
+                  winProbability: null,
+                },
+          },
+        }),
+      });
+    } else if (opName === 'getmatchuprecap') {
+      // LS-9868: MatchupRecapPanel renders for completed-status matchups
+      // and fires GetMatchupRecap regardless of entitlement (PremiumGate
+      // always mounts its children) — mirrors the established pattern in
+      // games-remaining-visualization.spec.ts. A null recap keeps the
+      // panel's narrative content out of scope for this suite while
+      // satisfying the hermetic API-isolation guard.
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { getMatchupById: { ...currentMatchup, recap: null } },
+        }),
+      });
+    } else if (opName === 'getmysubscription') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            mySubscription: isPremium
+              ? {
+                  __typename: 'Subscription',
+                  id: 1,
+                  status: 'active',
+                  tier: 'premium',
+                }
+              : null,
+          },
+        }),
+      });
+    } else {
+      // Let unknown operations fall back to the baseline mocks
+      await unmockedGraphQLFallback(route);
+    }
+  });
   // Pin the entitlement tier via the shared fixture (LS-8058). Registered after
   // the route above so its GetUserById handler runs first (Playwright LIFO).
   // Win-probability premium tests pass isPremium: true; the rest default to free.
@@ -624,7 +621,7 @@ premiumTest.describe(
         // the panel rendered moments later.
         const winProbabilityResponse = page.waitForResponse(
           (response) =>
-            isGraphQLEndpoint(response.url()) &&
+            isGraphQLEndpoint.test(response.url()) &&
             response.request().method() === 'POST' &&
             extractRequestOperationName(response.request()).toLowerCase() ===
               'getmatchupwinprobability',

@@ -172,53 +172,50 @@ function makeMockPlayersResponse(players = MOCK_PLAYERS) {
 async function mockPlayerComparisonGraphQL(
   page: import('@playwright/test').Page,
 ) {
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route) => {
-      const operation = extractOperationName(route).toLowerCase();
+  await page.route(isGraphQLEndpoint, async (route) => {
+    const operation = extractOperationName(route).toLowerCase();
 
-      if (operation === 'getplayerswithstats') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(makeMockPlayersResponse()),
-        });
-      } else if (operation === 'getallplayerseasonstats') {
-        // Season-by-season breakdown query fired after players are selected
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { playerSeasonStats: [] } }),
-        });
-      } else if (operation === 'getmysubscription') {
-        // PremiumGate requires an active premium subscription
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              mySubscription: {
-                __typename: 'SubscriptionInfo',
-                status: 'active',
-                tier: 'premium',
-                currentPeriodEnd: '2026-12-31T00:00:00.000Z',
-                cancelAtPeriodEnd: false,
-                trialEndsAt: null,
-                gracePeriodEndsAt: null,
-              },
+    if (operation === 'getplayerswithstats') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(makeMockPlayersResponse()),
+      });
+    } else if (operation === 'getallplayerseasonstats') {
+      // Season-by-season breakdown query fired after players are selected
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { playerSeasonStats: [] } }),
+      });
+    } else if (operation === 'getmysubscription') {
+      // PremiumGate requires an active premium subscription
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            mySubscription: {
+              __typename: 'SubscriptionInfo',
+              status: 'active',
+              tier: 'premium',
+              currentPeriodEnd: '2026-12-31T00:00:00.000Z',
+              cancelAtPeriodEnd: false,
+              trialEndsAt: null,
+              gracePeriodEndsAt: null,
             },
-          }),
-        });
-      } else {
-        // Safe default: return empty data instead of hitting the real backend
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: {} }),
-        });
-      }
-    },
-  );
+          },
+        }),
+      });
+    } else {
+      // Safe default: return empty data instead of hitting the real backend
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: {} }),
+      });
+    }
+  });
   // Pin the current user to premium via the shared entitlement fixture
   // (LS-8058). Registered after the route above so its GetUserById handler runs
   // first (Playwright LIFO); this handler's else returns {data:{}} and would
@@ -451,25 +448,22 @@ const freeUserTest = customAuthTest('freeuser@test.com', 'none');
 
 freeUserTest.describe('Player Comparison – premium gate @regression', () => {
   freeUserTest.beforeEach(async ({ page, playersPage }) => {
-    await page.route(
-      (url) => isGraphQLEndpoint(url),
-      async (route) => {
-        const operation = extractOperationName(route).toLowerCase();
-        if (operation === 'getmysubscription') {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { mySubscription: null } }),
-          });
-        } else {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: {} }),
-          });
-        }
-      },
-    );
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const operation = extractOperationName(route).toLowerCase();
+      if (operation === 'getmysubscription') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { mySubscription: null } }),
+        });
+      } else {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: {} }),
+        });
+      }
+    });
     // Pin the current user to free via the shared entitlement fixture (LS-8058)
     // so the inline premium upgrade CTA renders. Registered after the route
     // above so its GetUserById handler runs first (Playwright LIFO).

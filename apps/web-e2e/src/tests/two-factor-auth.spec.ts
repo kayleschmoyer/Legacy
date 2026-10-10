@@ -70,36 +70,33 @@ async function useStaticServerOauthProxy(page: PWPage): Promise<void> {
 
 /** Mock the GraphQL the profile settings page needs; cascade the rest. */
 async function setupProfileGraphQL(page: PWPage): Promise<void> {
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route, request) => {
-      const op = (request.postDataJSON() as { operationName?: string })
-        .operationName;
-      if (op === 'GetUserById') {
-        await route.fulfill(
-          jsonResponse(200, {
-            data: {
-              __typename: 'Query',
-              user: {
-                __typename: 'User',
-                id: 1,
-                username: 'testuser',
-                email: 'e2e-test@legacysports.dev',
-                avatarUrl: null,
-                accessLevel: 'none',
-                subscriptionTier: null,
-                themePreference: null,
-              },
+  await page.route(isGraphQLEndpoint, async (route, request) => {
+    const op = (request.postDataJSON() as { operationName?: string })
+      .operationName;
+    if (op === 'GetUserById') {
+      await route.fulfill(
+        jsonResponse(200, {
+          data: {
+            __typename: 'Query',
+            user: {
+              __typename: 'User',
+              id: 1,
+              username: 'testuser',
+              email: 'e2e-test@legacysports.dev',
+              avatarUrl: null,
+              accessLevel: 'none',
+              subscriptionTier: null,
+              themePreference: null,
             },
-          }),
-        );
-        return;
-      }
-      // Cascade unhandled ops (e.g. the ambient MyIdentities query) to the
-      // baseline fixture instead of swallowing them (LS-7960).
-      await unmockedGraphQLFallback(route);
-    },
-  );
+          },
+        }),
+      );
+      return;
+    }
+    // Cascade unhandled ops (e.g. the ambient MyIdentities query) to the
+    // baseline fixture instead of swallowing them (LS-7960).
+    await unmockedGraphQLFallback(route);
+  });
 }
 
 /**
@@ -112,29 +109,26 @@ async function setupSubscriptionGraphQL(
   page: PWPage,
   onBillingAction: () => void,
 ): Promise<void> {
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route, request) => {
-      const op =
-        (request.postDataJSON() as { operationName?: string }).operationName ??
-        '';
-      const lower = op.toLowerCase();
-      if (lower.includes('mysubscription')) {
-        await route.fulfill(jsonResponse(200, myPremiumSubscriptionResponse()));
-        return;
-      }
-      if (lower.includes('createbillingportalsession')) {
-        onBillingAction();
-        await route.fulfill(
-          jsonResponse(200, {
-            data: { createBillingPortalSession: { url: null } },
-          }),
-        );
-        return;
-      }
-      await unmockedGraphQLFallback(route);
-    },
-  );
+  await page.route(isGraphQLEndpoint, async (route, request) => {
+    const op =
+      (request.postDataJSON() as { operationName?: string }).operationName ??
+      '';
+    const lower = op.toLowerCase();
+    if (lower.includes('mysubscription')) {
+      await route.fulfill(jsonResponse(200, myPremiumSubscriptionResponse()));
+      return;
+    }
+    if (lower.includes('createbillingportalsession')) {
+      onBillingAction();
+      await route.fulfill(
+        jsonResponse(200, {
+          data: { createBillingPortalSession: { url: null } },
+        }),
+      );
+      return;
+    }
+    await unmockedGraphQLFallback(route);
+  });
 }
 
 // ---------------------------------------------------------------------------

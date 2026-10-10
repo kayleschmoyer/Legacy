@@ -110,39 +110,36 @@ test.describe('Skip link coverage across major pages @regression', () => {
   });
 
   test('skip link exists on notifications page', async ({ page }) => {
-    await page.route(
-      (url) => isGraphQLEndpoint(url),
-      async (route) => {
-        const operation = extractOperationName(route).toLowerCase();
-        if (operation === 'getnotificationhistory') {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: { getNotificationHistory: [] },
-            }),
-          });
-        } else if (operation === 'markallnotificationsasread') {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: { markAllNotificationsAsRead: true },
-            }),
-          });
-        } else if (operation === 'marknotificationasread') {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: { markNotificationAsRead: true },
-            }),
-          });
-        } else {
-          await route.fallback();
-        }
-      },
-    );
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const operation = extractOperationName(route).toLowerCase();
+      if (operation === 'getnotificationhistory') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { getNotificationHistory: [] },
+          }),
+        });
+      } else if (operation === 'markallnotificationsasread') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { markAllNotificationsAsRead: true },
+          }),
+        });
+      } else if (operation === 'marknotificationasread') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { markNotificationAsRead: true },
+          }),
+        });
+      } else {
+        await route.fallback();
+      }
+    });
     await page.goto('/notifications');
     await page.waitForLoadState('load');
     await assertSkipLinkWorks(page);
@@ -155,23 +152,20 @@ test.describe('Skip link coverage across major pages @regression', () => {
   });
 
   test('skip link exists on league discovery page', async ({ page }) => {
-    await page.route(
-      (url) => isGraphQLEndpoint(url),
-      async (route) => {
-        const operation = extractOperationName(route).toLowerCase();
-        if (operation === 'getpublicleagues') {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: { publicLeagues: [] },
-            }),
-          });
-        } else {
-          await route.fallback();
-        }
-      },
-    );
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const operation = extractOperationName(route).toLowerCase();
+      if (operation === 'getpublicleagues') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { publicLeagues: [] },
+          }),
+        });
+      } else {
+        await route.fallback();
+      }
+    });
     await page.goto('/baseball/leagues');
     await page.waitForLoadState('load');
     await assertSkipLinkWorks(page);
