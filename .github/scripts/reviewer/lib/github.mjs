@@ -179,6 +179,40 @@ export function findLatestLabelActor(prNumber, label, exec = execFileSync) {
 }
 
 /**
+ * Resolve who applied `review-bot-override` and whether that applier may
+ * override the reviewer bot (LS-10965). W1's auto-approve path used to trust
+ * the label's mere presence, so anyone able to apply labels — including the
+ * Agent Author app whose PRs this gate reviews — could get a bot APPROVE and
+ * bot-review=success. The bar mirrors W5 (review-bot-override.yml): admin or
+ * maintain permission; bot/app appliers never qualify.
+ *
+ * The applier is the triggering event's sender when W1 was fired by the
+ * label itself, else the latest `labeled` actor on the timeline (the same
+ * recovery `bot:reset-cycle-counter` uses — LS-4178). An applier that cannot
+ * be resolved is unauthorized (safe default).
+ *
+ * @param {number} prNumber
+ * @param {{ eventSender?: string,
+ *           findActor?: (prNumber: number, label: string) => string,
+ *           checkPermission?: (login: string) => boolean }} [opts]
+ * @returns {{ applier: string, authorized: boolean }}
+ */
+export function resolveOverrideApplier(
+  prNumber,
+  {
+    eventSender = '',
+    findActor = findLatestLabelActor,
+    checkPermission = isRepoMaintainer,
+  } = {},
+) {
+  const applier = eventSender || findActor(prNumber, 'review-bot-override');
+  if (!applier || applier.endsWith('[bot]')) {
+    return { applier, authorized: false };
+  }
+  return { applier, authorized: checkPermission(applier) };
+}
+
+/**
  * Dismiss a formal review via the GitHub Reviews API. Only CHANGES_REQUESTED
  * and APPROVED reviews can be dismissed; the call is a no-op for other states.
  *

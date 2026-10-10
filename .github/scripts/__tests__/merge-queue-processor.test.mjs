@@ -139,6 +139,11 @@ function makeGithub({
   // fixtures don't accidentally trip the new in-flight-integration merge
   // guard. Defaults to [] (no in-flight integration run).
   integrationWorkflowRuns = [],
+  // LS-10965: review.yml (Reviewer W1) runs served to the bot-review
+  // self-heal's live-run guard, kept separate from `workflowRuns` so the
+  // orchestrator fixtures never hold off a heal. An Error value makes
+  // listWorkflowRuns throw for review.yml. Defaults to [] (no live W1 run).
+  reviewWorkflowRuns = [],
   // LS-9753: existing issue comments served to issues.listComments — used to
   // seed the staleness-guard's retrigger-history marker (or any other PR
   // comment state a test wants visible before the run). Defaults to [].
@@ -311,14 +316,20 @@ function makeGithub({
         // remediateCancelledCiRun (LS-9053) and checkInFlightIntegrationRun
         // (LS-9831) share this endpoint but query different workflow files —
         // route by workflow_id so each gets its own fixture list.
-        listWorkflowRuns: async (args) => ({
-          data: {
-            workflow_runs:
-              args.workflow_id === 'run-integration-tests.yml'
-                ? integrationWorkflowRuns
-                : workflowRuns,
-          },
-        }),
+        listWorkflowRuns: async (args) => {
+          if (args.workflow_id === 'review.yml') {
+            if (reviewWorkflowRuns instanceof Error) throw reviewWorkflowRuns;
+            return { data: { workflow_runs: reviewWorkflowRuns } };
+          }
+          return {
+            data: {
+              workflow_runs:
+                args.workflow_id === 'run-integration-tests.yml'
+                  ? integrationWorkflowRuns
+                  : workflowRuns,
+            },
+          };
+        },
         reRunWorkflow: async (args) => {
           calls.reruns.push(args);
           if (reRunWorkflowError) throw reRunWorkflowError;
@@ -2119,7 +2130,7 @@ describe('merge-queue-processor — bot-review self-heal (LS-8289)', () => {
     );
   });
 
-  it('treats a bot-review pending older than 45 minutes as a dead reviewer run and re-triggers', async () => {
+  it('treats a bot-review pending older than 60 minutes as a dead reviewer run and re-triggers', async () => {
     const { github, calls } = makeGithub({
       reviews: APPROVED_BOT_REVIEW,
       branchRules: BOT_REVIEW_RULES,
@@ -2517,6 +2528,216 @@ describe('merge-queue-processor — review-stall sweep (LS-9209)', () => {
     assert.strictEqual(calls.labels.length, 0);
     assert.strictEqual(calls.labelsRemoved.length, 0);
     assert.strictEqual(calls.statuses.length, 0);
+  });
+});
+
+// ── bot-review self-heal timing guards (LS-10965) ───────────────────────────
+
+describe('merge-queue-processor — bot-review self-heal timing guards (LS-10965)', () => {
+  const minutesAgo = (m) => new Date(Date.now() - m * 60 * 1000).toISOString();
+
+  const sweepPR = (overrides = {}) => ({
+    number: 42,
+    draft: false,
+    labels: [{ name: 'bot:ready-for-review' }],
+    head: { sha: HEAD_SHA },
+    ...overrides,
+  });
+
+  const pendingAt = (createdAt) => [
+    {
+      context: 'bot-review',
+      state: 'pending',
+      description: 'Review cycle starting — awaiting Reviewer (W1)',
+      created_at: createdAt,
+    },
+  ];
+
+  async function runSweep(opts) {
+    const { github, calls } = makeGithub({
+      mergeReadyItems: [],
+      sweepPRs: [sweepPR()],
+      ...opts,
+    });
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+    return { github, calls };
+  }
+
+  it('leaves a 50-minute-old pending alone (inside the 30m job timeout + runner queue window)', async () => {
+    const { calls } = await runSweep({
+      commitStatuses: pendingAt(minutesAgo(50)),
+    });
+    assert.strictEqual(calls.labels.length, 0, 'not stale yet — no cycle');
+    assert.strictEqual(calls.labelsRemoved.length, 0);
+    assert.strictEqual(calls.statuses.length, 0, 'no marker stamped');
+  });
+
+  it('does not cycle a stale pending while a Reviewer (W1) run for the head SHA is still in progress', async () => {
+    const { calls } = await runSweep({
+      commitStatuses: pendingAt(minutesAgo(90)),
+      reviewWorkflowRuns: [
+        {
+          id: 901,
+          head_sha: HEAD_SHA,
+          status: 'in_progress',
+          created_at: minutesAgo(70),
+        },
+      ],
+    });
+    assert.strictEqual(
+      calls.labelsRemoved.length,
+      0,
+      'cycling would cancel the live review via cancel-in-progress',
+    );
+    assert.strictEqual(calls.labels.length, 0);
+    assert.strictEqual(calls.statuses.length, 0, 'no attempt burned');
+  });
+
+  it('does not heal a missing status while a Reviewer (W1) run is still queued', async () => {
+    const { calls } = await runSweep({
+      commitStatuses: [],
+      reviewWorkflowRuns: [
+        {
+          id: 902,
+          head_sha: HEAD_SHA,
+          status: 'queued',
+          created_at: minutesAgo(2),
+        },
+      ],
+    });
+    assert.strictEqual(calls.labels.length, 0);
+    assert.strictEqual(calls.labelsRemoved.length, 0);
+  });
+
+  it('does not escalate to arbitration while a Reviewer (W1) run is still live', async () => {
+    const { calls } = await runSweep({
+      commitStatuses: [
+        {
+          context: 'bot-review',
+          state: 'pending',
+          description:
+            'self-heal re-trigger #1: re-firing Reviewer (W1) (LS-9209)',
+          created_at: minutesAgo(240),
+        },
+        {
+          context: 'bot-review',
+          state: 'pending',
+          description:
+            'self-heal re-trigger #2: re-firing Reviewer (W1) (LS-9209)',
+          created_at: minutesAgo(120),
+        },
+      ],
+      reviewWorkflowRuns: [
+        {
+          id: 903,
+          head_sha: HEAD_SHA,
+          status: 'in_progress',
+          created_at: minutesAgo(20),
+        },
+      ],
+    });
+    assert.strictEqual(calls.statuses.length, 0, 'no terminal failure');
+    assert.strictEqual(calls.labels.length, 0, 'no arbitration label');
+  });
+
+  it('ignores completed runs, runs for other SHAs, and wedged runs older than the live ceiling', async () => {
+    const { calls } = await runSweep({
+      commitStatuses: pendingAt(minutesAgo(90)),
+      reviewWorkflowRuns: [
+        {
+          id: 904,
+          head_sha: HEAD_SHA,
+          status: 'completed',
+          created_at: minutesAgo(80),
+        },
+        {
+          id: 905,
+          head_sha: 'other0000other0000other0000other0000othe',
+          status: 'in_progress',
+          created_at: minutesAgo(10),
+        },
+        {
+          id: 906,
+          head_sha: HEAD_SHA,
+          status: 'queued',
+          created_at: minutesAgo(4 * 60),
+        },
+      ],
+    });
+    assert.strictEqual(calls.labelsRemoved.length, 1, 'label cycled');
+    assert.strictEqual(calls.labels.length, 1);
+  });
+
+  it('stands down when the Reviewer (W1) runs cannot be listed', async () => {
+    const { calls } = await runSweep({
+      commitStatuses: pendingAt(minutesAgo(90)),
+      reviewWorkflowRuns: new Error('Server Error'),
+    });
+    assert.strictEqual(calls.labels.length, 0);
+    assert.strictEqual(calls.labelsRemoved.length, 0);
+    assert.strictEqual(calls.statuses.length, 0);
+  });
+
+  it('stamps the attempt marker before cycling the label', async () => {
+    const order = [];
+    const { github, calls } = makeGithub({
+      mergeReadyItems: [],
+      sweepPRs: [sweepPR()],
+      commitStatuses: pendingAt(minutesAgo(90)),
+    });
+    const { createCommitStatus } = github.rest.repos;
+    const { removeLabel, addLabels } = github.rest.issues;
+    github.rest.repos.createCommitStatus = async (args) => {
+      order.push('status');
+      return createCommitStatus(args);
+    };
+    github.rest.issues.removeLabel = async (args) => {
+      order.push('remove');
+      return removeLabel(args);
+    };
+    github.rest.issues.addLabels = async (args) => {
+      order.push('add');
+      return addLabels(args);
+    };
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+    assert.deepStrictEqual(order, ['status', 'remove', 'add']);
+    assert.ok(
+      calls.statuses[0].description.includes('self-heal re-trigger #1'),
+    );
+  });
+
+  it('skips the re-trigger when the attempt marker cannot be written (no uncounted cycle)', async () => {
+    const { github, calls } = makeGithub({
+      mergeReadyItems: [],
+      sweepPRs: [sweepPR()],
+      commitStatuses: pendingAt(minutesAgo(90)),
+    });
+    github.rest.repos.createCommitStatus = async () => {
+      throw Object.assign(new Error('Resource not accessible by integration'), {
+        status: 403,
+      });
+    };
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+    assert.strictEqual(calls.labelsRemoved.length, 0, 'label not removed');
+    assert.strictEqual(calls.labels.length, 0, 'label not re-added');
   });
 });
 

@@ -1,11 +1,12 @@
 name: Review Label Guard (W7)
 
 # Belt-and-suspenders for LS-4678: re-applies `bot:ready-for-review` on a
-# `synchronize` event when the label is absent but a prior APPROVED bot review
-# exists. Without this, a manually-stripped label after approval leaves the new
-# HEAD SHA without a `bot-review` status — the ruleset blocks merge and no
-# Reviewer (W1) cycle fires to unblock it (W1 only fires on synchronize when
-# the label is present).
+# `synchronize` event when the label is absent but a prior bot APPROVAL exists
+# (still APPROVED, or DISMISSED by the push itself via
+# dismiss_stale_reviews_on_push — LS-10965). Without this, a manually-stripped
+# label after approval leaves the new HEAD SHA without a `bot-review` status —
+# the ruleset blocks merge and no Reviewer (W1) cycle fires to unblock it (W1
+# only fires on synchronize when the label is present).
 #
 # The reviewer itself preserves the label through merge (see reviewer/index.mjs
 # `preserveReadyLabel: true`), so this guard only kicks in when something
@@ -52,18 +53,48 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          # Count APPROVED reviews authored by any Bot account. Any prior bot
-          # APPROVED means a cycle was previously in play and the label should
-          # be restored so the new HEAD SHA gets a fresh cycle. Filtering on
+          # Count bot reviews that were APPROVALS. Any prior bot approval means
+          # a cycle was previously in play and the label should be restored so
+          # the new HEAD SHA gets a fresh cycle. Filtering on
           # `user.type == "Bot"` rather than the specific reviewer app keeps
           # this workflow installation-token-friendly (no /app endpoint call)
           # and false positives from other bots just trigger a correct extra
           # cycle on a PR that benefits from one.
-          approvals=$(gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
-            --jq '[.[] | select(.user.type == "Bot" and .state == "APPROVED")] | length' \
-            | awk '{s+=$1} END {print s+0}')
-          if [ "${approvals}" -gt 0 ]; then
-            echo "Found ${approvals} prior bot APPROVED review(s); re-applying bot:ready-for-review"
+          #
+          # LS-10965: counting only `state == "APPROVED"` never matched on the
+          # very event this workflow runs for. `.github/ruleset.json` sets
+          # dismiss_stale_reviews_on_push, so by the time this synchronize
+          # fires, GitHub has already turned every prior approval into
+          # DISMISSED — the count was always 0 and W7 never re-applied the
+          # label. The reviews API does not keep the original verdict of a
+          # dismissed review (and the bot's APPROVE body carries no verdict
+          # marker), but the issue timeline's `review_dismissed` events do:
+          # `dismissed_review.state` is the state the review had when it was
+          # dismissed. So a DISMISSED bot review counts iff its timeline
+          # dismissal recorded an approval — a dismissed CHANGES_REQUESTED
+          # (cycle-counter reset, human-override path) still does not.
+          # If the timeline cannot be read, fall back to counting any
+          # DISMISSED bot review: the worst case is one extra review cycle.
+          bot_reviews=$(gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
+            --jq '.[] | select(.user.type == "Bot") | "\(.id) \(.state)"')
+          approvals=$(printf '%s\n' "${bot_reviews}" | awk '$2 == "APPROVED"' | grep -c . || true)
+          dismissed_ids=$(printf '%s\n' "${bot_reviews}" | awk '$2 == "DISMISSED" {print $1}')
+          dismissed_approvals=0
+          if [ -n "${dismissed_ids}" ]; then
+            if approved_dismissals=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/timeline" \
+              --jq '.[] | select(.event == "review_dismissed")
+                    | select(((.dismissed_review.state // "") | ascii_downcase) == "approved")
+                    | .dismissed_review.review_id'); then
+              dismissed_approvals=$(printf '%s\n' "${dismissed_ids}" \
+                | grep -Fxf <(printf '%s\n' "${approved_dismissals}" | grep .) -c || true)
+            else
+              echo "::warning::Could not read the PR timeline - counting every dismissed bot review as a prior approval"
+              dismissed_approvals=$(printf '%s\n' "${dismissed_ids}" | grep -c . || true)
+            fi
+          fi
+          total=$((approvals + dismissed_approvals))
+          if [ "${total}" -gt 0 ]; then
+            echo "Found ${approvals} active + ${dismissed_approvals} dismissed prior bot approval(s); re-applying bot:ready-for-review"
             gh api -X POST "repos/${REPO}/issues/${PR_NUMBER}/labels" \
               -f "labels[]=bot:ready-for-review" > /dev/null
           else

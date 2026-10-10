@@ -11,8 +11,9 @@ name: "E2E Hold Auto-Resume"
 # backstop: it fires on every merge to main, matches held PRs to the merged fix
 # by blocker ticket key, and resumes them with zero agent involvement.
 #
-# Matching contract: the merged PR's title carries its LS-#### key (commit
-# format rule), and every legitimate hold carries a machine-readable
+# Matching contract: the merged PR names the blocker's LS-#### key in its
+# title (commit format rule), head branch name, or body (LS-10965), and every
+# legitimate hold carries a machine-readable
 #   <!-- e2e-hold
 #   blocker: LS-####
 #   ... -->
@@ -77,17 +78,33 @@ jobs:
           GH_REPO: ${{ github.repository }}
           MERGED_PR: ${{ github.event.pull_request.number }}
           MERGED_TITLE: ${{ github.event.pull_request.title }}
+          # LS-10965: also matched against the head branch and body — see below.
+          MERGED_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          MERGED_BODY: ${{ github.event.pull_request.body }}
         run: |
           set -eo pipefail
 
-          # LS keys named by the merged PR (title carries the ticket key by
-          # commit-format rule; there may be more than one, e.g. revert PRs).
-          KEYS=$(printf '%s' "$MERGED_TITLE" | grep -oE 'LS-[0-9]+' | sort -u || true)
+          # LS keys named by the merged PR. The title carries the ticket key by
+          # commit-format rule (there may be more than one, e.g. revert PRs),
+          # but a fix merged without the key in its title never lifted the
+          # hold (LS-10965). So also collect keys from the head branch name
+          # (`LS-####/...` by branch convention, matched case-insensitively)
+          # and the PR body (e.g. "Fixes LS-####"). Matching is whole-key
+          # (`grep -x` below), so LS-12 never matches LS-123. A body that only
+          # mentions the blocker resumes against a main that may still be
+          # broken: CI re-fails and the holder re-holds — the same outcome as
+          # a premature manual resume, never a silent merge.
+          extract_keys() { grep -oiE 'LS-[0-9]+' | tr '[:lower:]' '[:upper:]' || true; }
+          KEYS=$({
+            printf '%s\n' "$MERGED_TITLE" | extract_keys
+            printf '%s\n' "$MERGED_HEAD_REF" | extract_keys
+            printf '%s\n' "$MERGED_BODY" | extract_keys
+          } | sort -u)
           if [ -z "$KEYS" ]; then
-            echo "Merged PR #${MERGED_PR} has no LS-#### key in its title; nothing to match."
+            echo "Merged PR #${MERGED_PR} has no LS-#### key in its title, head branch or body; nothing to match."
             exit 0
           fi
-          echo "Merged PR #${MERGED_PR} keys: $(echo "$KEYS" | tr '\n' ' ')"
+          echo "Merged PR #${MERGED_PR} keys (title/branch/body): $(echo "$KEYS" | tr '\n' ' ')"
 
           # Open PRs currently held. The issues endpoint supports label
           # filtering directly; .pull_request presence filters out plain issues.

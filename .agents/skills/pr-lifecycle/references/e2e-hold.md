@@ -113,11 +113,11 @@ With the monitor armed, the marker posted, the label applied, and the user notif
 
 ## Auto-resume backstop (tokenless)
 
-`.github/workflows/e2e-hold-resume.yml` (LS-9218) resumes held PRs with **zero agent tokens**: on every merge to `main` it matches the merged PR's LS-#### title keys against each held PR's `<!-- e2e-hold -->` marker `blocker:` key. On a match it runs `update-branch` (merging fresh main → a `synchronize` event that re-fires CI + review while this session sleeps), appends ▶️ auto-resumed to the hold comment, removes `blocked:e2e-on-main`, and ensures `bot:ready-for-review`. If `update-branch` hits conflicts it leaves the hold **fully intact** and appends a ⚠️ failure note — the rebase path is then this session's (or a resume chip's) job.
+`.github/workflows/e2e-hold-resume.yml` (LS-9218) resumes held PRs with **zero agent tokens**: on every merge to `main` it matches the LS-#### keys in the merged PR's title, head branch name and body (LS-10965) against each held PR's `<!-- e2e-hold -->` marker `blocker:` key. On a match it runs `update-branch` (merging fresh main → a `synchronize` event that re-fires CI + review while this session sleeps), appends ▶️ auto-resumed to the hold comment, removes `blocked:e2e-on-main`, and ensures `bot:ready-for-review`. If `update-branch` hits conflicts it leaves the hold **fully intact** and appends a ⚠️ failure note — the rebase path is then this session's (or a resume chip's) job.
 
 Because the workflow fires within seconds of the fix merging and the Phase D monitor polls at 10 minutes, **expect the backstop to have already acted by the time this session wakes**. Phase E reconciles the two.
 
-The backstop only matches fixes whose PR title carries the blocker key. Fixes without a PR (infra, Jira-only closure) or with a mistitled PR still rely on the Phase D monitor and the sweep net — the backstop is a layer, not a replacement for arming the monitor.
+The backstop only matches fixes whose PR title, head branch or body names the blocker key. Fixes without a PR (infra, Jira-only closure) or with no key anywhere on the PR still rely on the Phase D monitor and the sweep net — the backstop is a layer, not a replacement for arming the monitor.
 
 ## Phase E: Resume on blocker resolution
 

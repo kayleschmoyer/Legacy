@@ -7,6 +7,7 @@ import {
   listPrReviewsFresh,
   findHumanMaintainerApproval,
   findLatestLabelActor,
+  resolveOverrideApplier,
   dismissReview,
 } from './lib/github.mjs';
 import { cleanupOperationalLabels } from './lib/labels.mjs';
@@ -377,7 +378,25 @@ async function main() {
   // Skip LLM review entirely and post APPROVE directly. The commit status,
   // merge-when-ready label, and operational label cleanup all run on this path
   // as on the normal APPROVED path.
-  if (process.env.REVIEWER_AUTO_APPROVE === 'true') {
+  //
+  // LS-10965: the label's presence is NOT sufficient — verify that whoever
+  // applied it is a maintainer (same bar as W5). Otherwise fall through to a
+  // normal LLM review: the run has already set bot-review to pending, and a
+  // real verdict is the only safe terminal status. W5 concurrently removes
+  // the unauthorized label and posts the rejection comment.
+  let autoApprove = process.env.REVIEWER_AUTO_APPROVE === 'true';
+  if (autoApprove) {
+    const { applier, authorized } = resolveOverrideApplier(prNumber, {
+      eventSender: process.env.OVERRIDE_LABEL_SENDER ?? '',
+    });
+    if (!authorized) {
+      autoApprove = false;
+      process.stdout.write(
+        `[reviewer] Ignoring review-bot-override — applier '${applier || '<unknown>'}' is not a maintainer; running a normal review (LS-10965)\n`,
+      );
+    }
+  }
+  if (autoApprove) {
     process.stdout.write(
       '[reviewer] Auto-approve: review-bot-override label detected — skipping LLM review\n',
     );

@@ -4,6 +4,7 @@ import {
   findLatestLabelActor,
   listPrReviewsFresh,
   findHumanMaintainerApproval,
+  resolveOverrideApplier,
 } from '../github.mjs';
 
 describe('findLatestLabelActor', () => {
@@ -228,5 +229,67 @@ describe('findHumanMaintainerApproval', () => {
       findHumanMaintainerApproval(reviews, allow(['alice'])),
       'alice',
     );
+  });
+});
+
+// LS-10965: W1 auto-approve must verify the override label applier.
+describe('resolveOverrideApplier', () => {
+  const never = () => {
+    throw new Error('should not be called');
+  };
+
+  it('authorizes a maintainer event sender without a timeline lookup', () => {
+    const checked = [];
+    const result = resolveOverrideApplier(7, {
+      eventSender: 'maint',
+      findActor: never,
+      checkPermission: (login) => {
+        checked.push(login);
+        return true;
+      },
+    });
+    assert.deepStrictEqual(result, { applier: 'maint', authorized: true });
+    assert.deepStrictEqual(checked, ['maint']);
+  });
+
+  it('rejects a non-maintainer applier', () => {
+    const result = resolveOverrideApplier(7, {
+      eventSender: 'contributor',
+      findActor: never,
+      checkPermission: () => false,
+    });
+    assert.deepStrictEqual(result, {
+      applier: 'contributor',
+      authorized: false,
+    });
+  });
+
+  it('rejects bot/app appliers without a permission lookup', () => {
+    const result = resolveOverrideApplier(7, {
+      eventSender: 'agent-author[bot]',
+      findActor: never,
+      checkPermission: never,
+    });
+    assert.strictEqual(result.authorized, false);
+  });
+
+  it('falls back to the latest timeline labeler when there is no event sender', () => {
+    const result = resolveOverrideApplier(7, {
+      findActor: (pr, label) => {
+        assert.strictEqual(pr, 7);
+        assert.strictEqual(label, 'review-bot-override');
+        return 'maint';
+      },
+      checkPermission: (login) => login === 'maint',
+    });
+    assert.deepStrictEqual(result, { applier: 'maint', authorized: true });
+  });
+
+  it('is unauthorized when the applier cannot be resolved', () => {
+    const result = resolveOverrideApplier(7, {
+      findActor: () => '',
+      checkPermission: never,
+    });
+    assert.deepStrictEqual(result, { applier: '', authorized: false });
   });
 });

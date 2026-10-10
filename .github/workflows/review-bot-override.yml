@@ -17,14 +17,19 @@ name: Review Bot Override (W5)
 #      findHumanMaintainerApproval), so no bot cycle clobbers this override.
 #   2. review-bot-override label (fallback) — a maintainer applies the label.
 #      Kept for cases where flipping the status without a formal review is
-#      preferable. Same effect as the human-review path.
+#      preferable. Same effect as the human-review path. The applier must have
+#      admin/maintain permission, the same bar as path 1 (LS-10965): a label
+#      applied by anyone else (including any bot/app) is removed, a rejection
+#      comment is posted, and bot-review is left untouched.
 #
 # Mirrors the security-override pattern in security-scanning.yml.
 #
 # Fires on:
 #   pull_request_review submitted — maintainer APPROVE → flip bot-review to success
-#   labeled   — override label applied → flip bot-review to success + audit comment
-#   unlabeled — override label removed → flip bot-review to pending + audit comment
+#   labeled   — override label applied by a maintainer → flip bot-review to
+#               success + audit comment; by anyone else → remove label + comment
+#   unlabeled — override label removed → flip bot-review to pending, cycle
+#               bot:ready-for-review to re-fire W1 (LS-10965) + audit comment
 #
 # The reviewer workflow (W1) skips its run when this label is present, so the
 # override status is preserved across subsequent push/label events.
@@ -65,6 +70,10 @@ jobs:
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
       - name: Apply or remove bot-review override
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          # LS-10965: removes an unauthorized override label without emitting
+          # an `unlabeled` event to workflows (see the fallback path below).
+          DEFAULT_GITHUB_TOKEN: ${{ github.token }}
         with:
           github-token: ${{ steps.reviewer-token.outputs.token }}
           script: |
@@ -191,6 +200,73 @@ jobs:
             const isLabeled = context.payload.action === 'labeled';
 
             if (isLabeled) {
+              // LS-10965: the label is only an override when a maintainer
+              // applied it. Labels can be applied by anyone with triage/write
+              // access — including the Agent Author app whose PRs this gate
+              // reviews — so check the applier exactly as the human-APPROVE
+              // path above checks the reviewer (admin/maintain only). Bot
+              // senders never qualify. The reviewer (W1) applies the same
+              // check before its auto-approve path (reviewer/index.mjs), so a
+              // concurrent W1 run on this labeled event cannot bypass it.
+              let applierRole = null;
+              if (context.payload.sender.type !== 'Bot') {
+                try {
+                  const { data: perm } = await github.rest.repos.getCollaboratorPermissionLevel({
+                    owner,
+                    repo,
+                    username: applier,
+                  });
+                  applierRole = perm.role_name || perm.permission;
+                } catch (err) {
+                  core.info(`Could not resolve permission for @${applier}: ${err.message || err} — treating as unauthorized.`);
+                }
+              }
+
+              if (!['admin', 'maintain'].includes(applierRole)) {
+                core.warning(
+                  `review-bot-override applied by @${applier} (role '${applierRole}') — not a maintainer; removing label, bot-review untouched.`,
+                );
+                // Remove with the workflow's GITHUB_TOKEN, NOT the reviewer
+                // app token: events caused by GITHUB_TOKEN do not trigger
+                // workflows, so this removal does not re-enter this
+                // workflow's unlabeled path (which would flip bot-review to
+                // pending and re-fire W1 on the PR's legitimate status).
+                try {
+                  const defaultGithub = getOctokit(process.env.DEFAULT_GITHUB_TOKEN);
+                  await defaultGithub.rest.issues.removeLabel({
+                    owner,
+                    repo,
+                    issue_number: prNumber,
+                    name: 'review-bot-override',
+                  });
+                } catch (err) {
+                  if (err.status !== 404) {
+                    core.warning(`Could not remove unauthorized review-bot-override label: ${err.message || err}`);
+                  }
+                }
+
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: prNumber,
+                  body: [
+                    '> [!WARNING]',
+                    '> **Bot Review Override Rejected**',
+                    `> The \`review-bot-override\` label was applied by @${applier}, who does not have admin or maintain permission.` +
+                    ' The label has been removed and the `bot-review` check was not changed.',
+                    '>',
+                    '> Only a maintainer can override the reviewer bot — via this label or an APPROVE review.',
+                  ].join('\n'),
+                });
+
+                core.summary.addRaw(`## ⛔ Bot Review Override Rejected\n\n`);
+                core.summary.addRaw(`**Applied by:** @${applier} (role: ${applierRole ?? 'unknown'})\n\n`);
+                core.summary.addRaw(`**PR:** ${prUrl}\n\n`);
+                core.summary.addRaw(`The label was removed; \`bot-review\` on \`${sha.slice(0, 7)}\` was not changed.\n`);
+                await core.summary.write();
+                return;
+              }
+
               // Flip bot-review to success
               await github.rest.repos.createCommitStatus({
                 owner,
@@ -210,7 +286,7 @@ jobs:
                 body: [
                   '> [!WARNING]',
                   '> **Bot Review Override Applied**',
-                  `> The \`review-bot-override\` label was applied by @${applier}. The \`bot-review\` required check has been set to \`success\`.`,
+                  `> The \`review-bot-override\` label was applied by @${applier} (maintainer). The \`bot-review\` required check has been set to \`success\`.`,
                   '>',
                   '> This override bypasses the reviewer bot\'s blocking findings. Apply only after the' +
                   ' bot\'s findings have been reviewed and confirmed inapplicable or incorrect' +
@@ -225,17 +301,53 @@ jobs:
               core.summary.addRaw(`The \`bot-review\` commit status on \`${sha.slice(0, 7)}\` has been set to \`success\`.\n`);
               await core.summary.write();
             } else {
-              // Label removed — set back to pending so the next reviewer run
-              // or human can re-evaluate. Does not automatically re-trigger W1.
+              // Label removed — set back to pending, then re-fire the
+              // reviewer so the normal gate re-adjudicates this SHA.
               await github.rest.repos.createCommitStatus({
                 owner,
                 repo,
                 sha,
                 state: 'pending',
                 context: 'bot-review',
-                description: 'Override removed — re-apply bot:ready-for-review to re-run review',
+                description: 'Override removed — re-running Reviewer (W1)',
                 target_url: `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`,
               });
+
+              // LS-10965: `unlabeled` is not a W1 trigger, so the pending
+              // above used to sit until the merge queue's stale-pending
+              // self-heal (an hour, and only while the PR is queued). Cycle
+              // bot:ready-for-review (remove, then add) so a fresh `labeled`
+              // event fires W1 — a bare re-add of a present label emits no
+              // event. `github` here is the reviewer app token minted above:
+              // labels changed with the default GITHUB_TOKEN would not
+              // trigger W1 at all. Best-effort: on failure the audit comment
+              // tells the human how to re-trigger manually.
+              let retriggered = false;
+              if (context.payload.pull_request.state === 'open') {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner,
+                    repo,
+                    issue_number: prNumber,
+                    name: 'bot:ready-for-review',
+                  });
+                } catch (err) {
+                  if (err.status !== 404) {
+                    core.warning(`Could not remove bot:ready-for-review before re-adding: ${err.message || err}`);
+                  }
+                }
+                try {
+                  await github.rest.issues.addLabels({
+                    owner,
+                    repo,
+                    issue_number: prNumber,
+                    labels: ['bot:ready-for-review'],
+                  });
+                  retriggered = true;
+                } catch (err) {
+                  core.warning(`Could not apply bot:ready-for-review to re-trigger W1: ${err.message || err}`);
+                }
+              }
 
               // Audit comment
               await github.rest.issues.createComment({
@@ -245,13 +357,18 @@ jobs:
                 body: [
                   '> [!NOTE]',
                   '> **Bot Review Override Removed**',
-                  `> The \`review-bot-override\` label was removed by @${applier}. The \`bot-review\` check is now \`pending\` — re-apply \`bot:ready-for-review\` to trigger a new review cycle.`,
+                  `> The \`review-bot-override\` label was removed by @${applier}. ` +
+                    'The `bot-review` check is now `pending` ' +
+                    (retriggered
+                      ? 'and `bot:ready-for-review` has been re-applied to start a new review cycle.'
+                      : '— re-apply `bot:ready-for-review` to trigger a new review cycle.'),
                 ].join('\n'),
               });
 
               core.summary.addRaw(`## ⏳ Bot Review Override Removed\n\n`);
               core.summary.addRaw(`**Removed by:** @${applier}\n\n`);
               core.summary.addRaw(`**PR:** ${prUrl}\n\n`);
-              core.summary.addRaw(`The \`bot-review\` commit status on \`${sha.slice(0, 7)}\` has been set to \`pending\`.\n`);
+              core.summary.addRaw(`The \`bot-review\` commit status on \`${sha.slice(0, 7)}\` has been set to \`pending\`` +
+                (retriggered ? ' and Reviewer (W1) re-triggered.\n' : '.\n'));
               await core.summary.write();
             }

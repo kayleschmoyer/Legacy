@@ -114,6 +114,21 @@ const MAX_REVIEW_REMEDIATIONS_PER_RUN = 10;
 // never an unbounded retry.
 const SELF_HEAL_MARKER = 'self-heal re-trigger';
 const MAX_SELF_HEAL_ATTEMPTS_PER_SHA = 2;
+// LS-10965: a bot-review `pending` only counts as a dead reviewer run once it
+// is older than this AND no Reviewer (W1) run for the head SHA is still queued
+// or in progress (see remediateStaleBotReview). W1's review job has
+// `timeout-minutes: 30` (review.yml) on top of self-hosted runner queue time
+// that has exceeded 16 minutes, so the previous 45m threshold (justified by a
+// 15m timeout that no longer exists) could cycle the label under a live review
+// — and review.yml's cancel-in-progress concurrency then killed the in-flight
+// paid LLM review and burned a self-heal attempt.
+const STALE_PENDING_MS = 60 * 60 * 1000;
+const REVIEWER_WORKFLOW_FILE = 'review.yml';
+// LS-10965: a W1 run that has been non-completed for longer than this is
+// wedged (e.g. its review job queued forever on a starved self-hosted label —
+// LS-9209), not live, and must not hold off the self-heal indefinitely.
+// Comfortably above the 30m job timeout plus worst observed queue time.
+const MAX_LIVE_REVIEW_RUN_MS = 3 * 60 * 60 * 1000;
 const ARBITRATION_LABEL = 'needs-human-arbitration';
 
 // The CI Gate commit status (and the granular 🚀 CI Pipeline / * check runs)
@@ -1515,10 +1530,10 @@ module.exports = async ({
       // success/failure → the reviewer adjudicated this SHA; nothing to heal.
       // pending → the reviewer (or the LS-9209 early footprint in W1's
       // check-runner-access job) set "in progress" and W1 may still be
-      // running; W1's job timeout is 15 minutes, so a pending older than
-      // STALE_PENDING_MS means the run died and the status will never
-      // resolve — fall through and re-trigger.
-      const STALE_PENDING_MS = 45 * 60 * 1000;
+      // running. W1's review job timeout is 30 minutes plus runner queue
+      // time, so only a pending older than STALE_PENDING_MS (60m, LS-10965)
+      // is a candidate for a dead run — and even then the live-run check
+      // below must confirm no W1 run is still queued/in progress.
       const isStalePending =
         latestBotReview.state === 'pending' &&
         Date.now() - new Date(latestBotReview.created_at).getTime() >
@@ -1526,8 +1541,27 @@ module.exports = async ({
       if (!isStalePending) return;
       console.log(
         `⚠️ PR #${pr.number}: ${BOT_REVIEW_STATUS_CONTEXT} stuck in 'pending' since ` +
-          `${latestBotReview.created_at} — treating as a dead reviewer run`,
+          `${latestBotReview.created_at} — checking for a live reviewer run`,
       );
+    }
+
+    // LS-10965: never heal (or escalate) under a live review. Cycling the
+    // label fires a new W1 run whose cancel-in-progress concurrency kills the
+    // in-flight one — a paid LLM review thrown away, plus a self-heal attempt
+    // burned toward needs-human-arbitration. Applies to the "no status yet"
+    // case too: a W1 run whose check-runner-access job is still queued has
+    // not posted its LS-9209 footprint. If the runs cannot be listed, stand
+    // down this pass — a deferred heal is recoverable next wake, a cancelled
+    // live review is not.
+    const liveReviewRun = await findLiveReviewerRun(pr);
+    if (liveReviewRun === undefined) return;
+    if (liveReviewRun) {
+      console.log(
+        `⏳ PR #${pr.number}: Reviewer (W1) run ${liveReviewRun.id} is still ` +
+          `'${liveReviewRun.status}' for ${pr.head.sha} — not healing ` +
+          `${BOT_REVIEW_STATUS_CONTEXT} under a live review (LS-10965)`,
+      );
+      return;
     }
 
     if (reviewRemediationsThisRun >= MAX_REVIEW_REMEDIATIONS_PER_RUN) {
@@ -1611,6 +1645,33 @@ module.exports = async ({
         `(${reviewRemediationsThisRun}/${MAX_REVIEW_REMEDIATIONS_PER_RUN} this run, ` +
         `self-heal attempt ${priorAttempts + 1}/${MAX_SELF_HEAL_ATTEMPTS_PER_SHA} for this SHA)`,
     );
+    // LS-10965: stamp the attempt marker BEFORE touching the label. The
+    // marker is the only durable per-SHA attempt counter, so a cycle without
+    // it is an uncounted re-trigger — repeated marker-write failures (e.g. a
+    // missing "Commit statuses" permission) would otherwise cycle the label,
+    // and cancel W1, on every wake with no escalation ever reached. If the
+    // write fails, treat the attempt as made and skip healing this pass. The
+    // trade-off: a label op that fails after a successful stamp burns an
+    // attempt, which only brings the bounded escalation forward. The stamp
+    // also serves as the visible in-progress footprint until the
+    // re-triggered W1 run overwrites it.
+    try {
+      await statusGithub.rest.repos.createCommitStatus({
+        owner,
+        repo,
+        sha: pr.head.sha,
+        state: 'pending',
+        context: BOT_REVIEW_STATUS_CONTEXT,
+        description: `${SELF_HEAL_MARKER} #${priorAttempts + 1}: re-firing Reviewer (W1) (LS-9209)`,
+      });
+    } catch (statusError) {
+      console.warn(
+        `⚠️ PR #${pr.number}: could not stamp self-heal attempt status: ${statusError.message} — ` +
+          `skipping the re-trigger this pass so no uncounted attempt is made (LS-10965). ` +
+          `If this is a 403, grant the Merge Queue GitHub App "Commit statuses: Read and write".`,
+      );
+      return;
+    }
     if (labelPresent) {
       try {
         await github.rest.issues.removeLabel({
@@ -1637,26 +1698,43 @@ module.exports = async ({
       console.warn(
         `⚠️ PR #${pr.number}: could not apply '${REVIEW_TRIGGER_LABEL}': ${labelError.message}`,
       );
-      return;
     }
-    // Stamp the attempt AFTER the label ops succeed so a failed cycle does not
-    // burn an attempt. Also serves as the visible in-progress footprint until
-    // the re-triggered W1 run overwrites it.
+  }
+
+  // LS-10965: the newest Reviewer (W1) run for the PR's head SHA that is still
+  // queued / in progress and younger than MAX_LIVE_REVIEW_RUN_MS, or null when
+  // there is none. Returns undefined when the runs cannot be listed — the
+  // caller stands down rather than risk cancelling a live review. Runs are
+  // filtered on head_sha client-side as well as in the query, so a run for an
+  // older SHA of the same PR never holds off the heal.
+  async function findLiveReviewerRun(pr) {
+    let runs;
     try {
-      await statusGithub.rest.repos.createCommitStatus({
+      const res = await github.rest.actions.listWorkflowRuns({
         owner,
         repo,
-        sha: pr.head.sha,
-        state: 'pending',
-        context: BOT_REVIEW_STATUS_CONTEXT,
-        description: `${SELF_HEAL_MARKER} #${priorAttempts + 1}: re-firing Reviewer (W1) (LS-9209)`,
+        workflow_id: REVIEWER_WORKFLOW_FILE,
+        head_sha: pr.head.sha,
+        per_page: 100,
       });
-    } catch (statusError) {
+      runs = res.data.workflow_runs ?? [];
+    } catch (e) {
       console.warn(
-        `⚠️ PR #${pr.number}: could not stamp self-heal attempt status: ${statusError.message} — ` +
-          `if this is a 403, grant the Merge Queue GitHub App "Commit statuses: Read and write".`,
+        `⚠️ PR #${pr.number}: could not list Reviewer (W1) runs for ${pr.head.sha}: ` +
+          `${e.message} — not healing ${BOT_REVIEW_STATUS_CONTEXT} this pass (LS-10965)`,
       );
+      return undefined;
     }
+    const live = runs.filter(
+      (r) =>
+        r.head_sha === pr.head.sha &&
+        r.status !== 'completed' &&
+        Date.now() - new Date(r.created_at).getTime() < MAX_LIVE_REVIEW_RUN_MS,
+    );
+    if (live.length === 0) return null;
+    return live.reduce((a, b) =>
+      new Date(b.created_at) > new Date(a.created_at) ? b : a,
+    );
   }
 
   // LS-9209: PRs OUTSIDE the merge queue stall identically when their W1 run

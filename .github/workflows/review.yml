@@ -145,12 +145,20 @@ jobs:
             -f context=bot-review \
             -f "description=Review cycle starting — awaiting Reviewer (W1)"
           echo "Posted bot-review=pending footprint for ${HEAD_SHA}"
+      # LS-10965: checkout, Agent Author token minting and runner resolution
+      # only feed the review job's `runs-on`, and that job is skipped when
+      # the gate is false — so skip them too instead of paying for them on
+      # every irrelevant label event. Nothing else consumes runner-label, and
+      # no terminal bot-review status is written in this job (the gate-false
+      # path never posts the pending footprint, so there is nothing to close).
       - name: Checkout
+        if: steps.gate.outputs.should-review == 'true'
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           sparse-checkout: .github/actions/resolve-runner-label
       - name: Generate App Token
         id: app-token
+        if: steps.gate.outputs.should-review == 'true'
         continue-on-error: true
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
         with:
@@ -158,6 +166,7 @@ jobs:
           private-key: ${{ secrets.AGENT_AUTHOR_APP_PRIVATE_KEY }}
       - name: Resolve Runner Label
         id: resolve
+        if: steps.gate.outputs.should-review == 'true'
         uses: ./.github/actions/resolve-runner-label
         with:
           runner-label: ${{ vars.CI_RUNNER_LABEL }}
@@ -233,6 +242,12 @@ jobs:
           # when the label is NOT present, so this never widens auto-approve to
           # PRs without the override.
           REVIEWER_AUTO_APPROVE: ${{ contains(github.event.pull_request.labels.*.name, 'review-bot-override') && 'true' || '' }}
+          # LS-10965: label presence alone no longer auto-approves. index.mjs
+          # (resolveOverrideApplier) verifies the applier has admin/maintain
+          # permission — the same bar W5 enforces — using this sender on the
+          # label's own labeled event and the timeline's latest labeler on
+          # every other trigger. An unauthorized override runs a normal review.
+          OVERRIDE_LABEL_SENDER: ${{ github.event.action == 'labeled' && github.event.label.name == 'review-bot-override' && github.event.sender.login || '' }}
           CYCLE_RESET_SENDER: ${{ github.event.action == 'labeled' && github.event.label.name == 'bot:reset-cycle-counter' && github.event.sender.login || '' }}
           TRIGGERED_BY_SYNCHRONIZE: ${{ github.event.action == 'synchronize' && 'true' || '' }}
           # LS-9756: lets the LS-4857 post-arbitration auto-reset also fire on
