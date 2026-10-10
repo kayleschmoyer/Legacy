@@ -1290,6 +1290,9 @@ export class LiveTestData implements TestData {
         input: {
           leagueName,
           numberOfTeams,
+          // LS-11032: explicit rather than the server's
+          // defaultDivisionCount — one division is legal for any team count.
+          numberOfDivisions: 1,
           playerPool: 'all',
           sport: 'baseball',
         },

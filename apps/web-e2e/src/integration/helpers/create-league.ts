@@ -69,6 +69,18 @@ export async function createLeagueViaUI(
       .first()
       .click();
 
+    // LS-11032: pin one division explicitly instead of trusting the form's
+    // default for this team count. A deployed frontend older than the backend
+    // defaulted 4-team leagues to 2 divisions, which the server's
+    // MIN_TEAMS_PER_DIVISION rule (lib/utils division-rules.ts) rejects —
+    // reddening every live spec at league creation. One division is always
+    // legal, so this keeps the helper independent of the form's default.
+    const oneDivision = page
+      .getByTestId('numberOfDivisions-field')
+      .getByRole('button', { name: '1', exact: true });
+    await oneDivision.click();
+    await expect(oneDivision).toHaveAttribute('aria-pressed', 'true');
+
     // Click submit and wait for the GraphQL mutation response in parallel so
     // we can detect network failures vs. slow redirects.
     const responsePromise = page
