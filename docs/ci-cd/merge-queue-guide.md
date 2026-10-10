@@ -43,7 +43,7 @@ Ready PRs that target `main` are tested together and landed as a set. The logic 
 
 1. **Build.** Up to **16** ready PRs, lowest PR number first, are merged on top of the current `main` tip into a temporary branch `mq/test/<id>`. The branch's tip commit records the set's metadata: base SHA, PRs and their tested head SHAs.
 2. **Test.** The CI Orchestrator is dispatched on that branch with `base_sha` set to the `main` tip, so the run covers everything the PRs change together. Its CI Gate status on the batch tip is the batch verdict.
-3. **Land.** When the gate is green and `main` hasn't moved, the queue squash-merges each PR through the merge API, in order. Each PR keeps its own commit on `main`, so you can revert it on its own. After landing, the queue checks that `main`'s tree equals the tested tree.
+3. **Land.** When the gate is green and `main` hasn't moved (the gate is enough on its own: the queue doesn't wait for non-gating jobs like the Playwright report deploy, as long as the gate was posted by the run's current attempt — LS-11029), the queue squash-merges each PR through the merge API, in order. Each PR keeps its own commit on `main`, so you can revert it on its own. After landing, the queue checks that `main`'s tree equals the tested tree.
 4. **Confirm.** A red batch is never acted on straight away. The queue re-runs only its failed jobs once; only a second red counts. A flaky test therefore costs one partial re-run, not a bisection or an ejection.
 5. **Bisect.** When a confirmed-red batch of N > 1 fails, the queue splits it into two halves and tests both at once on the current `main`:
    - The first green half lands.

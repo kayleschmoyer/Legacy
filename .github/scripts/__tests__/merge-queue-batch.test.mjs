@@ -127,6 +127,65 @@ describe('helpers', () => {
       'infra',
     );
   });
+
+  describe('gate success while the run is still in progress (LS-11029)', () => {
+    const started = '2026-10-01T20:00:00Z';
+    const url = (id) => `https://github.com/o/r/actions/runs/${id}`;
+    const run = (extra = {}) => ({
+      id: 7,
+      status: 'in_progress',
+      run_attempt: 1,
+      run_started_at: started,
+      ...extra,
+    });
+    const c = (gate, r = run()) =>
+      classifyBatchRun({
+        gateState: 'success',
+        gateCreatedAt: gate.at,
+        gateTargetUrl: gate.url,
+        run: r,
+        createdAt: 0,
+        now: Date.parse(started) + 10 * 60 * 1000,
+      });
+
+    it('is green when this attempt posted it (report deploy still running)', () => {
+      assert.equal(c({ at: '2026-10-01T20:34:17Z', url: url(7) }), 'green');
+      assert.equal(c({ at: '2026-10-01T20:34:17Z', url: null }), 'green');
+    });
+
+    it('stays pending for a gate an earlier attempt left during a re-run', () => {
+      const rerun = run({
+        run_attempt: 2,
+        run_started_at: '2026-10-01T20:40:00Z',
+      });
+      assert.equal(
+        c({ at: '2026-10-01T20:34:17Z', url: url(7) }, rerun),
+        'pending',
+      );
+    });
+
+    it('stays pending for a gate posted by another run', () => {
+      assert.equal(c({ at: '2026-10-01T20:34:17Z', url: url(6) }), 'pending');
+    });
+
+    it('stays pending when the gate time is unknown', () => {
+      assert.equal(c({ at: null, url: url(7) }), 'pending');
+    });
+
+    it('never treats a non-success gate as a verdict mid-run', () => {
+      assert.equal(
+        classifyBatchRun({
+          gateState: 'failure',
+          gateCreatedAt: '2026-10-01T20:34:17Z',
+          gateTargetUrl: url(7),
+          run: run(),
+          createdAt: 0,
+          now: Date.parse(started),
+        }),
+        'pending',
+      );
+    });
+  });
 });
 
 describe('decideBatchActions', () => {
@@ -875,6 +934,68 @@ describe('runBatchQueue', () => {
     assert.ok(!refs.has(`heads/${name}`));
     // No PRs left → no new batch.
     assert.equal(calls.dispatches.length, 1);
+  });
+
+  it('lands on a current-attempt CI Gate success while the run is still in progress (LS-11029)', async () => {
+    const fake = makeFakeGithub();
+    const { github, refs } = fake;
+    await runBatchQueue({
+      github,
+      owner: 'o',
+      repo: 'r',
+      readyPRs: [readyPR(1)],
+      mergePR: async () => assert.fail('nothing should merge yet'),
+      now: () => 1000,
+    });
+    const name = `mq/test/${(1000).toString(36)}`;
+    const tip = refs.get(`heads/${name}`);
+    const gateAt = (ms) => [
+      {
+        context: 'CI Gate',
+        state: 'success',
+        created_at: new Date(ms).toISOString(),
+        target_url: 'https://github.com/o/r/actions/runs/42',
+      },
+    ];
+    let statuses = gateAt(1500);
+    github.rest.repos.getCombinedStatusForRef = async ({ ref }) => ({
+      data: { statuses: ref === tip ? statuses : [] },
+    });
+    // Attempt 2 (a confirmation re-run) started after the gate was posted.
+    const runOf = (attempt, startedMs) => ({
+      id: 42,
+      head_sha: tip,
+      status: 'in_progress',
+      run_attempt: attempt,
+      created_at: new Date(1000).toISOString(),
+      run_started_at: new Date(startedMs).toISOString(),
+    });
+    const run = runOf(2, 1800);
+    github.rest.actions.listWorkflowRuns = async () => ({
+      data: { workflow_runs: [run] },
+    });
+    const merged = [];
+    const mergePR = async (pr) => {
+      merged.push(pr.number);
+      return { merged: true, sha: `squash${pr.number}` };
+    };
+    const pass = (ms) =>
+      runBatchQueue({
+        github,
+        owner: 'o',
+        repo: 'r',
+        readyPRs: [readyPR(1)],
+        mergePR,
+        now: () => ms,
+      });
+
+    await pass(2000);
+    assert.deepEqual(merged, [], 'stale gate from attempt 1 stays pending');
+
+    statuses = gateAt(2500);
+    await pass(3000);
+    assert.deepEqual(merged, [1]);
+    assert.ok(!refs.has(`heads/${name}`));
   });
 
   it('stops landing when a PR fails to merge', async () => {

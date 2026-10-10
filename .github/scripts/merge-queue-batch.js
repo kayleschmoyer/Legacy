@@ -50,7 +50,7 @@
 // decideBatchActions() is pure and holds every decision; runBatchQueue() is
 // the thin I/O layer that gathers state and executes the decided actions.
 
-const { CI_GATE_CONTEXT } = require('./ci-gate.js');
+const { CI_GATE_CONTEXT, runIdFromTargetUrl } = require('./ci-gate.js');
 
 const BATCH_REF_PREFIX = 'mq/test/';
 const MAX_BATCH_SIZE = 16;
@@ -174,8 +174,23 @@ function splitInHalves(prs) {
 // pending even when an earlier attempt left a gate behind — that is what a
 // confirmation re-run looks like. A run that finished without a terminal gate,
 // or that has been running past MAX_RUN_AGE_MS, is infra, never a PR's fault.
-function classifyBatchRun({ gateState, run, createdAt, now }) {
+// A success gate posted by the run's current attempt is green even while
+// non-gating jobs (the Playwright report deploy) are still running (LS-11029).
+function classifyBatchRun({
+  gateState,
+  gateCreatedAt,
+  gateTargetUrl,
+  run,
+  createdAt,
+  now,
+}) {
   if (run && run.status !== 'completed') {
+    if (
+      gateState === 'success' &&
+      isGateFromCurrentAttempt({ gateCreatedAt, gateTargetUrl, run })
+    ) {
+      return 'green';
+    }
     const started = Date.parse(run.run_started_at ?? run.created_at);
     if (Number.isFinite(started) && now - started > MAX_RUN_AGE_MS) {
       return 'stuck';
@@ -188,6 +203,21 @@ function classifyBatchRun({ gateState, run, createdAt, now }) {
     return now - createdAt > DISPATCH_GRACE_MS ? 'lost' : 'pending';
   }
   return 'infra';
+}
+
+// The gate's target_url names only the run, not the attempt, so a gate from
+// this attempt is one that points at this run (or at no run) and was posted
+// after the attempt started — run_started_at moves forward on every re-run.
+function isGateFromCurrentAttempt({ gateCreatedAt, gateTargetUrl, run }) {
+  const gateRunId = runIdFromTargetUrl(gateTargetUrl);
+  if (gateRunId !== null && run.id !== undefined && gateRunId !== run.id) {
+    return false;
+  }
+  const posted = Date.parse(gateCreatedAt);
+  const started = Date.parse(run.run_started_at ?? run.created_at);
+  return (
+    Number.isFinite(posted) && Number.isFinite(started) && posted >= started
+  );
 }
 
 /**
@@ -851,6 +881,8 @@ async function runBatchQueue({
         holdNotified: tip.holdNotified,
         verdict: classifyBatchRun({
           gateState: tip.gateState,
+          gateCreatedAt: tip.gateCreatedAt,
+          gateTargetUrl: tip.gateTargetUrl,
           run,
           createdAt: meta.createdAt,
           now: now(),
@@ -869,8 +901,11 @@ async function runBatchQueue({
     });
     const byContext = (ctx) =>
       (data.statuses || []).find((st) => st.context === ctx);
+    const gate = byContext(CI_GATE_CONTEXT);
     return {
-      gateState: byContext(CI_GATE_CONTEXT)?.state ?? null,
+      gateState: gate?.state ?? null,
+      gateCreatedAt: gate?.created_at ?? null,
+      gateTargetUrl: gate?.target_url ?? null,
       landAttempt: parseLandAttempt(
         byContext(LAND_STATUS_CONTEXT)?.description,
       ),
