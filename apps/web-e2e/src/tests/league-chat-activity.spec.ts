@@ -127,8 +127,8 @@ const MOCK_ACTIVITY_EVENTS = [
     teamId: 2,
     actorUserId: 2,
     actorUsername: 'opponent',
-    eventType: 'waiver_claimed',
-    payload: JSON.stringify({ playerId: 42 }),
+    eventType: 'waiver_claim_approved',
+    payload: JSON.stringify({ playerId: 42, playerName: 'Waiver Target' }),
     occurredAt: agoIso(7_200_000),
   },
 ];
@@ -288,8 +288,11 @@ test.describe('Activity feed displays events with type badges @regression', () =
     // Verify trade event renders with its title
     await expect(page.getByText('Trade accepted')).toBeVisible();
 
-    // Verify waiver event renders with its title
-    await expect(page.getByText('Waiver claim processed')).toBeVisible();
+    // Verify waiver event renders with its title and the player's name
+    await expect(page.getByText('Waiver claim approved')).toBeVisible();
+    await expect(
+      page.getByText(/claimed Waiver Target off waivers/),
+    ).toBeVisible();
 
     // Verify type badges are displayed
     await expect(
@@ -361,7 +364,7 @@ test.describe('Activity feed shows multiple event types @regression', () => {
 
     // Verify all four event types are rendered
     await expect(page.getByText('Trade accepted')).toBeVisible();
-    await expect(page.getByText('Waiver claim processed')).toBeVisible();
+    await expect(page.getByText('Waiver claim approved')).toBeVisible();
     await expect(
       page.getByText('Round 1, Pick 3', { exact: false }),
     ).toBeVisible();

@@ -8,10 +8,11 @@
  */
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, count, desc, eq, inArray } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, ne } from 'drizzle-orm';
 
 import { builder, type Context } from './builder';
 import { AuthenticationError, ForbiddenError } from './graphql-errors';
+import { resolvePlayerNames } from '../services/activity-log';
 
 // ── GraphQL enum ───────────────────────────────────────────────────────────
 
@@ -118,6 +119,64 @@ async function assertLeagueMember(
   }
 }
 
+/**
+ * `waiver_claimed` is written when a blind claim is *submitted*, so exposing
+ * it would leak pending claims to the whole league. Members see the outcome
+ * (`waiver_claim_approved` / `waiver_claim_rejected`) instead (LS-10527).
+ */
+const notPendingClaim = ne(
+  PublicSchema.leagueActivityLog.eventType,
+  'waiver_claimed',
+);
+
+const WAIVER_OUTCOME_TYPES = new Set<string>([
+  'waiver_claim_approved',
+  'waiver_claim_rejected',
+]);
+
+/**
+ * Events written before names were saved with the payload only carry player
+ * IDs; look the names up at read time so the feed never shows a bare ID.
+ */
+async function withWaiverPlayerNames<
+  T extends { eventType: string; payload: Record<string, unknown> },
+>(context: Context, rows: T[]): Promise<T[]> {
+  const missing = rows.filter(
+    (r) =>
+      WAIVER_OUTCOME_TYPES.has(r.eventType) &&
+      (typeof r.payload['playerName'] !== 'string' ||
+        (typeof r.payload['dropPlayerId'] === 'number' &&
+          typeof r.payload['dropPlayerName'] !== 'string')),
+  );
+  if (missing.length === 0) return rows;
+
+  const names = await resolvePlayerNames(
+    context,
+    missing.flatMap((r) => [
+      r.payload['playerId'] as number | undefined,
+      r.payload['dropPlayerId'] as number | undefined,
+    ]),
+  );
+  return rows.map((r) => {
+    if (!missing.includes(r)) return r;
+    const { playerId, dropPlayerId } = r.payload;
+    const playerName =
+      typeof playerId === 'number' ? names.get(playerId) : undefined;
+    const dropPlayerName =
+      typeof dropPlayerId === 'number' ? names.get(dropPlayerId) : undefined;
+    return {
+      ...r,
+      payload: {
+        ...r.payload,
+        ...(typeof r.payload['playerName'] !== 'string' &&
+          playerName && { playerName }),
+        ...(typeof r.payload['dropPlayerName'] !== 'string' &&
+          dropPlayerName && { dropPlayerName }),
+      },
+    };
+  });
+}
+
 // ── Query ──────────────────────────────────────────────────────────────────
 
 builder.queryField('leagueActivity', (t) =>
@@ -145,12 +204,16 @@ builder.queryField('leagueActivity', (t) =>
           args.eventTypes && args.eventTypes.length > 0
             ? and(
                 eq(PublicSchema.leagueActivityLog.leagueId, leagueId),
+                notPendingClaim,
                 inArray(
                   PublicSchema.leagueActivityLog.eventType,
                   args.eventTypes,
                 ),
               )
-            : eq(PublicSchema.leagueActivityLog.leagueId, leagueId);
+            : and(
+                eq(PublicSchema.leagueActivityLog.leagueId, leagueId),
+                notPendingClaim,
+              );
 
         const rows = await context.db
           .select()
@@ -159,7 +222,7 @@ builder.queryField('leagueActivity', (t) =>
           .orderBy(desc(PublicSchema.leagueActivityLog.occurredAt))
           .limit(limit);
 
-        return rows.map((row) => ({
+        const events = rows.map((row) => ({
           id: row.id,
           leagueId: row.leagueId,
           teamId: row.teamId ?? null,
@@ -171,6 +234,8 @@ builder.queryField('leagueActivity', (t) =>
               ? row.occurredAt.toISOString()
               : String(row.occurredAt),
         }));
+
+        return await withWaiverPlayerNames(context, events);
       } catch (err) {
         LOGGER.error('Error fetching league activity', {
           leagueId,
@@ -204,7 +269,12 @@ builder.queryField('leagueActivityCounts', (t) =>
             count: count(),
           })
           .from(PublicSchema.leagueActivityLog)
-          .where(eq(PublicSchema.leagueActivityLog.leagueId, leagueId))
+          .where(
+            and(
+              eq(PublicSchema.leagueActivityLog.leagueId, leagueId),
+              notPendingClaim,
+            ),
+          )
           .groupBy(PublicSchema.leagueActivityLog.eventType);
 
         return rows.map((row) => ({

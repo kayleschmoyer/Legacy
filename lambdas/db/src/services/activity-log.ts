@@ -7,7 +7,7 @@
  */
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { Context } from '../schema/builder';
 
 export type InsertActivityLogPayload = {
@@ -130,4 +130,61 @@ export async function logDraftPickActivity(
       ...(data.wasCommissionerPick && { wasCommissionerPick: true }),
     },
   });
+}
+
+/**
+ * Resolve display names ("First Last") for a set of player IDs.
+ *
+ * Never throws — a failed lookup yields an empty map so callers can still
+ * write/read the activity entry without names.
+ */
+export async function resolvePlayerNames(
+  context: Pick<Context, 'db'>,
+  playerIds: Array<number | null | undefined>,
+): Promise<Map<number, string>> {
+  const ids = [
+    ...new Set(playerIds.filter((id): id is number => typeof id === 'number')),
+  ];
+  const names = new Map<number, string>();
+  if (ids.length === 0) return names;
+
+  try {
+    const rows = await context.db
+      .select({
+        id: PublicSchema.players.id,
+        firstName: PublicSchema.players.firstName,
+        lastName: PublicSchema.players.lastName,
+      })
+      .from(PublicSchema.players)
+      .where(inArray(PublicSchema.players.id, ids));
+    for (const row of rows) {
+      names.set(row.id, `${row.firstName} ${row.lastName}`);
+    }
+  } catch (err) {
+    LOGGER.warn(
+      'Failed to resolve player names for activity (non-fatal)',
+      err instanceof Error ? err : new Error(String(err)),
+      { playerIds: ids },
+    );
+  }
+  return names;
+}
+
+/**
+ * Payload fields (`playerName`, `dropPlayerName`) for a waiver activity
+ * event, omitting any name that could not be resolved.
+ */
+export async function waiverNamePayload(
+  context: Pick<Context, 'db'>,
+  playerId: number,
+  dropPlayerId?: number | null,
+): Promise<{ playerName?: string; dropPlayerName?: string }> {
+  const names = await resolvePlayerNames(context, [playerId, dropPlayerId]);
+  const playerName = names.get(playerId);
+  const dropPlayerName =
+    dropPlayerId != null ? names.get(dropPlayerId) : undefined;
+  return {
+    ...(playerName && { playerName }),
+    ...(dropPlayerName && { dropPlayerName }),
+  };
 }

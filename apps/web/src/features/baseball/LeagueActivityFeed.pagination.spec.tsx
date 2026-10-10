@@ -60,6 +60,8 @@ jest.mock('@legacy-sports/graphql', () => ({
     TradeCancelled: 'TradeCancelled',
     TradeVetoed: 'TradeVetoed',
     WaiverClaimed: 'WaiverClaimed',
+    WaiverClaimApproved: 'WaiverClaimApproved',
+    WaiverClaimRejected: 'WaiverClaimRejected',
     WaiverCancelled: 'WaiverCancelled',
     DraftPickMade: 'DraftPickMade',
     LeagueAnnouncement: 'LeagueAnnouncement',

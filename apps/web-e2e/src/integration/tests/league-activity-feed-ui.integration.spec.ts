@@ -497,7 +497,7 @@ test.describe
 
   // -----------------------------------------------------------------------
   // PHASE 6 — WAIVER: CLAIM + PROCESS
-  // (generates waiver_claimed + waiver_claim_approved events)
+  // (only waiver_claim_approved is visible in the feed)
   // -----------------------------------------------------------------------
 
   test('Phase 6: Claim and process a waiver', async ({
@@ -678,7 +678,7 @@ test.describe
 
     await test.step('Verify waiver events appear', async () => {
       await expect(
-        page.getByText(/Waiver claim processed|Waiver claim/i).first(),
+        page.getByText(/Waiver claim approved/i).first(),
       ).toBeVisible({ timeout: 10_000 });
     });
 
@@ -719,7 +719,9 @@ test.describe
       expect(eventTypes.has('draft_pick_made')).toBe(true);
       expect(eventTypes.has('trade_proposed')).toBe(true);
       expect(eventTypes.has('trade_accepted')).toBe(true);
-      expect(eventTypes.has('waiver_claimed')).toBe(true);
+      expect(eventTypes.has('waiver_claim_approved')).toBe(true);
+      // Pending claims are never exposed to the league (LS-10527)
+      expect(eventTypes.has('waiver_claimed')).toBe(false);
       expect(eventTypes.has('league_announcement')).toBe(true);
     });
   });
@@ -772,7 +774,7 @@ test.describe
       // its own timeout for the filtered event to appear (LS-4457).
 
       await expect(
-        page.getByText(/Waiver claim processed|Waiver claim/i).first(),
+        page.getByText(/Waiver claim approved/i).first(),
       ).toBeVisible({ timeout: 5_000 });
     });
 

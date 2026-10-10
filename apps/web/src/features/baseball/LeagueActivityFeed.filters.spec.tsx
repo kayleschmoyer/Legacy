@@ -153,8 +153,8 @@ describe('LeagueActivityFeed – filter chips (LS-10686)', () => {
     mockCounts = [
       { eventType: 'TradeProposed', count: 20 },
       { eventType: 'DraftPickMade', count: 4 },
-      // Not rendered by the feed, so excluded from the "All" total.
-      { eventType: 'WaiverClaimApproved', count: 3 },
+      // `waiver_claimed` (pending) is excluded server-side, so it never
+      // appears in the counts.
     ];
   });
 

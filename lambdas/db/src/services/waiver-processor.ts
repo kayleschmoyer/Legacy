@@ -17,7 +17,7 @@ import {
   notifyDiscordWaiverClaim,
 } from './discord-league';
 
-import { insertActivityLog } from './activity-log';
+import { insertActivityLog, waiverNamePayload } from './activity-log';
 import { assertCapSpace, computeTeamPayroll } from './cap-service';
 import {
   addPlayerToRoster,
@@ -207,20 +207,11 @@ export class WaiverClaimProcessor {
 
             if (result.outcome === 'failed') {
               failed++;
-              void insertActivityLog(
-                { db: this.db },
-                {
-                  leagueId: claim.leagueId,
-                  teamId: claim.teamId,
-                  actorUserId: claim.userId,
-                  eventType: 'waiver_claim_rejected',
-                  payload: {
-                    claimId: claim.id,
-                    playerId: claim.playerId,
-                    reason: result.reason ?? 'Claim could not be fulfilled',
-                  },
-                },
-              );
+              void this.logClaimOutcome(claim, 'waiver_claim_rejected', {
+                claimId: claim.id,
+                playerId: claim.playerId,
+                reason: result.reason ?? 'Claim could not be fulfilled',
+              });
               // Check if it's a "player taken" failure — block remaining claims
               claimed = await isPlayerOnRoster(
                 this.db,
@@ -243,22 +234,13 @@ export class WaiverClaimProcessor {
               waiverType,
             });
 
-            void insertActivityLog(
-              { db: this.db },
-              {
-                leagueId: claim.leagueId,
-                teamId: claim.teamId,
-                actorUserId: claim.userId,
-                eventType: 'waiver_claim_approved',
-                payload: {
-                  claimId: claim.id,
-                  playerId: claim.playerId,
-                  dropPlayerId: claim.dropPlayerId ?? null,
-                  faabBid: claim.faabBid ?? null,
-                  waiverType,
-                },
-              },
-            );
+            void this.logClaimOutcome(claim, 'waiver_claim_approved', {
+              claimId: claim.id,
+              playerId: claim.playerId,
+              dropPlayerId: claim.dropPlayerId ?? null,
+              faabBid: claim.faabBid ?? null,
+              waiverType,
+            });
 
             // Rotate waiver order for standard waivers
             if (waiverType === 'standard') {
@@ -299,22 +281,13 @@ export class WaiverClaimProcessor {
                 faabBid: claim.faabBid ?? null,
                 waiverType,
               });
-              void insertActivityLog(
-                { db: this.db },
-                {
-                  leagueId: claim.leagueId,
-                  teamId: claim.teamId,
-                  actorUserId: claim.userId,
-                  eventType: 'waiver_claim_approved',
-                  payload: {
-                    claimId: claim.id,
-                    playerId: claim.playerId,
-                    dropPlayerId: claim.dropPlayerId ?? null,
-                    faabBid: claim.faabBid ?? null,
-                    waiverType,
-                  },
-                },
-              );
+              void this.logClaimOutcome(claim, 'waiver_claim_approved', {
+                claimId: claim.id,
+                playerId: claim.playerId,
+                dropPlayerId: claim.dropPlayerId ?? null,
+                faabBid: claim.faabBid ?? null,
+                waiverType,
+              });
               if (waiverType === 'standard') {
                 await this.rotateWaiverOrder(claim, teamSettingsMap);
               }
@@ -329,20 +302,11 @@ export class WaiverClaimProcessor {
                 .where(eq(PublicSchema.waiverClaims.id, claim.id));
 
               failed++;
-              void insertActivityLog(
-                { db: this.db },
-                {
-                  leagueId: claim.leagueId,
-                  teamId: claim.teamId,
-                  actorUserId: claim.userId,
-                  eventType: 'waiver_claim_rejected',
-                  payload: {
-                    claimId: claim.id,
-                    playerId: claim.playerId,
-                    reason: errorMessage,
-                  },
-                },
-              );
+              void this.logClaimOutcome(claim, 'waiver_claim_rejected', {
+                claimId: claim.id,
+                playerId: claim.playerId,
+                reason: errorMessage,
+              });
             }
           }
         }
@@ -720,6 +684,40 @@ export class WaiverClaimProcessor {
       .update(PublicSchema.waiverClaims)
       .set({ status: 'failed', errorMessage, processedAt: new Date() })
       .where(eq(PublicSchema.waiverClaims.id, claimId));
+  }
+
+  /**
+   * Fire-and-forget activity entry for a processed claim. Player names are
+   * resolved here and saved with the event so the feed never has to show a
+   * bare player ID (LS-10527).
+   */
+  private async logClaimOutcome(
+    claim: {
+      id: number;
+      leagueId: number;
+      teamId: number;
+      userId: number;
+      playerId: number;
+      dropPlayerId?: number | null;
+    },
+    eventType: 'waiver_claim_approved' | 'waiver_claim_rejected',
+    payload: Record<string, unknown>,
+  ): Promise<void> {
+    const names = await waiverNamePayload(
+      { db: this.db },
+      claim.playerId,
+      claim.dropPlayerId,
+    );
+    await insertActivityLog(
+      { db: this.db },
+      {
+        leagueId: claim.leagueId,
+        teamId: claim.teamId,
+        actorUserId: claim.userId,
+        eventType,
+        payload: { ...payload, ...names },
+      },
+    );
   }
 
   private async rotateWaiverOrder(

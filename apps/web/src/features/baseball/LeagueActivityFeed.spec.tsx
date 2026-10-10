@@ -195,4 +195,60 @@ describe('eventToActivityItem', () => {
       expect(cancelled?.detail).toBe('alice cancelled a pending trade.');
     });
   });
+
+  describe('waiver events (LS-10527)', () => {
+    const waiver = (
+      eventType: LeagueActivityEventType,
+      payload: Record<string, unknown>,
+    ) =>
+      eventToActivityItem({
+        ...baseEvent,
+        eventType,
+        payload: JSON.stringify(payload),
+      });
+
+    it('does not render pending (waiver_claimed) events', () => {
+      expect(
+        waiver(LeagueActivityEventType.WaiverClaimed, { playerId: 1 }),
+      ).toBeNull();
+    });
+
+    it('renders approved claims with add and drop names, never a player ID', () => {
+      const result = waiver(LeagueActivityEventType.WaiverClaimApproved, {
+        playerId: 128376,
+        playerName: 'Israel Abanikanda',
+        dropPlayerName: 'Lavale Thomas',
+      });
+      expect(result?.title).toBe('Waiver claim approved');
+      expect(result?.detail).toBe(
+        'alice claimed Israel Abanikanda off waivers and dropped Lavale Thomas.',
+      );
+      expect(result?.detail).not.toContain('#');
+    });
+
+    it('omits the drop clause when nobody was dropped', () => {
+      const result = waiver(LeagueActivityEventType.WaiverClaimApproved, {
+        playerName: 'Israel Abanikanda',
+      });
+      expect(result?.detail).toBe(
+        'alice claimed Israel Abanikanda off waivers.',
+      );
+    });
+
+    it('falls back to "a player" when no name is available', () => {
+      const result = waiver(LeagueActivityEventType.WaiverClaimApproved, {
+        playerId: 5,
+      });
+      expect(result?.detail).toBe('alice claimed a player off waivers.');
+    });
+
+    it('renders rejected claims', () => {
+      const result = waiver(LeagueActivityEventType.WaiverClaimRejected, {
+        playerName: 'Israel Abanikanda',
+      });
+      expect(result?.type).toBe('waiver');
+      expect(result?.title).toBe('Waiver claim rejected');
+      expect(result?.detail).toContain('Israel Abanikanda');
+    });
+  });
 });

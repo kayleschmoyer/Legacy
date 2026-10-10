@@ -28,7 +28,10 @@ import { WaiverClaimProcessor } from '../../services/waiver-processor';
 import { assertAuthorized } from '../matchups/scheduled-mutations';
 import { writeAuditLog } from '../audit-log';
 import { builder } from '../builder';
-import { insertActivityLog } from '../../services/activity-log';
+import {
+  insertActivityLog,
+  waiverNamePayload,
+} from '../../services/activity-log';
 import {
   AuthenticationError,
   ForbiddenError,
@@ -383,18 +386,22 @@ builder.mutationField('claimFreeAgent', (t) =>
         userId,
       });
 
-      void insertActivityLog(context, {
-        leagueId,
-        teamId,
-        actorUserId: userId,
-        eventType: 'waiver_claimed',
-        payload: {
-          claimId: inserted[0].id,
-          playerId,
-          dropPlayerId: dropPlayerId ?? null,
-          faabBid: resolvedFaabBid,
-        },
-      });
+      const claimId = inserted[0].id;
+      void waiverNamePayload(context, playerId, dropPlayerId).then((names) =>
+        insertActivityLog(context, {
+          leagueId,
+          teamId,
+          actorUserId: userId,
+          eventType: 'waiver_claimed',
+          payload: {
+            claimId,
+            playerId,
+            dropPlayerId: dropPlayerId ?? null,
+            faabBid: resolvedFaabBid,
+            ...names,
+          },
+        }),
+      );
 
       return inserted[0];
     },

@@ -27,6 +27,7 @@ import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
+  BRAND_SEAM_RED_LIGHT,
   withAlpha,
 } from '../../constants/colors';
 
@@ -83,6 +84,11 @@ function formatRelativeDate(isoDate: string): string {
   if (diffDays < 7) return `${diffDays}d ago`;
   if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
   return `${Math.floor(diffDays / 30)}mo ago`;
+}
+
+/** Player name from an event payload, or a generic noun if it's missing. */
+function nameOrFallback(value: unknown): string {
+  return typeof value === 'string' && value ? value : 'a player';
 }
 
 export function eventToActivityItem(event: {
@@ -215,22 +221,42 @@ export function eventToActivityItem(event: {
         linkTo: `/leagues/${lid}/trades`,
       };
 
-    case LeagueActivityEventType.WaiverClaimed: {
-      const playerName =
-        typeof payload['playerId'] === 'number'
-          ? `Player #${payload['playerId']}`
-          : 'a player';
+    // `waiver_claimed` marks a still-pending (blind) claim — never show it
+    // to the league; the processed outcome below is what members see.
+    case LeagueActivityEventType.WaiverClaimed:
+      return null;
+
+    case LeagueActivityEventType.WaiverClaimApproved: {
+      const playerName = nameOrFallback(payload['playerName']);
+      const dropName =
+        typeof payload['dropPlayerName'] === 'string'
+          ? payload['dropPlayerName']
+          : null;
       return {
         id: String(event.id),
         type: 'waiver',
         icon: <UserCheck size={16} color="rgb(44, 74, 124)" />,
-        title: 'Waiver claim processed',
-        detail: `${actor} claimed ${playerName} off waivers.`,
+        title: 'Waiver claim approved',
+        detail: dropName
+          ? `${actor} claimed ${playerName} off waivers and dropped ${dropName}.`
+          : `${actor} claimed ${playerName} off waivers.`,
         isoDate,
         accentColor: '$brandNavyLight',
         linkTo: `/leagues/${lid}/waivers`,
       };
     }
+
+    case LeagueActivityEventType.WaiverClaimRejected:
+      return {
+        id: String(event.id),
+        type: 'waiver',
+        icon: <UserMinus size={16} color={BRAND_SEAM_RED_LIGHT} />,
+        title: 'Waiver claim rejected',
+        detail: `${actor}'s waiver claim for ${nameOrFallback(payload['playerName'])} was not successful.`,
+        isoDate,
+        accentColor: '$red11',
+        linkTo: `/leagues/${lid}/waivers`,
+      };
 
     case LeagueActivityEventType.WaiverCancelled:
       return {
@@ -320,7 +346,8 @@ const FILTER_EVENT_TYPES: Record<FilterableType, LeagueActivityEventType[]> = {
     LeagueActivityEventType.TradeVetoed,
   ],
   waiver: [
-    LeagueActivityEventType.WaiverClaimed,
+    LeagueActivityEventType.WaiverClaimApproved,
+    LeagueActivityEventType.WaiverClaimRejected,
     LeagueActivityEventType.WaiverCancelled,
   ],
   draft_pick: [LeagueActivityEventType.DraftPickMade],

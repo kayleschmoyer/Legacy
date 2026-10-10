@@ -155,6 +155,7 @@ describe('leagueActivity resolver', () => {
         eq: jest.fn(actual.eq),
         and: jest.fn(actual.and),
         inArray: jest.fn(actual.inArray),
+        ne: jest.fn(actual.ne),
       };
     });
 
@@ -382,6 +383,63 @@ describe('leagueActivity resolver', () => {
       'trade_accepted',
       'waiver_claimed',
     ]);
+  });
+
+  it('excludes pending waiver_claimed events from the feed (LS-10527)', async () => {
+    mockDb.limit.mockResolvedValueOnce([{ id: 1 }]).mockResolvedValueOnce([]);
+
+    await getResolver()(
+      {},
+      { leagueId: 1, limit: 20, eventTypes: null },
+      mockContext,
+      undefined as never,
+    );
+
+    const { ne } = require('drizzle-orm') as { ne: jest.Mock };
+    expect(ne).toHaveBeenCalledWith('eventType', 'waiver_claimed');
+  });
+
+  it('fills in missing player names on old waiver outcome events (LS-10527)', async () => {
+    const rows = [
+      {
+        id: 5,
+        leagueId: 1,
+        teamId: 2,
+        actorUserId: 1,
+        eventType: 'waiver_claim_approved',
+        payload: { claimId: 9, playerId: 128376, dropPlayerId: 55 },
+        occurredAt: new Date('2024-06-03'),
+      },
+      {
+        id: 4,
+        leagueId: 1,
+        teamId: 2,
+        actorUserId: 1,
+        eventType: 'waiver_claim_approved',
+        payload: { playerId: 7, playerName: 'Saved Name' },
+        occurredAt: new Date('2024-06-02'),
+      },
+    ];
+    mockDb.limit.mockResolvedValueOnce([{ id: 1 }]).mockResolvedValueOnce(rows);
+    mockDb.then.mockImplementationOnce((resolve: (v: unknown) => unknown) =>
+      resolve([
+        { id: 128376, firstName: 'Israel', lastName: 'Abanikanda' },
+        { id: 55, firstName: 'Lavale', lastName: 'Thomas' },
+      ]),
+    );
+
+    const result = (await getResolver()(
+      {},
+      { leagueId: 1, limit: 20, eventTypes: null },
+      mockContext,
+      undefined as never,
+    )) as { payload: Record<string, unknown> }[];
+
+    expect(result[0].payload).toMatchObject({
+      playerName: 'Israel Abanikanda',
+      dropPlayerName: 'Lavale Thomas',
+    });
+    expect(result[1].payload['playerName']).toBe('Saved Name');
   });
 
   it('does not apply inArray filter when eventTypes is an empty array', async () => {
