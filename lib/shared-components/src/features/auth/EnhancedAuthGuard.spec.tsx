@@ -149,6 +149,69 @@ describe('EnhancedAuthGuard – session expiry on a public path', () => {
     });
     expect(screen.queryByTestId('app')).toBeNull();
   });
+  it('shows the LoginPage when sign-in and a session-expiry logout are batched into one render (LS-11057)', async () => {
+    const MockedAuthService = jest.mocked(AuthService);
+    MockedAuthService.mockImplementation(
+      () => makeMockAuthService() as unknown as AuthService,
+    );
+    setLocation('/about');
+
+    render(
+      <AuthProvider config={testConfig}>
+        <EnhancedAuthGuard publicPaths={['/about']}>
+          <div data-testid="app">app</div>
+        </EnhancedAuthGuard>
+      </AuthProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('app')).toBeTruthy();
+    });
+
+    // AUTH_SUCCESS followed by a forced AUTH_LOGOUT before React commits a
+    // render with isAuthenticated=true — the WebKit timing where a restored
+    // session and a fast 401 refresh rejection land in the same batch.
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('auth:token-refreshed', {
+          detail: {
+            user: {
+              id: 1,
+              email: 'user@test.com',
+              username: 'ActiveUser',
+              accessLevel: 'none',
+            },
+          },
+        }),
+      );
+      window.dispatchEvent(new CustomEvent('auth:session-expired'));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('login-page')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('app')).toBeNull();
+  });
+
+  it('keeps the public-path bypass for a visitor who was never signed in', async () => {
+    const MockedAuthService = jest.mocked(AuthService);
+    MockedAuthService.mockImplementation(
+      () => makeMockAuthService() as unknown as AuthService,
+    );
+    setLocation('/about');
+
+    render(
+      <AuthProvider config={testConfig}>
+        <EnhancedAuthGuard publicPaths={['/about']}>
+          <div data-testid="app">app</div>
+        </EnhancedAuthGuard>
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('app')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('login-page')).toBeNull();
+  });
 });
 
 describe('EnhancedAuthGuard – client-side navigation from a public path (LS-10488)', () => {

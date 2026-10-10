@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import { Spinner, Text, YStack } from 'tamagui';
 import { useAuth } from './hooks/useAuth';
@@ -200,21 +200,8 @@ export function EnhancedAuthGuard({
   isPremiumUser,
   premiumFallback = null,
 }: EnhancedAuthGuardProps) {
-  const { isAuthenticated, isLoading, loginWithOAuth, config } = useAuth();
-
-  // Track whether the user has been authenticated at any point this session.
-  // Once true, a subsequent unauthenticated state means they were just logged
-  // out (manual sign-out or session expiry) — in that case we always show the
-  // LoginPage so there is a clear way to sign back in, even on public paths.
-  // Without this, a passive logout while viewing a public path (e.g. /baseball,
-  // /about) would leave the user on a page with no nav bar (Navigation hides
-  // when !isAuthenticated) and no login UI (publicPath bypass returns App).
-  const wasAuthenticatedRef = useRef(false);
-  useEffect(() => {
-    if (isAuthenticated) {
-      wasAuthenticatedRef.current = true;
-    }
-  }, [isAuthenticated]);
+  const { isAuthenticated, isLoading, loginWithOAuth, config, sessionEnded } =
+    useAuth();
 
   // Public paths bypass the auth gate entirely (no login wall, no loading spinner).
   // On web, window.location.pathname is already restored by the companion script in
@@ -230,11 +217,14 @@ export function EnhancedAuthGuard({
       (p) => currentPath === p || currentPath.startsWith(p + '/'),
     ) ||
       publicExactPaths.some((p) => currentPath === p));
-  // Skip the public-path bypass when the user was just logged out so the
-  // LoginPage renders instead of leaving them stranded with no nav bar and
-  // no sign-in affordance.
-  const justLoggedOut =
-    wasAuthenticatedRef.current && !isAuthenticated && !isLoading;
+  // Skip the public-path bypass when the user was just logged out (manual
+  // sign-out or session expiry) so the LoginPage renders instead of leaving
+  // them stranded with no nav bar and no sign-in affordance. sessionEnded
+  // comes from the auth reducer rather than a ref set in a post-commit effect:
+  // when the cached-profile restore and a fast 401 refresh rejection land in
+  // the same render batch (seen on WebKit), the guard never commits an
+  // authenticated render, so an effect-driven ref stayed false (LS-11057).
+  const justLoggedOut = sessionEnded && !isAuthenticated && !isLoading;
   if (isPublicPath && !justLoggedOut) {
     return children;
   }

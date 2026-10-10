@@ -61,6 +61,13 @@ interface AuthContextType {
   config: OAuthConfig;
   /** In-memory JWT, available after login or first token refresh. Null on initial page load until refresh completes. */
   token: string | null;
+  /**
+   * True once a signed-in session has ended in this page lifetime (manual
+   * sign-out or forced logout on session expiry) and no new session has
+   * started since. Tracked in the reducer so it is correct even when the
+   * sign-in and the logout are batched into a single render (LS-11057).
+   */
+  sessionEnded: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginWithOAuth: (oauthResponse: OAuthResponse) => Promise<void>;
   loginWithProvider: () => Promise<void>;
@@ -160,6 +167,8 @@ interface AuthState {
   adminUser: User | null;
   /** In-memory JWT, available after login or first token refresh. */
   token: string | null;
+  /** See AuthContextType.sessionEnded. */
+  sessionEnded: boolean;
 }
 
 type AuthAction =
@@ -187,6 +196,7 @@ const initialAuthState: AuthState = {
   isImpersonating: false,
   adminUser: null,
   token: null,
+  sessionEnded: false,
 };
 
 const authReducer = (state: AuthState, action: AuthAction): AuthState => {
@@ -204,6 +214,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isLoading: false,
         user: action.payload,
         error: null,
+        sessionEnded: false,
       };
     }
 
@@ -224,6 +235,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isImpersonating: false,
         adminUser: null,
         token: null,
+        sessionEnded: state.sessionEnded || state.user !== null,
       };
 
     case 'TOKEN_UPDATED':
@@ -253,6 +265,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isImpersonating: true,
         adminUser: action.payload.adminUser,
         user: action.payload.targetUser,
+        sessionEnded: false,
         // Clear in-memory token so WebSocket and other consumers that pass
         // token via query string don't accidentally authenticate as the admin
         // instead of the impersonated user (auth uses HttpOnly cookies now).
@@ -280,8 +293,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   onLogout,
 }) => {
   const [authState, dispatchAuth] = useReducer(authReducer, initialAuthState);
-  const { user, isLoading, error, isImpersonating, adminUser, token } =
-    authState;
+  const {
+    user,
+    isLoading,
+    error,
+    isImpersonating,
+    adminUser,
+    token,
+    sessionEnded,
+  } = authState;
 
   // Read by the session-expired listener so a 401/403 refresh rejection while
   // already signed out (e.g. a public page's query) never arms the
@@ -940,6 +960,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       error,
       config,
       token,
+      sessionEnded,
       login,
       loginWithOAuth,
       loginWithProvider,
@@ -959,6 +980,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       error,
       config,
       token,
+      sessionEnded,
       login,
       loginWithOAuth,
       loginWithProvider,
