@@ -147,4 +147,19 @@ describe('prTimeline', () => {
     );
     expect(result.content[0].text).toContain('boom');
   });
+
+  it('maps committed events from their git author/committer identities', async () => {
+    mockedRest.mockResolvedValueOnce([
+      {
+        event: 'committed',
+        sha: 'abc',
+        author: { name: 'Jane Dev', date: '2026-01-01T00:00:00Z' },
+        committer: { name: 'GitHub', date: '2026-01-02T00:00:00Z' },
+      },
+    ] as never);
+
+    const text = (await prTimeline({ number: 5, events: ['committed'] }))
+      .content[0].text;
+    expect(text).toContain('committed|2026-01-02T00:00:00Z|Jane Dev||');
+  });
 });

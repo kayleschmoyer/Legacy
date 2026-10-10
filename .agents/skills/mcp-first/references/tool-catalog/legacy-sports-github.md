@@ -449,7 +449,7 @@ Scan open PRs into buckets: conflicting, reviews, ciFailing, ciPending, clean. S
 
 ### `github_pr_timeline`
 
-List issue/PR timeline events (thin wrapper over GET /repos/{owner}/{repo}/issues/{number}/timeline), paginated fully. Use for historical questions the live GraphQL state cannot answer, e.g. "who was asked to review, when, and was that request satisfied or withdrawn" — reviewRequests only shows currently-open requests. Returns event, createdAt, actor, requestedReviewer (user login, or "team:<name>" for team reviewers), and label per row. Defaults to review_requested/review_request_removed/labeled/unlabeled; pass "events" to filter to a different subset. Pass the PR number as "number" (preferred) or "prNumber" (alias).
+List issue/PR timeline events (thin wrapper over GET /repos/{owner}/{repo}/issues/{number}/timeline), paginated fully. Use for historical questions the live GraphQL state cannot answer, e.g. "who was asked to review, when, and was that request satisfied or withdrawn" — reviewRequests only shows currently-open requests. Returns event, createdAt, actor, requestedReviewer (user login, or "team:<name>" for team reviewers), and label per row ("committed" rows use the committer date and git author name, since commit events have no created_at/actor login). Defaults to review_requested/review_request_removed/labeled/unlabeled; pass "events" to filter to a different subset. Pass the PR number as "number" (preferred) or "prNumber" (alias).
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |

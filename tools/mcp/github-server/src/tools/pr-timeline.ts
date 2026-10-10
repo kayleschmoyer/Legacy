@@ -40,6 +40,14 @@ interface GitHubTimelineEvent {
   requested_team?: { name: string } | null;
   review_requester?: GitHubActor | null;
   label?: { name: string } | null;
+  // `committed` events carry git identities instead of created_at/actor.
+  author?: GitHubCommitIdentity | null;
+  committer?: GitHubCommitIdentity | null;
+}
+
+interface GitHubCommitIdentity {
+  name?: string;
+  date?: string;
 }
 
 interface MappedTimelineEvent {
@@ -58,8 +66,14 @@ function mapEvent(e: GitHubTimelineEvent): MappedTimelineEvent {
 
   return {
     event: e.event,
-    createdAt: e.created_at ?? '',
-    actor: e.actor?.login ?? e.review_requester?.login ?? 'unknown',
+    // Commit events have no created_at; committer.date is when the commit
+    // landed on the branch (author.date survives rebases unchanged).
+    createdAt: e.created_at ?? e.committer?.date ?? e.author?.date ?? '',
+    actor:
+      e.actor?.login ??
+      e.review_requester?.login ??
+      e.author?.name ??
+      'unknown',
     ...(requestedReviewer !== undefined ? { requestedReviewer } : {}),
     ...(e.label ? { label: e.label.name } : {}),
   };

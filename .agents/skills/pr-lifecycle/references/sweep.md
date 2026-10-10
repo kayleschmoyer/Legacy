@@ -42,10 +42,19 @@ github_pr_dashboard(state: "open", limit: 100, excludeDrafts: false, format: "js
 
 - Pass `excludeDrafts: false` explicitly on **every** dashboard call — drafts must be in the scan for stalled-agent detection (Step 2b). Pass `limit: 100` explicitly — the default is 30 and the hard cap is 100; if more than 100 PRs are open, cover the remainder with filtered slices (`label:` / `author:` params).
 - `format: "json"` returns the structured payload (`summary`, `prs[]` with `mergeable`, `hasConflictSignal`, `ciStatus`, `reviewDecision`, `unresolvedThreads`, `labels[]`, `branch`, `isDraft`, `updatedAt`).
-- **Post-filter in-context with the staleness rule**: the dashboard does **not** filter `agent-in-progress` or `sweep-claimed` server-side. For each PR whose `labels` include either, compute minutes since `updatedAt`:
-  - **< 90 min** → freshly owned by another agent. Skip it and log the count. (A healthy author session bumps `updatedAt` continuously: checkpoint-comment refreshes after each validation chunk, pushes, label events.)
+- **Post-filter in-context with the staleness rule**: the dashboard does **not** filter `agent-in-progress` or `sweep-claimed` server-side. For each PR whose `labels` include either, compute **claimant last activity** — **never** use the dashboard's `updatedAt` for this. `updatedAt` is bumped by every bot comment, so a review-bot or merge-queue comment on a dead session's PR makes the claim look fresh (the 2026-10-06 sweep missed stalled PRs 8397 and 8351 this way: on 8397 the last claimant event was 2026-10-05T21:20Z, but a review-bot comment at 2026-10-06T02:38Z reset `updatedAt` — LS-10610). Batch the timeline calls for all claimed PRs in one turn:
+
+  ```
+  github_pr_timeline(number: <PR#>, events: ["labeled", "unlabeled", "committed", "commented"], limit: 500)
+  ```
+
+  Claimant last activity = the newest `createdAt` among rows whose `actor` is the claimant: `legacy-sports-code-bot[bot]` or a human. Commits (`committed` rows carry the git author name as `actor`), label events, and comments all count. **Ignore** rows by `legacy-sports-review-bot[bot]`, `personal-merge-queue[bot]`, and `github-actions[bot]`. These bots react to a PR whether or not anyone owns it, so their activity says nothing about the claimant. Then compute minutes since claimant last activity:
+  - **< 90 min** → freshly owned by another agent. Skip it and log the count. (A healthy author session produces claimant events continuously: checkpoint-comment refreshes after each validation chunk, pushes, label events.)
   - **≥ 90 min** → **stalled agent session** — route to Step 2b. Do not skip it: the owning session is dead and nothing else will ever pick this PR up.
+  - **Shortcut**: if `updatedAt` is already ≥ 90 min old, claimant activity is too, so skip the timeline call. Only a fresh `updatedAt` needs the timeline to check it.
+  - **Why the dashboard has no `claimantLastActivityAt` field**: computing it means a fully paginated REST timeline fetch for each claimed PR. Every dashboard caller would pay for that on every call, while only this staleness rule needs the value, and only for the few claimed PRs that have a fresh `updatedAt`. That cost belongs here, not in the dashboard.
   - **Exception — `blocked:e2e-on-main` present** → the PR is deliberately held on an external E2E blocker and is quiet by design, not stalled. The staleness rule does **not** apply. Instead: parse the blocker key from the PR's `<!-- e2e-hold -->` marker comment (`github_list_pr_comments`) and `jira_view` it. Blocker still open → skip, count as "held" in the report (do not strip `agent-in-progress`). Blocker Done/Closed → dispatch a **resume chip** running Phase E of [e2e-hold.md](e2e-hold.md) (rebase → un-hold → `bot:ready-for-review` → drive to merge). No parseable marker → malformed hold; treat as a normal stalled PR (Step 2b).
+
 - Drafts with **no** agent claim are human/WIP drafts: settled, count them for the report.
 - **Dashboard `ciStatus` can be stale** (checks latched on an old SHA). Before classifying a PR as CI-failing or clean, confirm job-level state with `github_pr_batch_status(prs: [...])` — max 50 numbers per call, chunk larger lists.
 
@@ -62,7 +71,7 @@ For each PR, take whichever action applies:
 
 ## Step 2b: Stalled-agent recovery (the draft-checkpoint consumer)
 
-For each PR the staleness rule flagged (agent claim + `updatedAt` ≥ 90 min ago):
+For each PR the staleness rule flagged (agent claim + claimant last activity ≥ 90 min ago):
 
 - **Draft** → dispatch a **resume-draft chip** (template in Step 4). This is the recovery consumer of the spine's [draft-PR-before-validation checkpoint](../../workflow-overview/references/ticket-to-merge-spine.md#critical-gates-preconditions): the author session opened the draft, pushed, posted a `<!-- continuation-plan -->` comment, then died (most often mid-validation, waiting on a background-chunk notification that never got processed — the PR #6190 / LS-8542 incident). The checkpoint is worthless unless something resumes from it; this step is that something. Leave the existing `agent-in-progress` label in place — it is the resume chip's claim.
 - **Not draft** → the agent died after mark-ready. Release the stale claim (`github_manage_labels(prs: [<PR#>], remove: ["agent-in-progress", "sweep-claimed"])`) and let the PR flow into Steps 2–3 classification in this same pass like any other PR.
@@ -172,7 +181,7 @@ Substitute concrete `<num>`, `<branch>`, and failing-check lists per PR. Keep ti
 
 Print a summary listing:
 
-- Human/WIP drafts skipped (no agent claim) and freshly agent-owned PRs skipped (claim + activity < 90 min)
+- Human/WIP drafts skipped (no agent claim) and freshly agent-owned PRs skipped (claim + claimant activity < 90 min)
 - Stalled agent sessions recovered: resume-draft chips dispatched (each with PR link + minutes stale) and stale non-draft claims released
 - Clean PRs where `bot:ready-for-review` was (re-)applied (Reviewer Bot will label `merge-when-ready` on APPROVED)
 - Dependabot PRs commented / routed to [sweep-dependabot](../../sweep-dependabot/SKILL.md)
