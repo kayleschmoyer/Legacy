@@ -4,6 +4,12 @@ import { ScrollView, Text, useMedia, XStack, YStack } from 'tamagui';
 import { Chip, type ChipTone } from '../../components/Chip';
 import { Select } from '../../components/Select';
 import { BrandIcon, type BrandIconName } from '../../components/icons';
+import { useThemeTokens } from '../../hooks/useThemeTokens';
+import { GradientSurface } from '../home/GradientSurface';
+import {
+  nearestScrollFor,
+  type ScrollMetrics,
+} from '../matchup/StandingsScrollTable';
 import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
@@ -758,16 +764,19 @@ function TabButton({
   active,
   badge,
   buttonRef,
+  onLayout,
   onPress,
 }: {
   label: string;
   active: boolean;
   badge?: number;
   buttonRef: (el: HTMLElement | null) => void;
+  /** Native only — reports the tab's offset within the tab strip. */
+  onLayout?: (e: LayoutEventLike) => void;
   onPress: () => void;
 }): React.JSX.Element {
   return (
-    <YStack>
+    <YStack {...(onLayout ? { onLayout } : {})}>
       <XStack
         tag="button"
         role="tab"
@@ -842,6 +851,37 @@ function hoistCommissionerTab(
   const [commish] = reordered.splice(index, 1);
   reordered.splice(1, 0, commish);
   return reordered;
+}
+
+interface LayoutEventLike {
+  nativeEvent: { layout: { x: number; width: number } };
+}
+
+interface ScrollEventLike {
+  nativeEvent: {
+    contentOffset: { x: number };
+    contentSize?: { width: number };
+    layoutMeasurement?: { width: number };
+  };
+}
+
+/** Width of the edge fades that signal more tabs off-screen. */
+const TAB_FADE_WIDTH = 32;
+
+/**
+ * Which edges of the tab strip hide tabs (LS-10722). Pure so the visibility
+ * rules are unit-testable; the 1px slack absorbs sub-pixel layout rounding,
+ * so a strip that fits exactly shows no cue.
+ */
+export function tabStripOverflow({ x, viewport, content }: ScrollMetrics): {
+  start: boolean;
+  end: boolean;
+} {
+  const overflow = viewport > 0 && content > viewport + 1;
+  return {
+    start: overflow && x > 1,
+    end: overflow && x + viewport < content - 1,
+  };
 }
 
 export function LeagueTabBar({
@@ -924,6 +964,96 @@ export function LeagueTabBar({
     if (next.id !== activeTab) onTabChange(next.id);
   };
 
+  // Overflow cue + reveal-active-tab (LS-10722). On a phone, or desktop at
+  // 200% zoom, the strip scrolls; without these a direct load of a middle
+  // tab (e.g. /standings) left the selected tab off-screen with nothing
+  // hinting that more tabs exist.
+  const { surface } = useThemeTokens();
+  const scrollRef = React.useRef<{
+    scrollTo?: (opts: { x: number; y?: number; animated?: boolean }) => void;
+    /** Web only — the scrolling DOM element. */
+    getScrollableNode?: () => unknown;
+  } | null>(null);
+  const metricsRef = React.useRef<ScrollMetrics>({
+    x: 0,
+    viewport: 0,
+    content: 0,
+  });
+  const [metrics, setMetrics] = React.useState<ScrollMetrics>(
+    metricsRef.current,
+  );
+  const updateMetrics = React.useCallback((patch: Partial<ScrollMetrics>) => {
+    const prev = metricsRef.current;
+    const next = { ...prev, ...patch };
+    if (
+      next.x === prev.x &&
+      next.viewport === prev.viewport &&
+      next.content === prev.content
+    ) {
+      return;
+    }
+    metricsRef.current = next;
+    setMetrics(next);
+  }, []);
+  const onScroll = React.useCallback(
+    (e: ScrollEventLike) => {
+      const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+      updateMetrics({
+        x: contentOffset.x,
+        ...(contentSize ? { content: contentSize.width } : {}),
+        ...(layoutMeasurement ? { viewport: layoutMeasurement.width } : {}),
+      });
+    },
+    [updateMetrics],
+  );
+  const cue = tabStripOverflow(metrics);
+
+  // Scroll the strip — never the page, which `scrollIntoView` can do when the
+  // strip loads below the fold — by the least amount that fully reveals the
+  // active tab. Web measures the DOM; native records each tab's offset from
+  // onLayout, since layout arrives after mount there.
+  const tabLayouts = React.useRef<({ x: number; width: number } | null)[]>([]);
+  const activeIdx = ordered.findIndex((t) => t.id === activeTab);
+  const revealTab = React.useCallback((idx: number) => {
+    const handle = scrollRef.current;
+    if (handle == null || idx < 0) return;
+    let layout = tabLayouts.current[idx];
+    let current = metricsRef.current;
+    if (Platform.OS === 'web') {
+      const node = handle.getScrollableNode?.() as HTMLElement | undefined;
+      const tab = tabRefs.current[idx];
+      if (node == null || tab == null) return;
+      const tabRect = tab.getBoundingClientRect();
+      layout = {
+        x: tabRect.left - node.getBoundingClientRect().left + node.scrollLeft,
+        width: tabRect.width,
+      };
+      current = {
+        x: node.scrollLeft,
+        viewport: node.clientWidth,
+        content: node.scrollWidth,
+      };
+    }
+    if (layout == null || current.viewport <= 0) return;
+    // Pad by the fade width so the revealed tab is not left under a fade,
+    // then clamp to the scrollable range.
+    const x = Math.min(
+      Math.max(0, current.content - current.viewport),
+      Math.max(
+        0,
+        nearestScrollFor(
+          layout.x - TAB_FADE_WIDTH,
+          layout.width + 2 * TAB_FADE_WIDTH,
+          current,
+        ),
+      ),
+    );
+    if (x !== current.x) handle.scrollTo?.({ x, y: 0, animated: false });
+  }, []);
+  React.useEffect(() => {
+    revealTab(activeIdx);
+  }, [activeIdx, revealTab]);
+
   return (
     <YStack
       marginVertical={24}
@@ -931,31 +1061,96 @@ export function LeagueTabBar({
       borderBottomColor="$outlineSubtle"
     >
       <XStack alignItems="center">
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ minWidth: '100%' }}
-        >
-          <XStack
-            gap={2}
-            role="tablist"
-            aria-label="League sections"
-            onKeyDown={onKeyDown}
+        <YStack flex={1} minWidth={0} position="relative">
+          <ScrollView
+            ref={scrollRef as never}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ minWidth: '100%' }}
+            scrollEventThrottle={16}
+            onScroll={onScroll}
+            // Re-reveal once sizes settle: native layout lands after mount,
+            // and a zoom/resize can push the active tab back out of view.
+            onLayout={(e: { nativeEvent: { layout: { width: number } } }) => {
+              updateMetrics({ viewport: e.nativeEvent.layout.width });
+              revealTab(activeIdx);
+            }}
+            onContentSizeChange={(width: number) => {
+              updateMetrics({ content: width });
+              revealTab(activeIdx);
+            }}
           >
-            {ordered.map((t, i) => (
-              <TabButton
-                key={t.id}
-                label={t.label}
-                active={activeTab === t.id}
-                badge={t.id === 'trades' ? pendingTradeCount : undefined}
-                buttonRef={(el) => {
-                  tabRefs.current[i] = el;
-                }}
-                onPress={() => onTabChange(t.id)}
+            <XStack
+              gap={2}
+              role="tablist"
+              aria-label="League sections"
+              onKeyDown={onKeyDown}
+            >
+              {ordered.map((t, i) => (
+                <TabButton
+                  key={t.id}
+                  label={t.label}
+                  active={activeTab === t.id}
+                  badge={t.id === 'trades' ? pendingTradeCount : undefined}
+                  buttonRef={(el) => {
+                    tabRefs.current[i] = el;
+                  }}
+                  {...(Platform.OS === 'web'
+                    ? {}
+                    : {
+                        onLayout: (e: LayoutEventLike) => {
+                          const { x, width } = e.nativeEvent.layout;
+                          tabLayouts.current[i] = { x, width };
+                          if (i === activeIdx) revealTab(i);
+                        },
+                      })}
+                  onPress={() => onTabChange(t.id)}
+                />
+              ))}
+            </XStack>
+          </ScrollView>
+          {/* Edge fades: shown only on the side(s) hiding tabs, so a strip that
+            fits (desktop at 100% zoom) shows none. Decorative — the tabs
+            themselves stay in the tablist for assistive tech. */}
+          {cue.start ? (
+            <YStack
+              testID="league-tabs-fade-start"
+              position="absolute"
+              top={0}
+              left={0}
+              bottom={0}
+              width={TAB_FADE_WIDTH}
+              pointerEvents="none"
+              aria-hidden
+            >
+              <GradientSurface
+                colors={[surface.bg, withAlpha(surface.bg, 0)]}
+                angle={90}
+                width={TAB_FADE_WIDTH}
+                height="100%"
               />
-            ))}
-          </XStack>
-        </ScrollView>
+            </YStack>
+          ) : null}
+          {cue.end ? (
+            <YStack
+              testID="league-tabs-fade-end"
+              position="absolute"
+              top={0}
+              right={0}
+              bottom={0}
+              width={TAB_FADE_WIDTH}
+              pointerEvents="none"
+              aria-hidden
+            >
+              <GradientSurface
+                colors={[withAlpha(surface.bg, 0), surface.bg]}
+                angle={90}
+                width={TAB_FADE_WIDTH}
+                height="100%"
+              />
+            </YStack>
+          ) : null}
+        </YStack>
         {/* Analytics is a distinct premium-gated route (/leagues/:id/analytics),
             not a same-page tab — it must live outside role="tablist" so it
             isn't announced or styled as a tab that silently navigates away

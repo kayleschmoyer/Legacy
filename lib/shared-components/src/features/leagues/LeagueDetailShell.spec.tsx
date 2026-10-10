@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, within } from '@testing-library/react';
+import { act, fireEvent, within } from '@testing-library/react';
 import { useMedia } from 'tamagui';
 import {
   getDraftStatusChipDef,
@@ -7,6 +7,7 @@ import {
   LeagueDetailShell,
   type LeagueDetailShellProps,
   type LeagueTabDef,
+  tabStripOverflow,
 } from './LeagueDetailShell';
 import { render } from '../../test-utils';
 
@@ -33,8 +34,10 @@ const baseLeague: HeroLeague = {
   inviteCode: 'ABC123',
 };
 
-function renderShell(overrides: Partial<LeagueDetailShellProps> = {}) {
-  const props: LeagueDetailShellProps = {
+function shellProps(
+  overrides: Partial<LeagueDetailShellProps> = {},
+): LeagueDetailShellProps {
+  return {
     sport: 'baseball',
     league: baseLeague,
     role: 'commish',
@@ -51,7 +54,10 @@ function renderShell(overrides: Partial<LeagueDetailShellProps> = {}) {
     onInvite: jest.fn(),
     ...overrides,
   };
-  return render(<LeagueDetailShell {...props} />);
+}
+
+function renderShell(overrides: Partial<LeagueDetailShellProps> = {}) {
+  return render(<LeagueDetailShell {...shellProps(overrides)} />);
 }
 
 describe('LeagueDetailShell', () => {
@@ -389,6 +395,210 @@ describe('LeagueDetailShell', () => {
     expect(within(getByRole('tablist')).queryByText('Analytics')).toBeNull();
     expect(analyticsAction.closest('[role="tab"]')).toBeNull();
     expect(analyticsAction.closest('[role="link"]')).not.toBeNull();
+  });
+
+  // LS-10722: on a phone (or desktop at 200% zoom) the tab strip scrolls. A
+  // direct load of a middle tab must scroll it into view, and the strip must
+  // show a fade on each side that hides tabs — none when everything fits.
+  describe('tab strip overflow (LS-10722)', () => {
+    const tamaguiMock = jest.requireMock<Record<string, unknown>>('tamagui');
+    const realScrollView: unknown = tamaguiMock.ScrollView;
+    let scrollProps: Record<string, (...args: never[]) => void>;
+    let scrollTo: jest.Mock;
+    let strip: { scrollLeft: number; clientWidth: number; scrollWidth: number };
+
+    // Stand-in for the RN/Tamagui ScrollView: records its event props and
+    // exposes the same imperative handle the real one has on web.
+    const CapturingScrollView = React.forwardRef(function CapturingScrollView(
+      {
+        children,
+        ...props
+      }: { children?: React.ReactNode } & Record<string, unknown>,
+      ref: React.Ref<unknown>,
+    ) {
+      scrollProps = props as typeof scrollProps;
+      const nodeRef = React.useRef<HTMLDivElement | null>(null);
+      React.useImperativeHandle(ref, () => ({
+        scrollTo,
+        getScrollableNode: () => nodeRef.current,
+      }));
+      return (
+        <div
+          data-testid="league-tabs-strip"
+          ref={(el) => {
+            nodeRef.current = el;
+            if (el) {
+              Object.defineProperties(el, {
+                scrollLeft: { configurable: true, get: () => strip.scrollLeft },
+                clientWidth: {
+                  configurable: true,
+                  get: () => strip.clientWidth,
+                },
+                scrollWidth: {
+                  configurable: true,
+                  get: () => strip.scrollWidth,
+                },
+              });
+            }
+          }}
+        >
+          {children}
+        </div>
+      );
+    });
+
+    // Tabs are 100px wide, laid out left to right from x=0 in DOM order.
+    function mockTabRects() {
+      jest
+        .spyOn(Element.prototype, 'getBoundingClientRect')
+        .mockImplementation(function (this: Element) {
+          if (this.getAttribute('role') === 'tab') {
+            const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+            const left = tabs.indexOf(this) * 100;
+            return { left, right: left + 100, width: 100 } as DOMRect;
+          }
+          return { left: 0, right: 0, width: 0 } as DOMRect;
+        });
+    }
+
+    beforeEach(() => {
+      scrollTo = jest.fn();
+      strip = { scrollLeft: 0, clientWidth: 375, scrollWidth: 400 };
+      tamaguiMock.ScrollView = CapturingScrollView;
+      mockTabRects();
+    });
+
+    afterEach(() => {
+      tamaguiMock.ScrollView = realScrollView;
+      jest.restoreAllMocks();
+    });
+
+    function setSizes(viewport: number, content: number) {
+      act(() => {
+        scrollProps.onLayout({
+          nativeEvent: { layout: { width: viewport } },
+        } as never);
+        scrollProps.onContentSizeChange(content as never);
+      });
+    }
+
+    function scrollStripTo(x: number, viewport: number, content: number) {
+      act(() => {
+        scrollProps.onScroll({
+          nativeEvent: {
+            contentOffset: { x },
+            contentSize: { width: content },
+            layoutMeasurement: { width: viewport },
+          },
+        } as never);
+      });
+    }
+
+    it('scrolls an off-screen active tab into view on load, clear of the fade', () => {
+      // Six tabs at 100px in a 250px strip: Tab F (500–600) is off-screen.
+      const tabs: LeagueTabDef[] = ['A', 'B', 'C', 'D', 'E', 'F'].map((l) => ({
+        id: l.toLowerCase(),
+        label: `Tab ${l}`,
+      }));
+      strip = { scrollLeft: 0, clientWidth: 250, scrollWidth: 600 };
+      renderShell({ tabs, activeTab: 'f' });
+      // Least movement that shows 500–600 plus a 32px fade margin, clamped
+      // to the 350px scroll range.
+      expect(scrollTo).toHaveBeenCalledWith({ x: 350, y: 0, animated: false });
+    });
+
+    it('scrolls a middle tab just far enough to clear the right fade', () => {
+      const tabs: LeagueTabDef[] = ['A', 'B', 'C', 'D', 'E', 'F'].map((l) => ({
+        id: l.toLowerCase(),
+        label: `Tab ${l}`,
+      }));
+      strip = { scrollLeft: 0, clientWidth: 250, scrollWidth: 600 };
+      renderShell({ tabs, activeTab: 'c' });
+      // Tab C is 200–300; with the fade margin it needs 168–332 visible.
+      expect(scrollTo).toHaveBeenCalledWith({ x: 82, y: 0, animated: false });
+    });
+
+    it('re-reveals the active tab when the selection changes', () => {
+      const tabs: LeagueTabDef[] = ['A', 'B', 'C', 'D', 'E', 'F'].map((l) => ({
+        id: l.toLowerCase(),
+        label: `Tab ${l}`,
+      }));
+      strip = { scrollLeft: 0, clientWidth: 250, scrollWidth: 600 };
+      const { rerender } = renderShell({ tabs, activeTab: 'a' });
+      expect(scrollTo).not.toHaveBeenCalled();
+      rerender(<LeagueDetailShell {...shellProps({ tabs, activeTab: 'e' })} />);
+      expect(scrollTo).toHaveBeenCalledWith({ x: 282, y: 0, animated: false });
+    });
+
+    it('does not scroll when the active tab is already visible', () => {
+      renderShell({ activeTab: 'overview' });
+      expect(scrollTo).not.toHaveBeenCalled();
+    });
+
+    it('shows no fade when every tab fits (desktop, 100% zoom)', () => {
+      const { queryByTestId } = renderShell();
+      setSizes(1232, 600);
+      expect(queryByTestId('league-tabs-fade-start')).toBeNull();
+      expect(queryByTestId('league-tabs-fade-end')).toBeNull();
+    });
+
+    it('shows only the trailing fade at the start of an overflowing strip', () => {
+      const { queryByTestId } = renderShell();
+      setSizes(327, 900);
+      expect(queryByTestId('league-tabs-fade-start')).toBeNull();
+      expect(queryByTestId('league-tabs-fade-end')).not.toBeNull();
+    });
+
+    it('shows both fades mid-scroll and only the leading fade at the end', () => {
+      const { queryByTestId } = renderShell();
+      scrollStripTo(200, 327, 900);
+      expect(queryByTestId('league-tabs-fade-start')).not.toBeNull();
+      expect(queryByTestId('league-tabs-fade-end')).not.toBeNull();
+      scrollStripTo(573, 327, 900);
+      expect(queryByTestId('league-tabs-fade-start')).not.toBeNull();
+      expect(queryByTestId('league-tabs-fade-end')).toBeNull();
+    });
+
+    it('keeps the fades out of the tablist and the accessibility tree', () => {
+      const { getByTestId, getByRole } = renderShell();
+      scrollStripTo(200, 327, 900);
+      const fade = getByTestId('league-tabs-fade-end');
+      expect(fade.getAttribute('aria-hidden')).toBe('true');
+      expect(getByRole('tablist').contains(fade)).toBe(false);
+    });
+  });
+
+  describe('tabStripOverflow', () => {
+    it.each([
+      ['fits', { x: 0, viewport: 1000, content: 600 }, false, false],
+      [
+        'fits within 1px rounding',
+        { x: 0, viewport: 600, content: 601 },
+        false,
+        false,
+      ],
+      ['not measured yet', { x: 0, viewport: 0, content: 900 }, false, false],
+      [
+        'overflowing, at start',
+        { x: 0, viewport: 300, content: 900 },
+        false,
+        true,
+      ],
+      [
+        'overflowing, mid-scroll',
+        { x: 200, viewport: 300, content: 900 },
+        true,
+        true,
+      ],
+      [
+        'overflowing, at end',
+        { x: 600, viewport: 300, content: 900 },
+        true,
+        false,
+      ],
+    ])('%s', (_name, metrics, start, end) => {
+      expect(tabStripOverflow(metrics)).toEqual({ start, end });
+    });
   });
 
   // LS-8988: the League Home "Guided Home" redesign replaces the hero + tab
