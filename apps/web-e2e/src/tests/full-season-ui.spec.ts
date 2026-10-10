@@ -308,7 +308,7 @@ function waitForGraphQLRequest(
   matches: (variables: Record<string, unknown>) => boolean = () => true,
 ) {
   return page.waitForRequest((request) => {
-    if (!isGraphQLEndpoint(new URL(request.url()))) return false;
+    if (!isGraphQLEndpoint.test(request.url())) return false;
     if (extractRequestOperationName(request).toLowerCase() !== operation) {
       return false;
     }
