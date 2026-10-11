@@ -4,15 +4,45 @@ const RELOAD_KEY = 'chunk-load-reload-attempted';
 
 // Set by the 'pagehide' listener below. `pagehide` fires on *this* document
 // the moment the browser commits to navigating away from it (new-document
-// navigation, tab close, or back/forward) — including the window where a
-// same-tab `page.goto()`-style navigation cancels an in-flight chunk fetch
-// before this document has finished unloading. Module-scoped and never
-// reset: once a document starts unloading it never becomes active again, so
+// navigation, tab close, or back/forward). Module-scoped and never reset:
+// once a document starts unloading it never becomes active again, so
 // there's nothing to reset for.
 let pageIsUnloading = false;
+// Set by the 'beforeunload' listener below. `pagehide` alone is too late on
+// WebKit: when a new-document navigation (e.g. Playwright's `page.goto()` or
+// a typed URL) starts its provisional load, WebKit stops every in-flight
+// load of the *current* document right away, long before the new page
+// commits and `pagehide` fires. A lazy chunk still downloading at that
+// moment rejects while the old document is visible and not yet unloading,
+// which used to look like a stale-chunk 404 and trigger
+// `window.location.reload()`. That reload is itself a navigation to the
+// current URL, and it interrupts the navigation the user actually asked for
+// (LS-11061: Mobile Safari "Navigation to /games/season-draft/create is
+// interrupted by another navigation to /profile/settings").
+// `beforeunload` fires before WebKit cancels those loads, so it closes that
+// window.
+let navigationAwayStarted = false;
 if (typeof window !== 'undefined') {
   window.addEventListener('pagehide', () => {
     pageIsUnloading = true;
+  });
+  window.addEventListener('beforeunload', (event) => {
+    navigationAwayStarted = true;
+    // An unsaved-changes guard (useUnsavedChangesGuard, EliteDraftBoard,
+    // LeagueScoringEditor) can cancel the unload, so the user may stay on
+    // this document. Re-check once every listener has run and clear the
+    // flag if the unload was cancelled, so a later genuine stale-chunk 404
+    // still gets its recovery reload.
+    // A cancelling handler either calls preventDefault() or sets
+    // `returnValue` to a non-empty string (its spec default is '').
+    setTimeout(() => {
+      if (
+        event.defaultPrevented ||
+        (typeof event.returnValue === 'string' && event.returnValue !== '')
+      ) {
+        navigationAwayStarted = false;
+      }
+    }, 0);
   });
 }
 
@@ -27,6 +57,9 @@ if (typeof window !== 'undefined') {
  *
  *  - `pageIsUnloading`: the 'pagehide' listener above already fired, meaning
  *    a navigation away from this document is in progress.
+ *  - `navigationAwayStarted`: the 'beforeunload' listener above fired and
+ *    nothing cancelled the unload. This covers WebKit, which cancels the
+ *    chunk fetch before 'pagehide'.
  *  - `document.visibilityState === 'hidden'`: covers engines/timings where
  *    visibility flips before 'pagehide' is observed.
  *  - `DOMException` named 'AbortError': the rare case where the browser does
@@ -40,7 +73,7 @@ if (typeof window !== 'undefined') {
  * foregrounded again.
  */
 function isLikelyNavigationAbort(error: unknown): boolean {
-  if (pageIsUnloading) {
+  if (pageIsUnloading || navigationAwayStarted) {
     return true;
   }
   if (

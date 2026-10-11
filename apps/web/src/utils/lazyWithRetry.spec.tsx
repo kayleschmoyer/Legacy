@@ -23,8 +23,11 @@ class CaughtErrorBoundary extends React.Component<
   }
 }
 
-function renderLazy(factory: () => Promise<{ default: React.ComponentType }>) {
-  const LazyComponent = lazyWithRetry(factory);
+function renderLazy(
+  factory: () => Promise<{ default: React.ComponentType }>,
+  wrap: typeof lazyWithRetry = lazyWithRetry,
+) {
+  const LazyComponent = wrap(factory);
   return render(
     <CaughtErrorBoundary>
       <React.Suspense fallback={<div>loading</div>}>
@@ -148,5 +151,65 @@ describe('lazyWithRetry', () => {
 
     await waitFor(() => expect(screen.getByText('loaded')).toBeInTheDocument());
     expect(sessionStorage.getItem(RELOAD_KEY)).toBeNull();
+  });
+
+  // The 'beforeunload' flag is module-scoped and sticky for the life of the
+  // document, so these tests load a fresh module copy (with its own
+  // listeners) rather than poisoning the shared import used above.
+  function loadFreshLazyWithRetry(): typeof lazyWithRetry {
+    let fresh: typeof lazyWithRetry | undefined;
+    jest.isolateModules(() => {
+      fresh =
+        jest.requireActual<typeof import('./lazyWithRetry')>(
+          './lazyWithRetry',
+        ).lazyWithRetry;
+    });
+    if (!fresh) throw new Error('failed to load lazyWithRetry');
+    return fresh;
+  }
+
+  async function flushTimers() {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  // LS-11061: WebKit cancels the in-flight chunk fetch when a new-document
+  // navigation starts, before 'pagehide' and while the tab is still visible.
+  // 'beforeunload' is the earliest signal, so it must suppress the reload.
+  // Otherwise the reload interrupts the navigation the user asked for.
+  it('does NOT reload when the import rejects after beforeunload (WebKit cancels the fetch before pagehide)', async () => {
+    const fresh = loadFreshLazyWithRetry();
+    window.dispatchEvent(new Event('beforeunload'));
+    await flushTimers();
+    const factory = jest
+      .fn()
+      .mockRejectedValue(new TypeError('Importing a module script failed.'));
+
+    renderLazy(factory, fresh);
+
+    await waitFor(() =>
+      expect(screen.getByText(/error-boundary/)).toBeInTheDocument(),
+    );
+    expect(sessionStorage.getItem(RELOAD_KEY)).toBeNull();
+  });
+
+  it('still reloads on a stale-chunk 404 when an unsaved-changes guard cancelled the beforeunload', async () => {
+    const fresh = loadFreshLazyWithRetry();
+    const cancelUnload = (event: Event) => event.preventDefault();
+    window.addEventListener('beforeunload', cancelUnload);
+    window.dispatchEvent(new Event('beforeunload', { cancelable: true }));
+    window.removeEventListener('beforeunload', cancelUnload);
+    await flushTimers();
+    const factory = jest
+      .fn()
+      .mockRejectedValue(
+        new TypeError('Failed to fetch dynamically imported module'),
+      );
+
+    renderLazy(factory, fresh);
+
+    await waitFor(() =>
+      expect(sessionStorage.getItem(RELOAD_KEY)).toBe('true'),
+    );
+    expect(screen.getByText('loading')).toBeInTheDocument();
   });
 });
