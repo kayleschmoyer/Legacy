@@ -11,7 +11,7 @@
  *   3. For each week (1..totalMatchups):
  *      a. For each game (1..gamesPerMatchup):
  *         - autoSelectGames(leagueId)
- *         - waitForAllMatchupsStatsLoaded
+ *         - waitForWeekStatsHydrated
  *         - Assert matchup_player_games records created with valid game_identifier
  *      b. autoAdvanceMatchups(leagueId)
  *      c. Assert current week incremented, matchup statuses correct
@@ -29,7 +29,10 @@
 import { cleanupLeague } from '../helpers/cleanup-league';
 import { expect, test } from '../fixtures/api';
 import { graphqlOk } from '../helpers/graphql';
-import { waitForAllMatchupsStatsLoaded } from '../helpers/wait-for-stats-loaded';
+import {
+  STATS_HYDRATION_TIMEOUT_MS,
+  waitForWeekStatsHydrated,
+} from '../helpers/wait-for-stats-hydrated';
 
 import { testLeagueName } from '../league-run-scope';
 // ---------------------------------------------------------------------------
@@ -43,6 +46,10 @@ const TOTAL_MATCHUPS = 2;
 // (lambdas/db/.../drafts/helpers.ts: isDraftComplete). Phase 2.6 must make that
 // many picks for the draft to reach `draftStatus: 'completed'` (LS-7704).
 const MAX_ROSTER_SIZE = 15;
+// Test envelope for a week phase: one worst-case stats wait per game, plus
+// slack for the surrounding mutation/verification round-trips (LS-11063).
+const WEEK_PHASE_TIMEOUT_MS =
+  GAMES_PER_MATCHUP * STATS_HYDRATION_TIMEOUT_MS + 120_000;
 
 // ---------------------------------------------------------------------------
 // Shared state accumulated across serial tests
@@ -445,11 +452,9 @@ test.describe
     api,
     apiCommissioner,
   }) => {
-    // Two games per matchup, each waiting up to 180s for the live stats
-    // pipeline to finish (see 4.Nb below). Budget the test envelope to cover
-    // both worst-case waits plus the surrounding mutation/verification
-    // round-trips. (LS-7876)
-    test.setTimeout(480_000);
+    // Two games per matchup, each waiting on the live stats pipeline (see
+    // 4.Nb below). Budget the envelope for both worst-case waits. (LS-11063)
+    test.setTimeout(WEEK_PHASE_TIMEOUT_MS);
 
     for (let game = 1; game <= GAMES_PER_MATCHUP; game++) {
       await test.step(`4.${game}a Auto-select games (game ${game} of ${GAMES_PER_MATCHUP})`, async () => {
@@ -465,17 +470,17 @@ test.describe
       });
 
       await test.step(`4.${game}b Wait for stats to load (game ${game})`, async () => {
-        // The stats pipeline (autoSelectGames → Lambda/SQS → matchup_player_games
-        // → statsLoadingStatus: completed) runs on the shared live backend. Under
-        // the 3-shard integration ceiling it can stay in `loading` past 120s
-        // (LS-7876: run 27253153489 timed out at 122s with matchup 48423 still
-        // loading). The poll is already backend-authoritative; the deadline was
-        // simply tighter than the observed completion time, so widen it to 180s.
-        const matchups = await waitForAllMatchupsStatsLoaded(
+        // The stats pipeline (autoSelectGames → game-selection → ~4 FIFO
+        // batches → single-concurrency stats-lambda → statsLoadingStatus:
+        // completed) is serialized on the shared live backend, and the matchup
+        // status flips only after the last batch. A fixed ceiling cut it off
+        // mid-progress (LS-7876 at 120s, LS-11063 at 180s: run 38112360534,
+        // matchup 120908 still loading), so judge liveness per player instead.
+        const matchups = await waitForWeekStatsHydrated(
           api,
           state.leagueId,
           1,
-          { timeoutMs: 180_000 },
+          { label: 'season-lifecycle' },
         );
         expect(matchups.length).toBeGreaterThan(0);
       });
@@ -721,11 +726,9 @@ test.describe
     api,
     apiCommissioner,
   }) => {
-    // Two games per matchup, each waiting up to 180s for the live stats
-    // pipeline to finish (see 5.Nb below). Budget the test envelope to cover
-    // both worst-case waits plus the surrounding mutation/verification
-    // round-trips. (LS-7876)
-    test.setTimeout(480_000);
+    // Two games per matchup, each waiting on the live stats pipeline (see
+    // 5.Nb below). Budget the envelope for both worst-case waits. (LS-11063)
+    test.setTimeout(WEEK_PHASE_TIMEOUT_MS);
 
     for (let game = 1; game <= GAMES_PER_MATCHUP; game++) {
       await test.step(`5.${game}a Auto-select games (game ${game} of ${GAMES_PER_MATCHUP})`, async () => {
@@ -741,14 +744,12 @@ test.describe
       });
 
       await test.step(`5.${game}b Wait for stats to load (game ${game})`, async () => {
-        // Same live-backend stats-pipeline latency as week 1 (4.Nb): widen the
-        // already-backend-authoritative poll to 180s so a slow-but-progressing
-        // `loading` matchup under the 3-shard ceiling is not cut off. (LS-7876)
-        const matchups = await waitForAllMatchupsStatsLoaded(
+        // Same serialized stats pipeline as week 1 (4.Nb). (LS-11063)
+        const matchups = await waitForWeekStatsHydrated(
           api,
           state.leagueId,
           2,
-          { timeoutMs: 180_000 },
+          { label: 'season-lifecycle' },
         );
         expect(matchups.length).toBeGreaterThan(0);
       });

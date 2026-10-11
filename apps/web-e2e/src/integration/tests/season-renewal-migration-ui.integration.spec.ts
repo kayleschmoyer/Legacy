@@ -40,6 +40,10 @@ import {
 } from '../helpers/wait-for-season-active';
 import { test } from '../fixtures/ui';
 import { gqlFetch } from '../helpers/gql-fetch';
+import {
+  STATS_HYDRATION_TIMEOUT_MS,
+  waitForWeekStatsHydrated,
+} from '../helpers/wait-for-stats-hydrated';
 
 import { testLeagueName } from '../league-run-scope';
 // ---------------------------------------------------------------------------
@@ -277,7 +281,9 @@ test.describe
   test('Phase 4: Complete the 1-week season via API', async ({
     commissionerJwt,
   }) => {
-    test.setTimeout(60_000);
+    // The stats wait below dominates; keep the original 60s for the advance
+    // poll plus slack on top of its worst case. (LS-11063)
+    test.setTimeout(STATS_HYDRATION_TIMEOUT_MS + 120_000);
 
     await test.step('Auto-select games for week 1', async () => {
       await gqlFetch<{
@@ -291,11 +297,21 @@ test.describe
       );
     });
 
+    await test.step('Wait for week 1 stats to load', async () => {
+      // autoAdvanceMatchups refuses to advance until every rostered player has
+      // a resolved game (LS-10795), which the serialized stats pipeline
+      // provides only after ~4 FIFO batches on a single-concurrency lambda.
+      // Polling autoAdvance under a flat 60s cut that off (LS-11063: run
+      // 38112360534), so wait on per-player hydration progress first.
+      await waitForWeekStatsHydrated(commissionerJwt, state.leagueId, 1, {
+        label: 'season-renewal-migration',
+      });
+    });
+
     await test.step('Auto-advance and poll until season is complete', async () => {
-      // autoSelectGames sends an SQS message and returns immediately.
-      // The Lambda processing game selection may not finish before we call
-      // autoAdvanceMatchups, so we call autoAdvanceMatchups inside the poll
-      // loop — it is idempotent and will succeed once games are selected.
+      // With stats hydrated the first autoAdvanceMatchups call should
+      // complete the season; it stays in the poll as cheap insurance — it is
+      // idempotent and succeeds once every game is resolved.
       await expect
         .poll(
           async () => {
