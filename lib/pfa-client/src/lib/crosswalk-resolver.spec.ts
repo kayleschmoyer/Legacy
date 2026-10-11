@@ -156,4 +156,129 @@ describe('resolvePfaCrosswalk', () => {
     );
     expect(rows[0].playerId).toBe(1);
   });
+
+  describe('box-score season disambiguation (LS-11064)', () => {
+    const mikeClarkK = candidate({
+      id: 132300,
+      firstName: 'Mike',
+      lastName: 'Clark',
+      position: 'K',
+      seasonMin: 1963,
+      seasonMax: 1973,
+    });
+    const mikeClarkDl = candidate({
+      id: 132301,
+      firstName: 'Mike',
+      lastName: 'Clark',
+      position: 'DL',
+      seasonMin: 1981,
+      seasonMax: 1987,
+    });
+    const clark = entry({ pfaId: 'clar08000', name: 'Mike Clark' });
+
+    it('picks the one same-name nfl candidate whose seasons match the box scores', () => {
+      const [row] = resolvePfaCrosswalk(
+        [clark],
+        [mikeClarkK, mikeClarkDl],
+        new Map([['clar08000', new Set([1965, 1966])]]),
+      );
+      expect(row).toMatchObject({
+        playerId: 132300,
+        matchMethod: 'name_season_disambiguated',
+        candidateCount: 2,
+        matchedFinalSeason: 1973,
+      });
+      expect(row.confidence).toBeGreaterThan(0.5);
+    });
+
+    it('stays unresolved without observed seasons (the pre-LS-11064 behaviour)', () => {
+      const [row] = resolvePfaCrosswalk([clark], [mikeClarkK, mikeClarkDl]);
+      expect(row.matchMethod).toBe('ambiguous_unresolved');
+    });
+
+    it('accepts a candidate whose partial season range sits within the gap tolerance', () => {
+      // Bruce Alford kicked through 1976 but has stat rows for 1967-1969 only.
+      const [row] = resolvePfaCrosswalk(
+        [entry({ pfaId: 'alfo00600', name: 'Bruce Alford' })],
+        [
+          candidate({
+            id: 128600,
+            firstName: 'Bruce',
+            lastName: 'Alford',
+            seasonMin: 1967,
+            seasonMax: 1969,
+          }),
+          candidate({
+            id: 128599,
+            firstName: 'Bruce',
+            lastName: 'Alford',
+            seasonMin: null,
+            seasonMax: null,
+          }),
+        ],
+        new Map([['alfo00600', new Set([1973, 1974])]]),
+      );
+      expect(row).toMatchObject({
+        playerId: 128600,
+        matchMethod: 'name_season_disambiguated',
+      });
+    });
+
+    it('never picks a candidate with no season data', () => {
+      const [row] = resolvePfaCrosswalk(
+        [clark],
+        [
+          candidate({
+            id: 1,
+            firstName: 'Mike',
+            lastName: 'Clark',
+            seasonMin: null,
+            seasonMax: null,
+          }),
+          mikeClarkDl,
+        ],
+        new Map([['clar08000', new Set([1965])]]),
+      );
+      expect(row.matchMethod).toBe('ambiguous_unresolved');
+    });
+
+    it('stays unresolved when more than one candidate is near the observed seasons', () => {
+      const [row] = resolvePfaCrosswalk(
+        [clark],
+        [mikeClarkK, { ...mikeClarkDl, seasonMin: 1974, seasonMax: 1976 }],
+        new Map([['clar08000', new Set([1972])]]),
+      );
+      expect(row.matchMethod).toBe('ambiguous_unresolved');
+    });
+
+    it('unresolves every PFA id that season-matched the same player row', () => {
+      const rows = resolvePfaCrosswalk(
+        [clark, entry({ pfaId: 'clar08200', name: 'Mike Clark' })],
+        [mikeClarkK, mikeClarkDl],
+        new Map([
+          ['clar08000', new Set([1965])],
+          ['clar08200', new Set([1970])],
+        ]),
+      );
+      expect(rows.map((r) => [r.playerId, r.matchMethod])).toEqual([
+        [null, 'ambiguous_unresolved'],
+        [null, 'ambiguous_unresolved'],
+      ]);
+    });
+
+    it('still prefers the afl era window when it narrows to one', () => {
+      const [row] = resolvePfaCrosswalk(
+        [entry({ league: 'afl' })],
+        [
+          candidate({ id: 1, seasonMin: 1979, seasonMax: 1994 }),
+          candidate({ id: 2, seasonMin: 1960, seasonMax: 1968 }),
+        ],
+        new Map([['mont00800', new Set([1985])]]),
+      );
+      expect(row).toMatchObject({
+        playerId: 2,
+        matchMethod: 'name_era_disambiguated',
+      });
+    });
+  });
 });

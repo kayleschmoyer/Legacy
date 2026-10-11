@@ -1,5 +1,12 @@
-import type { PfaCrosswalkRow } from '@legacy-sports/pfa-client';
-import { resolvePfaIngestIdentities } from './ingestPfaFootball';
+import {
+  accumulateBoxScore,
+  createAccumulator,
+  type PfaCrosswalkRow,
+} from '@legacy-sports/pfa-client';
+import {
+  collectObservedSeasons,
+  resolvePfaIngestIdentities,
+} from './ingestPfaFootball';
 
 jest.mock('@legacy-sports/db-client', () =>
   mockDbClientModule({ runWithPublicClient: jest.fn() }),
@@ -91,5 +98,41 @@ describe('resolvePfaIngestIdentities (ADR 0023 corpus key)', () => {
     expect(resolution.resolved.size).toBe(0);
     expect(resolution.unresolved).toBe(1);
     expect(resolution.noCorpusKey).toBe(1);
+  });
+});
+
+describe('collectObservedSeasons (LS-11064)', () => {
+  it('merges box-score stat seasons with kicker scoring-play seasons per pfaId', () => {
+    const acc = createAccumulator();
+    accumulateBoxScore(acc, {
+      gameIdentifier: '1965nfl001',
+      season: 1965,
+      players: [
+        {
+          pfaId: 'rb000100',
+          name: 'Some Back',
+          rushing: { att: 5, yds: 20, avg: 4, lng: 8, lngTd: false, td: 0 },
+          passing: null,
+          receiving: null,
+          interceptions: null,
+          punting: null,
+          puntReturns: null,
+          kickoffReturns: null,
+        },
+      ],
+      scoringPlays: [],
+      quarterScores: null,
+    });
+
+    const observed = collectObservedSeasons(
+      acc,
+      new Map([
+        [1965, new Set(['clar08000', 'rb000100'])],
+        [1966, new Set(['clar08000'])],
+      ]),
+    );
+
+    expect(observed.get('rb000100')).toEqual(new Set([1965]));
+    expect(observed.get('clar08000')).toEqual(new Set([1965, 1966]));
   });
 });

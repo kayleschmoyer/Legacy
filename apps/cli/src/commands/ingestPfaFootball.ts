@@ -207,9 +207,17 @@ export function resolvePfaIngestIdentities(
   return { resolved, unresolved, pfaIdConflict, noCorpusKey };
 }
 
-async function buildResolvedCrosswalk(
+interface CrosswalkInputs {
+  entries: Awaited<ReturnType<typeof crawlPlayerIndex>>['entries'];
+  candidates: Awaited<ReturnType<typeof fetchFootballPlayerCandidates>>;
+  identities: Map<number, FootballCorpusIdentity>;
+}
+
+/** Crawls the PFA player index and reads `players` up front, before the
+ * hours-long box-score crawl, so an unreachable index or DB fails fast. */
+async function loadCrosswalkInputs(
   rateLimiter: PfaRateLimiter,
-): Promise<Map<string, ResolvedPfaIdentity>> {
+): Promise<CrosswalkInputs> {
   LOGGER.info('PFA ingest: crawling player index for crosswalk...');
   const sourceTable = await crawlPlayerIndex({ rateLimiter });
   if (sourceTable.errors.length > 0) {
@@ -219,23 +227,65 @@ async function buildResolvedCrosswalk(
     );
   }
 
-  const resolved = await runWithPublicClient(getDbOptions(), async (db) => {
-    const [candidates, identities] = await Promise.all([
-      fetchFootballPlayerCandidates(db),
-      fetchFootballIdentities(db),
-    ]);
-    const crosswalkRows = resolvePfaCrosswalk(sourceTable.entries, candidates);
-    const resolution = resolvePfaIngestIdentities(crosswalkRows, identities);
+  const [candidates, identities] = await runWithPublicClient(
+    getDbOptions(),
+    (db) =>
+      Promise.all([
+        fetchFootballPlayerCandidates(db),
+        fetchFootballIdentities(db),
+      ]),
+  );
+  return { entries: sourceTable.entries, candidates, identities };
+}
 
-    LOGGER.info(
-      `PFA ingest: crosswalk resolved ${resolution.resolved.size}/${crosswalkRows.length} PFA entries ` +
-        `(${resolution.unresolved} unmatched, ${resolution.pfaIdConflict} matched a row owned by another pfa_id, ` +
-        `${resolution.noCorpusKey} matched but missing both players.pfr_id and players.pfa_id)`,
-    );
-    return resolution.resolved;
-  });
+/** pfaId -> every season it appeared in: a stat line in a box score, or a
+ * kick credited in a box score's scoring plays. */
+export function collectObservedSeasons(
+  acc: PfaIngestAccumulator,
+  kickersBySeason: ReadonlyMap<number, ReadonlySet<string>>,
+): Map<string, Set<number>> {
+  const observed = new Map<string, Set<number>>();
+  const add = (pfaId: string, season: number) => {
+    let seasons = observed.get(pfaId);
+    if (!seasons) {
+      seasons = new Set();
+      observed.set(pfaId, seasons);
+    }
+    seasons.add(season);
+  };
+  for (const { pfaId, season } of accumulatedPlayerSeasons(acc)) {
+    add(pfaId, season);
+  }
+  for (const [season, kickers] of kickersBySeason) {
+    for (const pfaId of kickers) add(pfaId, season);
+  }
+  return observed;
+}
 
-  return resolved;
+function resolveCrosswalk(
+  inputs: CrosswalkInputs,
+  observedSeasons: ReadonlyMap<string, ReadonlySet<number>>,
+): Map<string, ResolvedPfaIdentity> {
+  const crosswalkRows = resolvePfaCrosswalk(
+    inputs.entries,
+    inputs.candidates,
+    observedSeasons,
+  );
+  const resolution = resolvePfaIngestIdentities(
+    crosswalkRows,
+    inputs.identities,
+  );
+  const seasonMatched = crosswalkRows.filter(
+    (row) => row.matchMethod === 'name_season_disambiguated',
+  ).length;
+
+  LOGGER.info(
+    `PFA ingest: crosswalk resolved ${resolution.resolved.size}/${crosswalkRows.length} PFA entries ` +
+      `(${resolution.unresolved} unmatched, ${resolution.pfaIdConflict} matched a row owned by another pfa_id, ` +
+      `${resolution.noCorpusKey} matched but missing both players.pfr_id and players.pfa_id; ` +
+      `${seasonMatched} same-name match(es) settled by box-score seasons)`,
+  );
+  return resolution.resolved;
 }
 
 export async function crawlSeasonBoxScores(
@@ -277,7 +327,7 @@ export async function crawlSeasonBoxScores(
 }
 
 async function crawlKickerGameLogs(
-  kickerCandidates: Set<string>,
+  kickerCandidates: ReadonlySet<string>,
   resolved: Map<string, ResolvedPfaIdentity>,
   rateLimiter: PfaRateLimiter,
   acc: PfaIngestAccumulator,
@@ -287,9 +337,16 @@ async function crawlKickerGameLogs(
   const resolvedKickers = Array.from(kickerCandidates).filter((pfaId) =>
     resolved.has(pfaId),
   );
+  const unresolvedKickers = Array.from(kickerCandidates)
+    .filter((pfaId) => !resolved.has(pfaId))
+    .sort();
   LOGGER.info(
     `PFA ingest: crawling ${resolvedKickers.length} kicker game log(s) ` +
-      `(${kickerCandidates.size - resolvedKickers.length} unresolved kicker(s) skipped)`,
+      `(${unresolvedKickers.length} unresolved kicker(s) skipped` +
+      (unresolvedKickers.length > 0
+        ? `: ${unresolvedKickers.join(', ')}`
+        : '') +
+      ')',
   );
 
   for (const pfaId of resolvedKickers) {
@@ -349,26 +406,39 @@ export async function handleIngestPfaFootball(
   );
 
   const rateLimiter = new PfaRateLimiter();
-  const resolved = await buildResolvedCrosswalk(rateLimiter);
+  const crosswalkInputs = await loadCrosswalkInputs(rateLimiter);
 
   const acc = createAccumulator();
-  const kickerCandidates = new Set<string>();
+  const kickersBySeason = new Map<number, Set<string>>();
   let totalGames = 0;
   let totalPostseasonSkipped = 0;
 
   for (let season = from; season <= to; season++) {
+    const kickers = new Set<string>();
     const { games, postseasonSkipped } = await crawlSeasonBoxScores(
       season,
       rateLimiter,
       acc,
-      kickerCandidates,
+      kickers,
     );
+    kickersBySeason.set(season, kickers);
     totalGames += games;
     totalPostseasonSkipped += postseasonSkipped;
     LOGGER.info(
       `Season ${season}: ${games} regular-season box score(s) parsed ` +
         `(${postseasonSkipped} postseason game(s) skipped)`,
     );
+  }
+
+  // Resolved after the box-score crawl, not before: the seasons each PFA id
+  // appeared in are what tell same-name players apart (LS-11064).
+  const resolved = resolveCrosswalk(
+    crosswalkInputs,
+    collectObservedSeasons(acc, kickersBySeason),
+  );
+  const kickerCandidates = new Set<string>();
+  for (const kickers of kickersBySeason.values()) {
+    for (const pfaId of kickers) kickerCandidates.add(pfaId);
   }
 
   await crawlKickerGameLogs(

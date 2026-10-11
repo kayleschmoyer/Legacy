@@ -168,6 +168,10 @@ export type PfaCrosswalkMatchMethod =
   // Multiple candidates shared the normalized name; era-window filtering
   // (afl/aafc only) narrowed it to exactly one.
   | 'name_era_disambiguated'
+  // Multiple candidates shared the normalized name and the league era window
+  // could not narrow them (always the case for nfl); the seasons this PFA id
+  // was actually seen in box scores narrowed it to exactly one (LS-11064).
+  | 'name_season_disambiguated'
   // Multiple candidates remain after any available disambiguation — no
   // match is emitted; `playerId` is null.
   | 'ambiguous_unresolved'

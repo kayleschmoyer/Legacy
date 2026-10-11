@@ -133,6 +133,36 @@ function seasonRangeOverlapsWindow(
   );
 }
 
+// How far (in seasons) a candidate's known season range may sit from the
+// seasons a PFA id was observed in and still count as the same player.
+// Pre-1974 rows in the football_season_* tables are often partial (Bruce
+// Alford kicked 1967-1976 but has rows for 1967-1969 only), so an exact
+// overlap test would miss real matches in a later --from/--to range. A
+// same-name pair inside this gap of each other stays ambiguous, because the
+// match must still be unique.
+export const SEASON_DISAMBIGUATION_GAP = 5;
+
+/** Seasons between a candidate's range and the observed seasons; 0 = overlap. */
+function seasonGap(
+  candidate: FootballPlayerCandidate,
+  observed: ReadonlySet<number>,
+): number | null {
+  if (candidate.seasonMin === null || candidate.seasonMax === null) {
+    return null;
+  }
+  let gap = Infinity;
+  for (const season of observed) {
+    if (season < candidate.seasonMin) {
+      gap = Math.min(gap, candidate.seasonMin - season);
+    } else if (season > candidate.seasonMax) {
+      gap = Math.min(gap, season - candidate.seasonMax);
+    } else {
+      return 0;
+    }
+  }
+  return gap;
+}
+
 /**
  * Resolves PFA player-index entries against this repo's football players,
  * joined by normalized name and (for afl/aafc) era. Every input entry
@@ -143,10 +173,19 @@ function seasonRangeOverlapsWindow(
  * with each candidate's active-season range pre-derived by the caller (see
  * `fetchFootballPlayerCandidates`). This function does no I/O so it can be
  * unit-tested without a database.
+ *
+ * `observedSeasons` (optional) maps a PFA id to the seasons it appeared in
+ * crawled box scores. When same-name candidates survive the league era
+ * window — always, for nfl entries — the one candidate whose season range
+ * lies within {@link SEASON_DISAMBIGUATION_GAP} of those seasons is picked
+ * (LS-11064). A candidate with no season data is never picked this way, and
+ * a row claimed by more than one PFA id this way is left unresolved for all
+ * of them.
  */
 export function resolvePfaCrosswalk(
   entries: PfaPlayerIndexEntry[],
   candidates: FootballPlayerCandidate[],
+  observedSeasons?: ReadonlyMap<string, ReadonlySet<number>>,
 ): PfaCrosswalkRow[] {
   const candidatesByName = new Map<string, FootballPlayerCandidate[]>();
   for (const candidate of candidates) {
@@ -161,12 +200,47 @@ export function resolvePfaCrosswalk(
     }
   }
 
-  return entries.map((entry) => resolveOne(entry, candidatesByName));
+  const rows = entries.map((entry) =>
+    resolveOne(entry, candidatesByName, observedSeasons?.get(entry.pfaId)),
+  );
+
+  // Season disambiguation picks per entry, so two PFA ids with the same name
+  // and nearby careers could both land on one row. Neither is trustworthy
+  // then: undo both rather than attach one player's stats to the other.
+  const seasonClaims = new Map<number, number>();
+  for (const row of rows) {
+    if (
+      row.matchMethod === 'name_season_disambiguated' &&
+      row.playerId !== null
+    ) {
+      seasonClaims.set(row.playerId, (seasonClaims.get(row.playerId) ?? 0) + 1);
+    }
+  }
+  return rows.map((row) => {
+    if (
+      row.matchMethod !== 'name_season_disambiguated' ||
+      row.playerId === null ||
+      (seasonClaims.get(row.playerId) ?? 0) < 2
+    ) {
+      return row;
+    }
+    LOGGER.warn(
+      `PFA crosswalk: ${row.pfaId} (${row.pfaName}) and another PFA id both season-matched player ${row.playerId} — left unresolved rather than guessing`,
+    );
+    return {
+      ...row,
+      playerId: null,
+      confidence: 0,
+      matchMethod: 'ambiguous_unresolved' as const,
+      matchedFinalSeason: null,
+    };
+  });
 }
 
 function resolveOne(
   entry: PfaPlayerIndexEntry,
   candidatesByName: Map<string, FootballPlayerCandidate[]>,
+  observed: ReadonlySet<number> | undefined,
 ): PfaCrosswalkRow {
   const base = {
     pfaId: entry.pfaId,
@@ -237,8 +311,26 @@ function resolveOne(
     };
   }
 
+  if (eraFiltered.length > 1 && observed && observed.size > 0) {
+    const seasonFiltered = eraFiltered.filter((c) => {
+      const gap = seasonGap(c, observed);
+      return gap !== null && gap <= SEASON_DISAMBIGUATION_GAP;
+    });
+    if (seasonFiltered.length === 1) {
+      const [only] = seasonFiltered;
+      return {
+        ...base,
+        playerId: only.id,
+        confidence: 0.6,
+        matchMethod: 'name_season_disambiguated',
+        candidateCount,
+        matchedFinalSeason: only.seasonMax,
+      };
+    }
+  }
+
   LOGGER.warn(
-    `PFA crosswalk: ${entry.pfaId} (${entry.name}, ${entry.league}) has ${candidateCount} same-name candidates and could not be disambiguated by era — left unresolved rather than guessing`,
+    `PFA crosswalk: ${entry.pfaId} (${entry.name}, ${entry.league}) has ${candidateCount} same-name candidates and could not be disambiguated by era or box-score seasons — left unresolved rather than guessing`,
   );
   return {
     ...base,
