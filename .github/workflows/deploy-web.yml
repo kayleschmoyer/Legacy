@@ -156,12 +156,18 @@ jobs:
           # uploads are disabled with a "not configured" message.
           export VITE_IMAGE_UPLOAD_URL="${VITE_GRAPHQL_HOST%/graphql}"
 
+          # Stats API shares the same API Gateway base (terraform output
+          # stats_endpoint = "${api_base_url}/stats"). Unset → GameLogsTable
+          # renders "Game logs are currently unavailable." (LS-10494, LS-11048).
+          export VITE_STATS_API_URL="${VITE_GRAPHQL_HOST%/graphql}/stats"
+
           # Display version information
           echo "📋 Version Information:"
           echo "  Version: ${{ needs.setup.outputs.version }}"
           echo "  Commit: ${{ needs.setup.outputs.commit_sha }}"
           echo "  Build Number: ${{ needs.setup.outputs.build_number }}"
           echo "  Jira Proxy URL: $VITE_JIRA_PROXY_URL"
+          echo "  Stats API URL: $VITE_STATS_API_URL"
 
           NX_CMD="${NX_COMMAND:-}"
           if [ -z "$NX_CMD" ]; then

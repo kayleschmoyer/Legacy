@@ -144,11 +144,14 @@ jobs:
 
           echo "::group::Rewrite API URLs"
           # Replace compile-time localhost defaults (from vite.config.mts define block)
-          # with production values so the preview is fully functional.
+          # with production values so the preview is fully functional. The CI
+          # build also bakes the hermetic e2e stats placeholder (build-validation
+          # action, LS-11047); point it at the real stats API (LS-11048).
           find . -type f -name "*.js" -exec sed -i \
             -e "s|http://localhost:5001|${VITE_OAUTH_PROXY_URL}|g" \
             -e "s|placeholder-google-client-id|${VITE_GOOGLE_CLIENT_ID}|g" \
             -e "s|http://localhost:5000/graphql|${VITE_GRAPHQL_HOST}|g" \
+            -e "s|https://e2e-placeholder.test/stats|${VITE_GRAPHQL_HOST%/graphql}/stats|g" \
             {} +
 
           # Replace empty websocket URL only if a production value is provided
@@ -200,6 +203,8 @@ jobs:
         run: |
           # Derive jira proxy URL from the same API base as GraphQL
           export VITE_JIRA_PROXY_URL="${VITE_GRAPHQL_HOST%/graphql}/jira"
+          # Stats API shares the API Gateway base (LS-11048).
+          export VITE_STATS_API_URL="${VITE_GRAPHQL_HOST%/graphql}/stats"
           pnpm exec nx build web --configuration=production
 
       - name: Add SPA Fallback (Fallback Build)

@@ -160,6 +160,8 @@ jobs:
           export VITE_APP_VERSION="$VERSION"
           export VITE_JIRA_PROXY_URL="${VITE_GRAPHQL_HOST%/graphql}/jira"
           export VITE_IMAGE_UPLOAD_URL="${VITE_GRAPHQL_HOST%/graphql}"
+          # Stats API shares the API Gateway base (LS-11048).
+          export VITE_STATS_API_URL="${VITE_GRAPHQL_HOST%/graphql}/stats"
 
           TARGET_SHA="${{ steps.find-previous.outputs.target_sha }}"
           echo "Building web app at rollback revision ${TARGET_SHA:0:7}..."
