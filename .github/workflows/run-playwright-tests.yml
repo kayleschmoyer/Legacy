@@ -417,7 +417,7 @@ jobs:
             {
               echo 'description<<EOF_PLAYWRIGHT_NOTIFY'
               echo '**Suite:** Integration (real server, sharded) + E2E (4 shards) + Shared-live (1 shard)'
-              echo '**Browser:** chromium · **Workers:** e2e 4 / integration 1 / shared-live 1 · **Retries:** e2e 2 / integration 0 / shared-live 0'
+              echo '**Browser:** chromium · **Workers:** e2e 3 / integration 1 / shared-live 1 · **Retries:** e2e 2 / integration 0 / shared-live 0'
               echo '**Filters:** none — all tests including @slow'
               echo '**Mobile @critical:** Pixel 5 (LS-8457) · iPhone 12 (LS-8502)'
               echo 'EOF_PLAYWRIGHT_NOTIFY'
@@ -428,7 +428,7 @@ jobs:
             {
               echo 'description<<EOF_PLAYWRIGHT_NOTIFY'
               echo '**Suite:** Integration (real server, sharded) + E2E (4 shards) + Shared-live (1 shard)'
-              echo '**Browser:** chromium · **Workers:** e2e 4 / integration 1 / shared-live 1 · **Retries:** e2e 2 / integration 0 / shared-live 0'
+              echo '**Browser:** chromium · **Workers:** e2e 3 / integration 1 / shared-live 1 · **Retries:** e2e 2 / integration 0 / shared-live 0'
               echo '**Filters:** none — all tests including @slow'
               echo '**Mobile @critical:** Pixel 5 (LS-8457) · iPhone 12 (LS-8502)'
               echo 'EOF_PLAYWRIGHT_NOTIFY'
@@ -987,7 +987,15 @@ jobs:
           if [ "$SUITE" = "integration" ] || [ "$SUITE" = "shared-live" ]; then
             PLAYWRIGHT_ARGS+=( "--workers=1" )
           elif [ "$IS_NIGHTLY_LIKE" = "true" ]; then
-            PLAYWRIGHT_ARGS+=( "--workers=4" "--retries=2" )
+            # LS-11042: 3 workers, matching playwright.config.ts's CI default.
+            # The runner fleet is 4 vCPU, and LS-9695 traced random
+            # toBeVisible() timeouts to 4 workers oversubscribing the CPU
+            # (one worker per vCPU, no headroom for the OS, `vite preview`,
+            # and browser compositor threads). This was hard-coded to 4 by
+            # LS-2041; the ~33%/shard wall-clock cost became affordable once
+            # LS-11041 removed the ~10s/test _coverage teardown. Do not go
+            # above 4 on this fleet.
+            PLAYWRIGHT_ARGS+=( "--workers=3" "--retries=2" )
           else
             PLAYWRIGHT_ARGS+=( "--workers=${{ inputs.workers }}" "--retries=${{ inputs.retries }}" )
           fi
@@ -1962,7 +1970,7 @@ jobs:
           # Build test run summary
           if [ "${{ github.event_name }}" = "workflow_run" ] || [ "${{ inputs['test-suite'] }}" = "all" ]; then
             SUMMARY_LINE1="**Suite:** Integration (real server, sharded) + E2E (4 shards) + Shared-live (1 shard)"
-            SUMMARY_LINE2="**Browser:** chromium · **Workers:** e2e 4 / integration 1 / shared-live 1 · **Retries:** e2e 2 / integration 0 / shared-live 0"
+            SUMMARY_LINE2="**Browser:** chromium · **Workers:** e2e 3 / integration 1 / shared-live 1 · **Retries:** e2e 2 / integration 0 / shared-live 0"
             SUMMARY_LINE3="**Filters:** none — all tests including @slow · **Mobile @critical:** Pixel 5 (LS-8457) · iPhone 12 (LS-8502)"
           else
             SUITE="${{ inputs['test-suite'] || 'e2e' }}"
