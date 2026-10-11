@@ -881,3 +881,32 @@ export const onThisDayEvents = pgTable(
     ),
   }),
 );
+
+/**
+ * Per-season MLB award winners from the Lahman AwardsPlayers dataset
+ * (LS-10674). Keyed by B-Ref id (Lahman People.bbrefID) so rows exist before
+ * the player is loaded. award: MVP | CYA | ROY | GG | SS; league: AL | NL | ML.
+ */
+export const mlbSeasonAwards = pgTable(
+  'mlb_season_awards',
+  {
+    brefId: varchar('bref_id', { length: 10 }).notNull(),
+    season: integer('season').notNull(),
+    award: varchar('award', { length: 8 }).notNull(),
+    league: varchar('league', { length: 2 }).notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.brefId, table.season, table.award] }),
+  }),
+);
+
+/**
+ * mlb_season_awards rolled up to one B-Ref-format award_summary per player
+ * season (e.g. 'MVP-NL,GG,SS') — the value written to
+ * season_batting/season_pitching.award_summary.
+ */
+export const mlbSeasonAwardSummaries = pgView('mlb_season_award_summaries', {
+  brefId: varchar('bref_id', { length: 10 }).notNull(),
+  season: integer('season').notNull(),
+  awardSummary: text('award_summary').notNull(),
+}).as(sql``);

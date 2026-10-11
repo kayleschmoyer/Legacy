@@ -76,12 +76,53 @@ const AWARD_LABELS: Record<string, { label: string; color: string }> = {
   ROY: { label: 'ROY', color: BRAND_NAVY_LIGHT },
 };
 
-function parseAwards(summary: string | null | undefined): string[] {
+export interface ParsedAward {
+  /** Base award code, e.g. 'MVP' — the key into AWARD_LABELS. */
+  code: string;
+  /** True for an actual award; false for a ballot placement such as 'MVP-5'. */
+  won: boolean;
+  /** Display text, e.g. 'NL MVP', 'Gold Glove', 'MVP (5th in voting)'. */
+  label: string;
+}
+
+function ordinal(n: number): string {
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
+  const suffix = ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th';
+  return `${n}${suffix}`;
+}
+
+/**
+ * Parse one B-Ref award code. Same conventions as
+ * lib/bref-client/src/lib/CareerAchievements.ts `normalizeCode`:
+ *   - no suffix ('GG', 'MVP')            → win
+ *   - league suffix ('MVP-NL', 'CYA-AL') → win in that league
+ *   - ballot rank ('MVP-1', 'ROY-6')     → win only for rank 1
+ */
+function parseAwardCode(raw: string): ParsedAward {
+  const dashIdx = raw.indexOf('-');
+  const code = dashIdx === -1 ? raw : raw.slice(0, dashIdx);
+  const suffix = dashIdx === -1 ? '' : raw.slice(dashIdx + 1);
+  const rank = /^\d+$/.test(suffix) ? Number(suffix) : null;
+  const league = /^(AL|NL)\b/.exec(suffix)?.[1] ?? null;
+  const won = rank === null || rank === 1;
+  const name = AWARD_LABELS[code]?.label ?? code;
+
+  let label = name;
+  if (!won && rank !== null) label = `${name} (${ordinal(rank)} in voting)`;
+  else if (league) label = `${league} ${name}`;
+
+  return { code, won, label };
+}
+
+/** Parse a comma-separated B-Ref `award_summary` (e.g. 'MVP-NL,GG,SS'). */
+export function parseAwards(summary: string | null | undefined): ParsedAward[] {
   if (!summary) return [];
   return summary
     .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
+    .map((s) => s.trim().toUpperCase())
+    .filter(Boolean)
+    .map(parseAwardCode);
 }
 
 function getAwardMarkers(dataPoints: ChartDataPoint[]): MilestoneMarker[] {
@@ -89,12 +130,12 @@ function getAwardMarkers(dataPoints: ChartDataPoint[]): MilestoneMarker[] {
   for (const point of dataPoints) {
     const awards = parseAwards(point.awards);
     for (const award of awards) {
-      const match = AWARD_LABELS[award];
-      if (match) {
+      const match = AWARD_LABELS[award.code];
+      if (match && award.won) {
         markers.push({
           season: point.season,
           value: point.value,
-          label: match.label,
+          label: award.label,
           color: match.color,
         });
       }
@@ -293,11 +334,11 @@ function CareerArcTooltip({
       </XStack>
       {awards.length > 0 && (
         <XStack gap="$1" flexWrap="wrap">
-          {awards.map((award) => {
-            const meta = AWARD_LABELS[award];
+          {awards.map((award, i) => {
+            const meta = AWARD_LABELS[award.code];
             return (
               <Text
-                key={award}
+                key={`${award.label}-${i}`}
                 fontSize={10}
                 fontWeight="600"
                 color={meta?.color ?? TEXT_MUTED}
@@ -307,7 +348,7 @@ function CareerArcTooltip({
                   background: withAlpha(meta?.color ?? TEXT_MUTED, 0.15),
                 }}
               >
-                {meta?.label ?? award}
+                {award.label}
               </Text>
             );
           })}
@@ -628,7 +669,11 @@ export function CareerArcChart({
               </td>
               <td>{point.secondary}</td>
               <td>{point.games}</td>
-              <td>{point.awards ?? '—'}</td>
+              <td>
+                {parseAwards(point.awards)
+                  .map((award) => award.label)
+                  .join(', ') || '—'}
+              </td>
             </tr>
           ))}
         </tbody>

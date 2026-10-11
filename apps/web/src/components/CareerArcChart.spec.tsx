@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, within } from '@testing-library/react';
-import { CareerArcChart } from './CareerArcChart';
+import { CareerArcChart, parseAwards } from './CareerArcChart';
 
 // ── Module mocks ─────────────────────────────────────────────────────────────
 
@@ -206,7 +206,7 @@ describe('CareerArcChart — accessibility (LS-6968)', () => {
       expect(peakCells.length).toBeLessThanOrEqual(3);
     });
 
-    it('shows award summary in the Awards column when present', () => {
+    it('shows award labels in the Awards column when present', () => {
       render(
         <CareerArcChart
           battingSeasons={[makeBattingSeason({ awardSummary: 'AS, MVP' })]}
@@ -216,7 +216,45 @@ describe('CareerArcChart — accessibility (LS-6968)', () => {
       );
 
       const table = screen.getByTestId('career-arc-sr-table');
-      expect(within(table).getByText('AS, MVP')).toBeInTheDocument();
+      expect(within(table).getByText('All-Star, MVP')).toBeInTheDocument();
+    });
+
+    // LS-10674: the backfill writes B-Ref league-suffixed winner codes.
+    it('shows a league MVP in the Awards column and as a chart marker', () => {
+      render(
+        <CareerArcChart
+          battingSeasons={[
+            makeBattingSeason({ season: 2001, awardSummary: 'MVP-NL,GG,SS' }),
+          ]}
+          pitchingSeasons={null}
+          mode="batting"
+        />,
+      );
+
+      const table = screen.getByTestId('career-arc-sr-table');
+      expect(
+        within(table).getByText('NL MVP, Gold Glove, Silver Slugger'),
+      ).toBeInTheDocument();
+      expect(screen.getByText('2001 NL MVP')).toBeInTheDocument();
+      expect(screen.getByText('2001 Gold Glove')).toBeInTheDocument();
+    });
+
+    it('does not mark ballot placements as awards', () => {
+      render(
+        <CareerArcChart
+          battingSeasons={[
+            makeBattingSeason({ season: 1999, awardSummary: 'MVP-5' }),
+          ]}
+          pitchingSeasons={null}
+          mode="batting"
+        />,
+      );
+
+      const table = screen.getByTestId('career-arc-sr-table');
+      expect(
+        within(table).getByText('MVP (5th in voting)'),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/^1999 MVP/)).not.toBeInTheDocument();
     });
 
     it('shows "—" in the Awards column when there are no awards', () => {
@@ -286,6 +324,30 @@ describe('CareerArcChart — accessibility (LS-6968)', () => {
       expect(rows).toHaveLength(3);
       expect(within(table).getAllByText('CHC').length).toBeGreaterThan(0);
       expect(within(table).getAllByText('NYM').length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('parseAwards (LS-10674)', () => {
+    it.each([
+      ['MVP-NL', { code: 'MVP', won: true, label: 'NL MVP' }],
+      ['CYA-AL', { code: 'CYA', won: true, label: 'AL Cy Young' }],
+      ['MVP-1', { code: 'MVP', won: true, label: 'MVP' }],
+      ['MVP-NL-28', { code: 'MVP', won: true, label: 'NL MVP' }],
+      ['ROY-2', { code: 'ROY', won: false, label: 'ROY (2nd in voting)' }],
+      ['MVP-11', { code: 'MVP', won: false, label: 'MVP (11th in voting)' }],
+      ['gg', { code: 'GG', won: true, label: 'Gold Glove' }],
+      ['WS', { code: 'WS', won: true, label: 'WS' }],
+    ])('parses %s', (raw, expected) => {
+      expect(parseAwards(raw)).toEqual([expected]);
+    });
+
+    it('splits comma-separated summaries and ignores blanks', () => {
+      expect(parseAwards('AS, ,MVP-AL').map((a) => a.label)).toEqual([
+        'All-Star',
+        'AL MVP',
+      ]);
+      expect(parseAwards(null)).toEqual([]);
+      expect(parseAwards('')).toEqual([]);
     });
   });
 

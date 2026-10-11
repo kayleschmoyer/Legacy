@@ -9,6 +9,7 @@ import {
   SeasonBatting,
   SeasonFielding,
   SeasonPitching,
+  syncSeasonAwardSummaries,
 } from '@legacy-sports/db-client';
 import { addBreadcrumb, captureError } from '@legacy-sports/rollbar';
 import { sql } from 'drizzle-orm';
@@ -234,6 +235,22 @@ export async function loadCareerStats(
         playerName: playerName,
         pitchingRecordCount: stats.pitching.length,
         deduplicatedCount: deduplicateSeasonPitching(stats.pitching).length,
+      },
+    });
+    throw error;
+  }
+
+  // Per-season awards come from Lahman (mlb_season_awards), not the B-Ref
+  // scrape, so re-apply them after the upserts above (LS-10674).
+  try {
+    await syncSeasonAwardSummaries(db, player.id);
+  } catch (error) {
+    captureError(error instanceof Error ? error : new Error(String(error)), {
+      tags: { operation: 'load_career_stats', phase: 'season_awards_sync' },
+      extra: {
+        brefId,
+        playerId: player.id,
+        playerName: playerName,
       },
     });
     throw error;

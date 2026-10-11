@@ -191,6 +191,30 @@ export async function bulkUpsertPitchingSeason(
 }
 
 /**
+ * Write a player's per-season awards (Lahman AwardsPlayers, via the
+ * mlb_season_award_summaries view) into season_batting and
+ * season_pitching.award_summary (LS-10674). Run after the season upserts so a
+ * re-load keeps the awards. Seasons with no Lahman award are left untouched.
+ */
+export async function syncSeasonAwardSummaries(
+  db: PublicDb,
+  playerId: number,
+): Promise<void> {
+  for (const table of [Schema.seasonBatting, Schema.seasonPitching]) {
+    await db.execute(sql`
+      UPDATE ${table} AS s
+      SET award_summary = a.award_summary
+      FROM ${Schema.mlbSeasonAwardSummaries} AS a
+      JOIN ${Schema.players} AS p ON p.bref_id = a.bref_id
+      WHERE p.id = ${playerId}
+        AND s.player_id = p.id
+        AND s.season = a.season
+        AND s.award_summary IS DISTINCT FROM a.award_summary
+    `);
+  }
+}
+
+/**
  * Refresh the career_batting, career_fielding, career_pitching and
  * career_pitching_appearances materialized views.
  *
