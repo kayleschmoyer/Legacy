@@ -67,51 +67,165 @@ async function pollDraftStatus(
   );
 }
 
-async function pollAllMatchupStatsLoaded(
+/** Players per stats-lambda SQS message — mirrors BATCH_SIZE in
+ *  lambdas/game-selection/src/index.ts (queueMatchupStatsLoad). */
+const STATS_BATCH_SIZE = 8;
+/** One stats-lambda invocation's processing budget — mirrors
+ *  PLAYER_PROCESSING_BUDGET_MS in lambdas/stats-lambda/src/load-game-types.ts. */
+const STATS_INVOCATION_BUDGET_MS = 240_000;
+/**
+ * How long hydration may go without a single player game completing before
+ * we call the pipeline stuck rather than slow. The stats-lambda runs with
+ * reserved concurrency 1, shared across the game/season/football stats queues
+ * (terraform/main/lambda-stats.tf), so another matchup's invocation can hold
+ * the only slot for a full processing budget before ours is picked up. One
+ * budget plus a minute of slack is therefore the longest a *healthy* pipeline
+ * can go without progress on this matchup.
+ */
+const STATS_STALL_MS = STATS_INVOCATION_BUDGET_MS + 60_000;
+
+interface HydrationSnapshot {
+  matchupStatuses: string[];
+  /** Per-player game status → count, across every matchup in the week. */
+  gameStatusCounts: Record<string, number>;
+  completedGames: number;
+  totalGames: number;
+}
+
+async function readHydrationSnapshot(
+  jwt: string,
+  leagueId: number,
+  weekNumber: number,
+): Promise<HydrationSnapshot | null> {
+  const data = await gqlFetch<{
+    getMatchupsByWeek: Array<{ id: string; statsLoadingStatus: string }> | null;
+  }>(
+    jwt,
+    `query StatsLoaded($leagueId: Int!, $weekNumber: Int!) {
+       getMatchupsByWeek(leagueId: $leagueId, weekNumber: $weekNumber) {
+         id
+         statsLoadingStatus
+       }
+     }`,
+    { leagueId, weekNumber },
+  ).catch(() => null);
+  const matchups = data?.getMatchupsByWeek ?? [];
+  if (matchups.length === 0) return null;
+
+  const gameStatusCounts: Record<string, number> = {};
+  for (const matchup of matchups) {
+    const players = await gqlFetch<{
+      getMatchupPlayers: Array<{
+        games: Array<{ statsLoadingStatus: string | null }> | null;
+      }> | null;
+    }>(
+      jwt,
+      `query HydrationProgress($matchupId: Int!) {
+         getMatchupPlayers(matchupId: $matchupId) {
+           games { statsLoadingStatus }
+         }
+       }`,
+      { matchupId: Number(matchup.id) },
+    ).catch(() => null);
+    // All-or-nothing: a partial snapshot would read as a progress change.
+    if (!players) return null;
+    for (const player of players.getMatchupPlayers ?? []) {
+      for (const game of player.games ?? []) {
+        const status = game.statsLoadingStatus ?? 'null';
+        gameStatusCounts[status] = (gameStatusCounts[status] ?? 0) + 1;
+      }
+    }
+  }
+  const totalGames = Object.values(gameStatusCounts).reduce(
+    (sum, n) => sum + n,
+    0,
+  );
+  return {
+    matchupStatuses: matchups.map((m) => m.statsLoadingStatus),
+    gameStatusCounts,
+    completedGames: gameStatusCounts['completed'] ?? 0,
+    totalGames,
+  };
+}
+
+function describeSnapshot(snapshot: HydrationSnapshot | null): string {
+  if (!snapshot) return 'no matchups observed';
+  const games = Object.entries(snapshot.gameStatusCounts)
+    .map(([status, n]) => `${status}=${n}`)
+    .join(', ');
+  return (
+    `matchup statuses [${snapshot.matchupStatuses.join(', ')}], ` +
+    `player games ${snapshot.completedGames}/${snapshot.totalGames} hydrated ` +
+    `(${games || 'none'}), ` +
+    `~${Math.ceil(snapshot.totalGames / STATS_BATCH_SIZE)} stats batches`
+  );
+}
+
+/**
+ * Wait for the week's stats hydration to finish (LS-11046).
+ *
+ * The matchup-level `statsLoadingStatus` is the terminal signal autoAdvance
+ * needs, but it is a poor *liveness* signal: the stats-lambda only writes it
+ * after the matchup's **last** SQS batch (lambdas/stats-lambda/src/load-game.ts
+ * `isLastBatch`). A 2×15-player league queues ~4 FIFO batches of 8, each with
+ * its own 240s invocation budget, so the matchup sits at `loading` for the
+ * whole run even while players complete steadily — and a fixed wall-clock
+ * ceiling on it can't tell "slow" from "stuck". (The previous 240s ceiling
+ * was one *batch's* budget, below the nominal ~12s × 30 players of work.)
+ *
+ * So liveness comes from the per-player `matchup_player_games` statuses,
+ * which flip to `completed` as each player finishes: we fail fast when none
+ * completes for STATS_STALL_MS (pipeline genuinely not processing) and
+ * otherwise keep waiting up to `timeoutMs` for the matchup status to settle.
+ */
+async function waitForMatchupStatsHydrated(
   jwt: string,
   leagueId: number,
   weekNumber: number,
   timeoutMs: number,
 ): Promise<void> {
   const start = Date.now();
-  // Last-observed statuses, so a timeout can report *where* hydration stalled
-  // (queued vs loading vs retry) instead of an opaque "did not finish". Matches
-  // the diagnostic pattern in wait-for-stats-loaded.ts and the LS-4444 policy of
-  // never reinstating a diagnostic blindfold.
-  let lastStatuses: string[] = [];
+  let lastProgressAt = start;
+  let lastProgressKey = '';
+  let snapshot: HydrationSnapshot | null = null;
   while (Date.now() - start < timeoutMs) {
-    const data = await gqlFetch<{
-      getMatchupsByWeek: Array<{ statsLoadingStatus: string }> | null;
-    }>(
-      jwt,
-      `query StatsLoaded($leagueId: Int!, $weekNumber: Int!) {
-         getMatchupsByWeek(leagueId: $leagueId, weekNumber: $weekNumber) {
-           statsLoadingStatus
-         }
-       }`,
-      { leagueId, weekNumber },
-    ).catch(() => null);
-    const matchups = data?.getMatchupsByWeek ?? [];
-    if (matchups.length > 0) {
-      lastStatuses = matchups.map((m) => m.statsLoadingStatus);
+    snapshot =
+      (await readHydrationSnapshot(jwt, leagueId, weekNumber)) ?? snapshot;
+    if (snapshot) {
+      if (snapshot.matchupStatuses.includes('failed')) {
+        throw new Error(
+          `[provisionCompletedMatchup] stats loading failed for league ${leagueId} ` +
+            `week ${weekNumber} (${describeSnapshot(snapshot)})`,
+        );
+      }
+      if (snapshot.matchupStatuses.every((s) => s === 'completed')) {
+        LOGGER.info(
+          `[provisionCompletedMatchup] league ${leagueId} week ${weekNumber} stats hydrated ` +
+            `in ${Math.round((Date.now() - start) / 1000)}s (${describeSnapshot(snapshot)})`,
+        );
+        return;
+      }
+      // Any completed player game, or a matchup status transition (queued →
+      // loading → retry), counts as forward progress.
+      const progressKey = `${snapshot.completedGames}|${snapshot.matchupStatuses.join(',')}`;
+      if (progressKey !== lastProgressKey) {
+        lastProgressKey = progressKey;
+        lastProgressAt = Date.now();
+      }
     }
-    if (matchups.some((m) => m.statsLoadingStatus === 'failed')) {
+    if (Date.now() - lastProgressAt > STATS_STALL_MS) {
       throw new Error(
-        `[provisionCompletedMatchup] stats loading failed for league ${leagueId} week ${weekNumber}`,
+        `[provisionCompletedMatchup] stats hydration stalled for league ${leagueId} ` +
+          `week ${weekNumber}: no progress for ${STATS_STALL_MS}ms ` +
+          `(${describeSnapshot(snapshot)}) — the stats pipeline is not processing this matchup`,
       );
     }
-    if (
-      matchups.length > 0 &&
-      matchups.every((m) => m.statsLoadingStatus === 'completed')
-    ) {
-      return;
-    }
-    await delay(3_000);
+    await delay(5_000);
   }
   throw new Error(
-    `[provisionCompletedMatchup] stats did not finish loading for league ${leagueId} ` +
-      `week ${weekNumber} within ${timeoutMs}ms (last statuses: ` +
-      `[${lastStatuses.join(', ') || 'none observed'}])`,
+    `[provisionCompletedMatchup] stats still hydrating for league ${leagueId} ` +
+      `week ${weekNumber} after ${timeoutMs}ms despite steady progress ` +
+      `(${describeSnapshot(snapshot)})`,
   );
 }
 
@@ -249,19 +363,14 @@ export async function provisionCompletedMatchup(
     { leagueId },
   );
   // Wait for the async stats-hydration pipeline that autoSelectGames enqueues
-  // (queued → game-selection lambda `loading` → stats-lambda downloads game logs
-  // → `completed`). A freshly-provisioned league has *no cached* player stats, so
-  // every player is downloaded from Baseball Reference under the bref-client's
-  // 15-req/min single-concurrency throttle (~4s/request × batting+pitching+
-  // fielding). Hydration always completes, but for an uncached roster it
-  // routinely runs past 120s under nightly load (concurrent shards contend for
-  // the single-concurrency stats-lambda) — the original 120s ceiling was below
-  // the pipeline's own single-pass budget and produced the LS-8432 timeout.
-  // Anchor the ceiling to the stats-lambda's PLAYER_PROCESSING_BUDGET_MS
-  // (lambdas/stats-lambda/src/load-game-types.ts = 240_000ms): one full
-  // processing pass. (The durable fix — a test-only seed that bypasses the
-  // download entirely — is tracked on LS-4513.)
-  await pollAllMatchupStatsLoaded(commissionerJwt, leagueId, 1, 240_000);
+  // (game-selection → ~4 FIFO batches of 8 players → single-concurrency
+  // stats-lambda downloads each uncached game log from Baseball Reference at
+  // ~12s/player). Liveness is judged per player, so a stuck pipeline fails in
+  // STATS_STALL_MS; the overall ceiling only bounds a healthy-but-contended run
+  // (~6 min nominal for 30 uncached players, plus other shards' invocations
+  // holding the single slot). The durable fix — a test-only seed that bypasses
+  // the download entirely — is tracked on LS-4513.
+  await waitForMatchupStatsHydrated(commissionerJwt, leagueId, 1, 600_000);
 
   await gqlFetch(
     commissionerJwt,

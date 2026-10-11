@@ -111,13 +111,14 @@ test.describe
     managerJwt1,
   }) => {
     // provisionCompletedMatchup drives a full league to a completed matchup:
-    // create + join + a ~30-pick draft, then wait for the async stats-hydration
-    // pipeline. On a freshly-provisioned league every player's game log is
-    // downloaded from Baseball Reference under a 15-req/min single-concurrency
-    // throttle, so hydration alone can consume the helper's 240s ceiling (see
-    // provision-completed-matchup.ts, LS-8432). Budget the setup/draft work on
-    // top of that so the test itself doesn't time out before hydration finishes.
-    test.setTimeout(420_000);
+    // create + join + a ~30-pick draft (~2 min), then wait for the async
+    // stats-hydration pipeline. On a freshly-provisioned league every player's
+    // game log is downloaded from Baseball Reference by a single-concurrency
+    // stats-lambda in FIFO batches of 8 (~12s/player, ~6 min nominal for 30
+    // players). The helper fails fast if hydration stops making per-player
+    // progress, and caps a slow-but-healthy run at 600s (LS-11046); budget the
+    // setup/draft work on top of that ceiling.
+    test.setTimeout(780_000);
 
     const provisioned = await provisionCompletedMatchup({
       commissionerJwt,
