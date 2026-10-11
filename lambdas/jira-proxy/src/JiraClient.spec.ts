@@ -343,12 +343,12 @@ describe('searchJiraBugs', () => {
       key: string;
       fields: { summary: string; status: { name: string } };
     }>,
-    total?: number,
   ): Response {
-    return new Response(
-      JSON.stringify({ total: total ?? issues.length, issues }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } },
-    );
+    // Mirrors /rest/api/3/search/jql: no `total`, cursor paging only.
+    return new Response(JSON.stringify({ issues }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   it('returns matching issues from Jira search', async () => {
@@ -393,7 +393,7 @@ describe('searchJiraBugs', () => {
   });
 
   it('escapes double quotes in query to prevent JQL injection', async () => {
-    fetchSpy.mockResolvedValueOnce(makeSearchResponse([], 0));
+    fetchSpy.mockResolvedValueOnce(makeSearchResponse([]));
 
     await searchJiraBugs('test "injected" query', 'LS', 'jira-secret');
 
@@ -403,7 +403,7 @@ describe('searchJiraBugs', () => {
   });
 
   it('caps maxResults to 10', async () => {
-    fetchSpy.mockResolvedValueOnce(makeSearchResponse([], 0));
+    fetchSpy.mockResolvedValueOnce(makeSearchResponse([]));
 
     await searchJiraBugs('test', 'LS', 'jira-secret', 50);
 
@@ -413,12 +413,12 @@ describe('searchJiraBugs', () => {
   });
 
   it('uses Bearer auth and cloud API URL', async () => {
-    fetchSpy.mockResolvedValueOnce(makeSearchResponse([], 0));
+    fetchSpy.mockResolvedValueOnce(makeSearchResponse([]));
 
     await searchJiraBugs('test', 'LS', 'jira-secret');
 
     const calls = fetchSpy.mock.calls as unknown as FetchCall[];
-    expect(calls[0][0]).toContain(API_BASE);
+    expect(calls[0][0]).toContain(`${API_BASE}/rest/api/3/search/jql?`);
     const headers = calls[0][1].headers as Record<string, string>;
     expect(headers['Authorization']).toBe('Bearer test-access-token');
   });
@@ -537,7 +537,8 @@ describe('resolveCurrentBugEpicKey', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(2);
     // Verify JQL search URL contains the correct search params
     const jqlUrl = fetchSpy.mock.calls[1][0] as string;
-    expect(jqlUrl).toContain('/rest/api/3/search');
+    expect(jqlUrl).toContain('/rest/api/3/search/jql?');
+    expect(jqlUrl).toContain('fields=key');
     expect(jqlUrl).toContain('bucket%3Aclient-bugs');
   });
 

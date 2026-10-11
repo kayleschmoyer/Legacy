@@ -27,10 +27,10 @@ async function findCurrentBugEpicViaJql(
     const params = new URLSearchParams({
       jql,
       maxResults: '1',
-      fields: 'none',
+      fields: 'key',
     });
     const response = await fetchWithTimeout(
-      `${apiBaseUrl}/rest/api/3/search?${params.toString()}`,
+      `${apiBaseUrl}/rest/api/3/search/jql?${params.toString()}`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -560,7 +560,7 @@ export async function searchJiraBugs(
   });
 
   const response = await fetchWithTimeout(
-    `${apiBaseUrl}/rest/api/3/search?${params.toString()}`,
+    `${apiBaseUrl}/rest/api/3/search/jql?${params.toString()}`,
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -576,8 +576,9 @@ export async function searchJiraBugs(
     return { issues: [], total: 0 };
   }
 
+  // /search/jql (the replacement for the removed GET /search, which now
+  // returns 410 Gone) is cursor-paged and no longer reports `total`.
   const data = (await response.json()) as {
-    total: number;
     issues: Array<{
       key: string;
       fields: { summary: string; status: { name: string } };
@@ -585,7 +586,7 @@ export async function searchJiraBugs(
   };
 
   return {
-    total: data.total,
+    total: data.issues.length,
     issues: data.issues.map((issue) => ({
       issueKey: issue.key,
       issueUrl: `${siteUrl}/browse/${issue.key}`,
