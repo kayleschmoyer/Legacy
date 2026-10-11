@@ -113,7 +113,19 @@ const MOCK_TEAMS = [
   },
 ];
 
-const MOCK_CHAT_MESSAGES = [
+interface MockChatMessage {
+  __typename: string;
+  id: string;
+  userId: number | null;
+  messageText: string;
+  timestamp: string;
+  messageType: string;
+  gifUrl: string | null;
+  metadata: string | null;
+  sender: { username: string; avatarUrl: string | null } | null;
+}
+
+const MOCK_CHAT_MESSAGES: MockChatMessage[] = [
   {
     __typename: 'LeagueChatMessage',
     id: '1',
@@ -138,7 +150,7 @@ const MOCK_CHAT_MESSAGES = [
   },
 ];
 
-const MOCK_CHAT_MESSAGES_WITH_TRADE = [
+const MOCK_CHAT_MESSAGES_WITH_TRADE: MockChatMessage[] = [
   ...MOCK_CHAT_MESSAGES,
   {
     __typename: 'LeagueChatMessage',
@@ -157,7 +169,7 @@ const MOCK_CHAT_MESSAGES_WITH_TRADE = [
   },
 ];
 
-const MOCK_CHAT_MESSAGES_WITH_WAIVER = [
+const MOCK_CHAT_MESSAGES_WITH_WAIVER: MockChatMessage[] = [
   ...MOCK_CHAT_MESSAGES,
   {
     __typename: 'LeagueChatMessage',
@@ -181,7 +193,7 @@ const SENT_MESSAGE_TEXT = 'Good luck in the playoffs!';
 
 interface MockOptions {
   /** Override chat messages returned by getleaguechatmessages */
-  chatMessages?: typeof MOCK_CHAT_MESSAGES;
+  chatMessages?: MockChatMessage[];
   /** Capture sendLeagueChatMessage mutation calls */
   onSendMessage?: (variables: {
     leagueId: number;

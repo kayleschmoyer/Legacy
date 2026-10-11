@@ -204,7 +204,7 @@ const MOCK_OWN_TRADE_BLOCK_PLAYER = {
 };
 
 interface MockOpts {
-  leagueTradeOffers?: object[];
+  leagueTradeOffers?: Record<string, unknown>[];
   leagueTradeBlock?: object[];
 }
 

@@ -419,7 +419,6 @@ async function mockLeagueDetailGraphQL(
         body: JSON.stringify({
           data: {
             renameTeam: {
-              __typename: 'Team',
               ...MOCK_TEAMS[0],
               name: 'Renamed Squad',
             },

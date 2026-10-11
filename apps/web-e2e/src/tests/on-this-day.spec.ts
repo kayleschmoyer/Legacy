@@ -97,7 +97,10 @@ function transactionEvent(overrides: Record<string, unknown> = {}) {
 async function mockOnThisDay(
   page: import('@playwright/test').Page,
   options: {
-    entries?: ReturnType<typeof battingEntry>[];
+    entries?: (
+      | ReturnType<typeof battingEntry>
+      | ReturnType<typeof pitchingEntry>
+    )[];
     events?: ReturnType<typeof transactionEvent>[];
     entriesError?: boolean;
   } = {},

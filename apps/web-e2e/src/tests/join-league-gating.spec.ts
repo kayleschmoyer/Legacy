@@ -15,10 +15,10 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
-import { myLeaguesResponse } from '../mocks/graphql';
+import { type MockLeague, myLeaguesResponse } from '../mocks/graphql';
 import { createGraphQLRouter, fulfillJson } from '../mocks/graphql/router';
 
-const MOCK_LEAGUES = [
+const MOCK_LEAGUES: Partial<MockLeague>[] = [
   {
     id: 1,
     name: 'Alpha League',

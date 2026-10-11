@@ -392,10 +392,10 @@ test.describe
 
       expect(commTeamData.userTeamId).not.toBeNull();
       expect(mgr1TeamData.userTeamId).not.toBeNull();
-      if (commTeamData.userTeamId === undefined) {
+      if (commTeamData.userTeamId == null) {
         throw new Error('commTeamData.userTeamId should be set');
       }
-      if (mgr1TeamData.userTeamId === undefined) {
+      if (mgr1TeamData.userTeamId == null) {
         throw new Error('mgr1TeamData.userTeamId should be set');
       }
       state.commissionerTeamId = commTeamData.userTeamId;

@@ -414,7 +414,10 @@ const STATS_TABLE_RESPONSE = {
 
 interface SetupOptions {
   seasonStatsBody?: typeof BATTER_SEASON_STATS | typeof TWO_WAY_SEASON_STATS;
-  careerArcBody?: typeof BATTER_CAREER_ARC | typeof TWO_WAY_CAREER_ARC;
+  careerArcBody?:
+    | typeof BATTER_CAREER_ARC
+    | typeof TWO_WAY_CAREER_ARC
+    | typeof DUPLICATE_SEASON_CAREER_ARC;
 }
 
 async function setupMocks(

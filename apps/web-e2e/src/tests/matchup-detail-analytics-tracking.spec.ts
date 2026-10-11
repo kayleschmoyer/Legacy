@@ -237,7 +237,9 @@ test.describe('Matchup Detail – matchup_viewed GA4 no-op @regression', () => {
     await expect(page.locator('body')).not.toContainText(
       'Unexpected Application Error',
     );
-    const gtagType = await page.evaluate(() => typeof window.gtag);
+    const gtagType = await page.evaluate(
+      () => typeof (window as unknown as { gtag?: unknown }).gtag,
+    );
     expect(gtagType).toBe('undefined');
   });
 });

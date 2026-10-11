@@ -253,8 +253,10 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
   test('should send startDraft mutation and handle response correctly', async ({
     page,
   }) => {
-    let draftMutation: GraphQLRequest | null = null;
-    let draftMutationResp: GraphQLResponse | null = null;
+    // Widened via `as` so TS does not narrow these to `null` — they are
+    // assigned inside the route handler closure.
+    let draftMutation = null as GraphQLRequest | null;
+    let draftMutationResp = null as GraphQLResponse | null;
 
     // Set up hermetic GraphQL route that captures the InitializeDraft mutation
     // (the "Start Draft" button triggers InitializeDraft, not StartDraft)

@@ -83,7 +83,7 @@ function mockMember(overrides: Record<string, unknown> = {}) {
     __typename: 'TeamMember',
     id: 1,
     playerId: 101,
-    positionId: null,
+    positionId: null as number | null,
     teamId: 1,
     leagueId: 1,
     onTradeBlock: false,
@@ -187,7 +187,12 @@ async function setupGraphQL(
     } else if (operationName === 'updateteammemberposition') {
       const { teamMemberId, positionId } = body.variables ?? {};
       currentMembers = currentMembers.map((m) =>
-        m.id === teamMemberId ? { ...m, positionId: positionId ?? null } : m,
+        m.id === teamMemberId
+          ? {
+              ...m,
+              positionId: typeof positionId === 'number' ? positionId : null,
+            }
+          : m,
       );
       await route.fulfill({
         status: 200,

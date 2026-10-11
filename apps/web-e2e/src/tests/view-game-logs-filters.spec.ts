@@ -37,7 +37,7 @@ test.describe('View Game Logs — Opponent + Home/Away filters @regression', () 
   test('selecting an opponent + Home toggle posts the combined filter (LS-7466, LS-7467)', async ({
     page,
   }) => {
-    let body: Record<string, unknown> | null = null;
+    let body = null as Record<string, unknown> | null;
     await page.route('**/baseball-game-logs', async (route) => {
       body = JSON.parse(route.request().postData() ?? '{}') as Record<
         string,
@@ -66,7 +66,7 @@ test.describe('View Game Logs — Opponent + Home/Away filters @regression', () 
   test('relocated franchise (ATH) expands to OAK + LV historical abbrs (LS-7478)', async ({
     page,
   }) => {
-    let body: Record<string, unknown> | null = null;
+    let body = null as Record<string, unknown> | null;
     await page.route('**/baseball-game-logs', async (route) => {
       body = JSON.parse(route.request().postData() ?? '{}') as Record<
         string,
@@ -90,7 +90,7 @@ test.describe('View Game Logs — Opponent + Home/Away filters @regression', () 
   });
 
   test('Away toggle posts venue=away (LS-7467)', async ({ page }) => {
-    let body: Record<string, unknown> | null = null;
+    let body = null as Record<string, unknown> | null;
     await page.route('**/baseball-game-logs', async (route) => {
       body = JSON.parse(route.request().postData() ?? '{}') as Record<
         string,
@@ -114,7 +114,7 @@ test.describe('View Game Logs — Opponent + Home/Away filters @regression', () 
   test('venue=all (default) omits the venue key entirely (LS-7467)', async ({
     page,
   }) => {
-    let body: Record<string, unknown> | null = null;
+    let body = null as Record<string, unknown> | null;
     await page.route('**/baseball-game-logs', async (route) => {
       body = JSON.parse(route.request().postData() ?? '{}') as Record<
         string,

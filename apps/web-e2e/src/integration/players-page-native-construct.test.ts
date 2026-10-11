@@ -59,6 +59,9 @@ class StubElement implements UIElement {
   filterByText(): UIElement {
     return this;
   }
+  visible(): UIElement {
+    return this;
+  }
 
   #unsupported(): never {
     throw new Error('StubElement: verbs are not exercised by construction');

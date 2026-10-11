@@ -397,7 +397,6 @@ test.describe('Trade Block Management @regression', () => {
       tradeBlock: [ownPlayer],
       onSetTradeBlock: () => {
         return {
-          __typename: 'TeamMember',
           ...ownPlayer,
           askingPrice: '1st round pick',
         };

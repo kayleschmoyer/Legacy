@@ -91,7 +91,22 @@ const MOCK_TEAMS = [
 ];
 
 /** Standings intentionally NOT in win-order — proves the table (re)sorts them. */
-const MOCK_STANDINGS = [
+interface MockTeamStanding {
+  __typename: string;
+  teamId: number;
+  teamName: string;
+  wins: number;
+  losses: number;
+  ties: number;
+  winPercentage: number;
+  pointsFor: number;
+  pointsAgainst: number;
+  divisionId: number | null;
+  divisionName: string | null;
+  avatarUrl: string | null;
+}
+
+const MOCK_STANDINGS: MockTeamStanding[] = [
   {
     __typename: 'TeamStanding',
     teamId: 1,
@@ -137,11 +152,13 @@ const MOCK_STANDINGS = [
 ];
 
 /** Standings split across two divisions, each internally win-ordered. */
-const MOCK_DIVISION_STANDINGS = MOCK_STANDINGS.map((s, i) => ({
-  ...s,
-  divisionId: i === 1 ? 2 : 1,
-  divisionName: i === 1 ? 'AFC East' : 'NFC West',
-}));
+const MOCK_DIVISION_STANDINGS = MOCK_STANDINGS.map(
+  (s, i): MockTeamStanding => ({
+    ...s,
+    divisionId: i === 1 ? 2 : 1,
+    divisionName: i === 1 ? 'AFC East' : 'NFC West',
+  }),
+);
 
 const MOCK_POSITIONS = [
   { __typename: 'LeaguePosition', id: 1, name: 'Quarterback', abbrev: 'QB' },
@@ -152,7 +169,7 @@ const MOCK_POSITIONS = [
 
 interface MockOverrides {
   league?: Record<string, unknown>;
-  standings?: typeof MOCK_STANDINGS;
+  standings?: MockTeamStanding[];
   currentWeek?: number | null;
 }
 

@@ -165,7 +165,7 @@ export async function waitForJoinPreview(
 }
 
 interface JoinLeagueByCodeResponse {
-  data?: { joinLeagueByCode?: { leagueId: number } | null };
+  data?: { joinLeagueByCode?: { leagueId: number } | null } | null;
   errors?: Array<{
     message: string;
     path?: ReadonlyArray<string | number>;

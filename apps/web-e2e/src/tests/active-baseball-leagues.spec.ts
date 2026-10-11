@@ -9,7 +9,22 @@
 import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
 import { createGraphQLRouter, fulfillJson } from '../mocks/graphql/router';
 
-const MOCK_LEAGUES = [
+/** Shape of a `userLeagues` entry as served by the mocked GraphQL response. */
+interface MockLeague {
+  __typename: string;
+  id: number;
+  name: string;
+  sport: string;
+  draftStatus: string;
+  currentWeekNumber: number | null;
+  weekAdvanceStatus: string | null;
+  maxRosterSize: number;
+  tierFrozenAt: string | null;
+  frozenAt: string | null;
+  inviteCode: string;
+}
+
+const MOCK_LEAGUES: MockLeague[] = [
   {
     __typename: 'League',
     id: 101,
@@ -53,7 +68,7 @@ const MOCK_LEAGUES = [
 
 async function mockUserLeagues(
   page: import('@playwright/test').Page,
-  leagues: typeof MOCK_LEAGUES | [],
+  leagues: MockLeague[],
 ) {
   await createGraphQLRouter(page, {
     getuserleagues: (route) =>

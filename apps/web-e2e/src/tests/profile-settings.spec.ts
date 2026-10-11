@@ -361,7 +361,18 @@ test.describe('Profile Settings Page — App Avatar picker (LS-7212) @regression
 // LS-7825: Linked Identities section — canonical email management
 // ---------------------------------------------------------------------------
 
-const MOCK_IDENTITIES_GOOGLE_CANONICAL = [
+interface MockUserIdentity {
+  __typename: string;
+  id: number;
+  provider: string;
+  providerEmail: string;
+  providerEmailVerified: boolean;
+  providerUsername: string | null;
+  providerAvatar: string | null;
+  linkedAt: string;
+}
+
+const MOCK_IDENTITIES_GOOGLE_CANONICAL: MockUserIdentity[] = [
   {
     __typename: 'UserIdentity',
     id: 1,
@@ -374,7 +385,7 @@ const MOCK_IDENTITIES_GOOGLE_CANONICAL = [
   },
 ];
 
-const MOCK_IDENTITIES_MULTI = [
+const MOCK_IDENTITIES_MULTI: MockUserIdentity[] = [
   {
     __typename: 'UserIdentity',
     id: 1,
@@ -399,7 +410,7 @@ const MOCK_IDENTITIES_MULTI = [
 
 async function setupProfileGraphQLWithIdentities(
   page: import('@playwright/test').Page,
-  identities = MOCK_IDENTITIES_GOOGLE_CANONICAL,
+  identities: MockUserIdentity[] = MOCK_IDENTITIES_GOOGLE_CANONICAL,
 ) {
   await page.route(isGraphQLEndpoint, async (route, request) => {
     const body = request.postDataJSON() as { operationName?: string };

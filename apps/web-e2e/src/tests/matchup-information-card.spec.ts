@@ -54,8 +54,8 @@ const MOCK_MATCHUP = {
   gamesPerMatchup: 7,
   pitcherStartsPerMatchup: 2,
   selectedGamesCount: 4,
-  startTime: START_TIME,
-  endTime: END_TIME,
+  startTime: START_TIME as string | null,
+  endTime: END_TIME as string | null,
 };
 
 const MOCK_TEAMS = [
