@@ -167,9 +167,11 @@ export default async function globalTeardown(
     return;
   }
 
-  // Run-scoped selection (LS-10330): everything this run created is reclaimed
-  // immediately (the run is over), while another run's young leagues are left
-  // alone — the commissioner test user is shared, so they are that run's live
+  // Job-scoped selection (LS-10330, LS-11054): everything this job created is
+  // reclaimed immediately (the job is over), while any other tag's young
+  // leagues are left alone — including a sibling job of this same run (the
+  // shared-live job finishes while integration shards are still mid-spec), as
+  // the commissioner test user is shared, so they are that job's live
   // fixtures. See MIN_LEAGUE_AGE_FOR_CLEANUP_MS for the age guard (LS-4442).
   const runTag = resolveRunTag();
   const { targets, inFlight } = selectCleanupTargets(leagues, { runTag });
@@ -196,7 +198,9 @@ export default async function globalTeardown(
   targets.sort((a, b) => b.id - a.id);
 
   LOGGER.info(
-    `[integration teardown] Deleting ${targets.length} test league(s) (run ${runTag})...`,
+    `[integration teardown] Deleting ${targets.length} test league(s) (run ${runTag}): ${targets
+      .map((l) => `${l.id} (${l.name})`)
+      .join(', ')}`,
   );
 
   let deleted = 0;

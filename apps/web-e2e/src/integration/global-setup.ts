@@ -340,10 +340,11 @@ async function sweepStaleTestLeaguesForJwt(
 
   if (!leagues.some((l) => isTestLeague(l.name))) return 0;
 
-  // Run-scoped selection (LS-10330): this run's own leagues (a re-attempt of
-  // the same run id) are always reclaimed; another run's leagues are protected
-  // until they age past MIN_LEAGUE_AGE_FOR_CLEANUP_MS (LS-4442), since test
-  // users are shared across runs and a young league is that run's live fixture.
+  // Job-scoped selection (LS-10330, LS-11054): this job's own leagues (a
+  // re-attempt of the same job) are always reclaimed; any other tag — another
+  // run, or a sibling shard / the shared-live job of this run — is protected
+  // until it ages past MIN_LEAGUE_AGE_FOR_CLEANUP_MS (LS-4442), since test
+  // users are shared and a young league is that job's live fixture.
   const { targets, inFlight } = selectCleanupTargets(leagues, {
     runTag: resolveRunTag(),
   });
@@ -380,8 +381,12 @@ async function sweepStaleTestLeaguesForJwt(
     }
   }
 
+  // Name every target so a mid-spec "league no longer exists" can be traced
+  // back to the sweep that removed it from CI logs alone (LS-11054).
   LOGGER.info(
-    `[integration setup] ${label}: cleaned ${deleted}/${targets.length} stale test league(s).`,
+    `[integration setup] ${label}: cleaned ${deleted}/${targets.length} stale test league(s): ${targets
+      .map((l) => `${l.id} (${l.name})`)
+      .join(', ')}`,
   );
   return deleted;
 }

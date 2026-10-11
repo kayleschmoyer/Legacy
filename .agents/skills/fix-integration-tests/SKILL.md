@@ -74,6 +74,8 @@ Before touching any code, verify:
 
 The six-phase fix procedure — reproduce, classify against the class-of-bug catalog, fix the pattern rather than the phase, and the mandatory nightly-shaped verification (Phase 4b) before pushing: **[references/workflow.md](references/workflow.md)**.
 
+> **Never run live specs while a full run is in flight (LS-11054).** Local and agent runs against dev bypass the `live-backend-e2e` concurrency group and share its test users and league slots. Check `ci_list_runs({ workflow: "run-playwright-tests.yml", status: "in_progress" })` before reproducing or verifying, and wait if a full-suite run is going. Full rule: [testing/references/integration-testing.md](../testing/references/integration-testing.md#dont-run-live-integration-specs-while-a-full-run-is-in-flight).
+
 Before reproducing anything, read why a green local single-spec run proves almost nothing about the nightly: **[references/nightly-profile.md](references/nightly-profile.md)** (workers, shard count, accumulated state, and the retry/ceiling differences between the two profiles).
 
 ## Special Cases

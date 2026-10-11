@@ -14,6 +14,7 @@ import {
   selectCleanupTargets,
   writeActiveRunLock,
 } from './test-league-cleanup';
+import { runTagFromRunId } from './league-run-scope';
 
 const FIXED_NOW = 1715731200000;
 const HOUR_MS = 60 * 60 * 1000;
@@ -227,6 +228,34 @@ void test("selectCleanupTargets protects another run's young leagues and reclaim
     inFlight.map((l) => l.id),
     [10],
   );
+});
+
+void test("selectCleanupTargets never reclaims a sibling job's young league in the same run (LS-11054)", () => {
+  // Run 38084841194: shard 1's global-setup and the shared-live job's
+  // setup/teardown each swept while shard 2 was mid-draft in its live-draft
+  // league. With one run-wide tag the league matched "this run" and was
+  // deleted at pick 8; per-job tags keep it in the sibling's namespace.
+  const runId = '38084841194';
+  const shard1 = runTagFromRunId(runId, 's1');
+  const shard2 = runTagFromRunId(runId, 's2');
+  const sharedLive = runTagFromRunId(runId, 'sl');
+  const leagues = [
+    { id: 14577, name: `Live Draft E2E ${shard2} ${YOUNG_TS}` },
+    { id: 14578, name: `Dual League E2E ${sharedLive} ${YOUNG_TS}` },
+    { id: 14579, name: `Settings E2E ${shard1} ${YOUNG_TS}` },
+  ];
+  for (const runTag of [shard1, sharedLive]) {
+    const { targets, inFlight } = selectCleanupTargets(leagues, {
+      runTag,
+      now: FIXED_NOW,
+    });
+    assert.ok(
+      !targets.some((l) => l.id === 14577),
+      `${runTag} must not reclaim shard 2's in-flight league`,
+    );
+    assert.ok(inFlight.some((l) => l.id === 14577));
+    assert.equal(targets.length, 1, `${runTag} reclaims only its own league`);
+  }
 });
 
 void test('selectCleanupTargets keeps the legacy timestamp heuristic for untagged names', () => {

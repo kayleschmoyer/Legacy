@@ -7,6 +7,7 @@ import {
   INTEGRATION_RUN_ID_ENV,
   MAX_LEAGUE_NAME_LENGTH,
   resetRunTagCacheForTests,
+  resolveJobKey,
   resolveRunTag,
   runTagFromRunId,
   testLeagueName,
@@ -14,14 +15,53 @@ import {
 
 const FIXED_NOW = 1727683200000; // 2024-09-30T08:00:00Z (13 digits)
 
-void test('runTagFromRunId prefixes a CI run id with "r"', () => {
-  assert.equal(runTagFromRunId('36685892280'), 'r36685892280');
+void test('runTagFromRunId prefixes a base36-encoded CI run id with "r"', () => {
+  assert.equal(runTagFromRunId('38084841194'), 'rhhuqbje');
+  assert.equal(runTagFromRunId('99999999999'), 'r19xtf1tr');
 });
 
-void test('runTagFromRunId normalises and truncates arbitrary ids', () => {
+void test('runTagFromRunId appends the job key so sibling jobs never share a tag (LS-11054)', () => {
+  const shard1 = runTagFromRunId('38084841194', 's1');
+  const shard2 = runTagFromRunId('38084841194', 's2');
+  const sharedLive = runTagFromRunId('38084841194', 'sl');
+  assert.equal(shard2, 'rhhuqbjes2');
+  assert.equal(new Set([shard1, shard2, sharedLive]).size, 3);
+  // Re-running the same job (a `run_attempt` retry) reproduces its tag.
+  assert.equal(runTagFromRunId('38084841194', 's2'), shard2);
+});
+
+void test('runTagFromRunId normalises and truncates arbitrary ids, keeping the job key', () => {
   assert.equal(runTagFromRunId('My-Run_42'), 'rmyrun42');
   assert.equal(runTagFromRunId('1234567890123456'), 'r12345678901');
+  assert.equal(runTagFromRunId('1234567890123456', 'sl'), 'r123456789sl');
   assert.throws(() => runTagFromRunId('---'), /alphanumeric/);
+});
+
+void test('resolveJobKey prefers INTEGRATION_JOB_KEY, then the shard index', () => {
+  assert.equal(resolveJobKey({ INTEGRATION_JOB_KEY: 'sl' }), 'sl');
+  assert.equal(
+    resolveJobKey({
+      INTEGRATION_JOB_KEY: 'shared-live',
+      INTEGRATION_SHARD_CURRENT: '2',
+      INTEGRATION_SHARD_TOTAL: '3',
+    }),
+    'sha',
+  );
+  assert.equal(
+    resolveJobKey({
+      INTEGRATION_SHARD_CURRENT: '2',
+      INTEGRATION_SHARD_TOTAL: '3',
+    }),
+    's2',
+  );
+  assert.equal(
+    resolveJobKey({
+      INTEGRATION_SHARD_CURRENT: '1',
+      INTEGRATION_SHARD_TOTAL: '1',
+    }),
+    '',
+  );
+  assert.equal(resolveJobKey({}), '');
 });
 
 void test('generateLocalRunTag is short, "l"-prefixed base36', () => {
@@ -31,9 +71,23 @@ void test('generateLocalRunTag is short, "l"-prefixed base36', () => {
 
 void test('resolveRunTag reads INTEGRATION_RUN_ID and publishes the tag back to env', () => {
   resetRunTagCacheForTests();
-  const env: NodeJS.ProcessEnv = { [INTEGRATION_RUN_ID_ENV]: '36685892280' };
-  assert.equal(resolveRunTag(env), 'r36685892280');
-  assert.equal(env[INTEGRATION_RUN_ID_ENV], 'r36685892280');
+  const env: NodeJS.ProcessEnv = { [INTEGRATION_RUN_ID_ENV]: '38084841194' };
+  assert.equal(resolveRunTag(env), 'rhhuqbje');
+  assert.equal(env[INTEGRATION_RUN_ID_ENV], 'rhhuqbje');
+  resetRunTagCacheForTests();
+});
+
+void test('resolveRunTag folds the shard index into the tag', () => {
+  resetRunTagCacheForTests();
+  const env: NodeJS.ProcessEnv = {
+    [INTEGRATION_RUN_ID_ENV]: '38084841194',
+    INTEGRATION_SHARD_CURRENT: '2',
+    INTEGRATION_SHARD_TOTAL: '3',
+  };
+  assert.equal(resolveRunTag(env), 'rhhuqbjes2');
+  // Workers re-read the published, already-formed tag unchanged.
+  resetRunTagCacheForTests();
+  assert.equal(resolveRunTag(env), 'rhhuqbjes2');
   resetRunTagCacheForTests();
 });
 

@@ -762,12 +762,16 @@ jobs:
           # test runner env. Integration tests use real OAuth login via
           # getTestUserJwt, so they don't need a signing key either.
           INTEGRATION_BASE_URL: ${{ secrets.INTEGRATION_BASE_URL }}
-          # Per-run league namespace (LS-10330): every integration shard and the
-          # shared-live job of ONE workflow run stamp github.run_id into their
-          # league names, so the pre-run/teardown sweeps can tell this run's
-          # leagues from a concurrent run's instead of guessing from age alone.
+          # Per-job league namespace (LS-10330, LS-11054): every live-backend job
+          # stamps github.run_id plus a job key into its league names, so the
+          # pre-run/teardown sweeps reclaim only leagues THIS job created. The
+          # integration shards derive their key (s<N>) from
+          # INTEGRATION_SHARD_CURRENT; the shared-live job runs concurrently
+          # with them and needs its own key, or its setup/teardown would delete
+          # the shards' in-flight leagues (run 38084841194).
           # See apps/web-e2e/src/integration/league-run-scope.ts.
           INTEGRATION_RUN_ID: ${{ github.run_id }}
+          INTEGRATION_JOB_KEY: ${{ matrix.suite == 'shared-live' && 'sl' || '' }}
           # E2E_* credentials are only needed by the integration suite (real
           # OAuth login). Hermetic e2e tests mock the network and don't need
           # them.

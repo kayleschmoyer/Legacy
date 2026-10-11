@@ -436,13 +436,25 @@ try {
 
 ### Don't share mutable state between parallel tests
 
-Integration tests run `workers: 1` and `fullyParallel: false` by default. League names must come from `testLeagueName(label)` (`apps/web-e2e/src/integration/league-run-scope.ts`): it appends the `E2E` sweep marker, this run's tag (`INTEGRATION_RUN_ID` in CI), and a timestamp, so the pre-run/teardown sweeps can reclaim this run's leagues without touching a concurrent run's (LS-10330). Keep labels short — the server caps names at 50 characters and the helper throws when a label would overflow.
+Integration tests run `workers: 1` and `fullyParallel: false` by default. League names must come from `testLeagueName(label)` (`apps/web-e2e/src/integration/league-run-scope.ts`): it appends the `E2E` sweep marker, this **job's** tag, and a timestamp, so the pre-run/teardown sweeps can reclaim this job's leagues without touching anyone else's (LS-10330). In CI the tag is `r` + base36 `INTEGRATION_RUN_ID` + a job key (`s<N>` for integration shard N, `INTEGRATION_JOB_KEY=sl` for shared-live); locally it is a fresh `l…` tag per Playwright process. Keep labels short — the server caps names at 50 characters and the helper throws when a label would overflow.
 
 ```typescript
 import { testLeagueName } from '../league-run-scope';
 
-const leagueName = testLeagueName('Waiver Queue'); // "Waiver Queue E2E r36685892280 1727683200000"
+const leagueName = testLeagueName('Waiver Queue'); // "Waiver Queue E2E rhhuqbjes2 1727683200000"
 ```
+
+**The tag must stay per job, not per run (LS-11054).** Cleanup treats "my tag" as "nothing else can be using this league" and deletes it regardless of age. The integration shards and the shared-live job of one workflow run execute concurrently, so when they shared a run-wide tag, shard 1's global-setup and the shared-live job's setup + teardown deleted the live-draft league shard 2 was mid-draft in (run 38084841194, `League 14577 no longer exists … at pick 8`). Any new live-backend CI job that runs alongside the integration shards must set its own `INTEGRATION_JOB_KEY` in `run-playwright-tests.yml`. Setup/teardown log every deleted league as `id (name)`, so a mid-spec "league no longer exists" can be traced to the sweep that removed it from CI logs alone — grep the run's jobs for the league id.
+
+### Don't run live integration specs while a full run is in flight
+
+GitHub-hosted live-backend runs are serialized by the `live-backend-e2e` concurrency group in `run-playwright-tests.yml` (LS-10330), but **local and agent-session runs against dev bypass it**. Every run authenticates as the same shared test users, so a concurrent run competes for the same free-tier league slots and manager memberships, and its pre-run sweep reaps anything untagged (e.g. the server-named `Mock Draft Practice`) or older than the 4h age floor — including a slow live-draft fixture.
+
+Agent sessions must not run live integration specs (`playwright.integration.config.ts`, locally or via a `workflow_dispatch` of `run-playwright-tests.yml`) while a full-suite run is in progress:
+
+1. Before starting, check for one: `ci_list_runs({ workflow: "run-playwright-tests.yml", status: "in_progress" })` (and `queued`). A run of the full suite or of the post-deploy trigger means wait.
+2. If one is running, wait for it to finish (arm a `send_later` / Monitor wake — never poll in-context), or verify against the hermetic config (`playwright.integration-hermetic.config.ts`) instead.
+3. Prefer dispatching `run-playwright-tests.yml` with `test-file` for live verification over running locally: the dispatch joins the concurrency group and queues behind the full run instead of overlapping it.
 
 ## Distributed Flow Reference
 

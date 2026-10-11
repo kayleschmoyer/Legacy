@@ -193,13 +193,17 @@ export interface CleanupSelection<T extends CleanupCandidate> {
  * Partitions the test-pattern-matched leagues visible to a sweep into the set
  * it may delete and the set it must leave alone. Ownership beats age:
  *
- * 1. A league tagged with **this run's** tag is always a target — the run is
+ * 1. A league tagged with **this job's** tag is always a target — the job is
  *    either finishing (teardown) or re-attempting (a `run_attempt` retry of
- *    the same `github.run_id` after the first attempt died mid-suite), and in
- *    both cases nothing else can be using it.
- * 2. A league tagged with **another run's** tag is a target only once it is
- *    older than `MIN_LEAGUE_AGE_FOR_CLEANUP_MS` — before that it is that run's
- *    live fixture, whether or not the two runs are (mistakenly) overlapping.
+ *    the same job after the first attempt died mid-suite), and in both cases
+ *    nothing else can be using it. This is only sound because the tag is per
+ *    *job* (`resolveJobKey` in league-run-scope.ts): with one run-wide tag,
+ *    a sibling shard's or the shared-live job's live league also matched and
+ *    was deleted mid-spec (LS-11054).
+ * 2. A league tagged with **any other** tag — another run, or a sibling job of
+ *    this run — is a target only once it is older than
+ *    `MIN_LEAGUE_AGE_FOR_CLEANUP_MS`; before that it is that job's live
+ *    fixture, whether or not the two are (mistakenly) overlapping.
  * 3. An **untagged** league (legacy names, the server-assigned `Mock Draft
  *    Practice`) keeps the pre-existing timestamp heuristic: skipped while a
  *    parseable timestamp says it is young, otherwise deleted.

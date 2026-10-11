@@ -1009,7 +1009,7 @@ test.describe
                           .catch(() => false);
                         if (!leagueExists) {
                           throw new Error(
-                            `[live-draft] League ${state.leagueId} no longer exists — likely deleted by a concurrent automated full-suite run's global-setup. ` +
+                            `[live-draft] League ${state.leagueId} no longer exists — deleted by another integration process's cleanup sweep (a concurrent run's or sibling job's global-setup/teardown — see LS-11054). ` +
                               `Phase 5 interrupted by external cleanup at pick ${pickCount}.`,
                           );
                         }
