@@ -51,6 +51,34 @@ name: Deploy
 # infrastructure without rebuilding and re-uploading all 18 lambda bundles for
 # zero new SSM versions.
 #
+# Withheld web (LS-11040) — the reverse race. The gate above means a FAILED
+# Upload Lambdas / Apply Lambda Infrastructure withholds Deploy Web (and Build
+# Android App). But a Terraform apply that fails partway has usually already
+# pointed some functions at new code, so the backend moves ahead while the web
+# stays on its last good build. On 2026-10-08..09 that lasted ~43 h (runs
+# 5950..6106, apply failing on a missing secretsmanager:CreateSecret grant,
+# LS-11010): the graphql Lambda enforced LS-10890's 6-teams-per-division rule
+# while the stale web still sent 2 divisions for 4-team leagues, and nothing
+# alerted (LS-11032).
+#
+# Decision (LS-11040): keep failing CLOSED — Deploy Web still never runs after
+# a failed or cancelled lambda child — and make it loud instead.
+#   - Client ahead of server breaks every user on a schema the server does not
+#     serve yet ("Cannot query field", Rollbar #212/#232/#233). Server ahead of
+#     client is usually backward compatible (additive schema, old clients keep
+#     working); LS-10890-style rule changes are the exception, and those need
+#     a human anyway.
+#   - A failed apply's partial state is unknown from here. Shipping the web on
+#     "the apply probably got far enough" would trade a visible, alerting skew
+#     for an invisible one.
+# The signal: Rollup Status says "Web NOT deployed — backend may be ahead" in
+# the run's Discord summary and an ::error:: annotation on every withheld run,
+# and `deploy-markers.mjs withheld` keeps a consecutive-withheld streak in SSM.
+# The 2nd consecutive withheld Deploy (then every 10th) posts a Deploy Health
+# alert with a mention; the first web deploy after it posts the recovery. The
+# rollup already fails on the lambda failure, so this adds no new non-success
+# conclusion on main (LS-10309). Runbook: docs/ci-cd/deploy-markers.md.
+#
 # Deploy Watchdog (LS-10328) — a stuck child must not wedge main deploys.
 # `deploy-main` keeps one running and one pending umbrella; a newer pending run
 # cancels the older pending one. So when a child job never gets a runner — on
@@ -522,6 +550,10 @@ jobs:
     # read as safe even when it was skipped precisely because the lambda
     # upload failed — re-opening the client-ahead-of-server race this
     # ordering exists to close.
+    #
+    # Withholding the web here is deliberate, and alerting (LS-11040): Rollup
+    # Status reports every withheld run and escalates a streak — see "Withheld
+    # web" in the header. Do not relax this to "the apply partly succeeded".
     if: >-
       !cancelled() &&
       needs.detect-changes.outputs.web == 'true' &&
@@ -681,6 +713,23 @@ jobs:
           LAMBDAS_APPLY_STATE=$(translate "$INFRA_TARGETED" "$LAMBDAS_APPLY_RESULT")
           LAMBDAS_STATE=$(worse_of "$LAMBDAS_UPLOAD_STATE" "$LAMBDAS_APPLY_STATE")
           WEB_STATE=$(translate "$WEB_TARGETED" "$WEB_RESULT")
+          # LS-11040: a targeted web skipped behind a failed/cancelled lambda
+          # child was WITHHELD, not merely skipped — and a partial apply may
+          # have shipped Lambda code, so the backend can be ahead of the web.
+          # Mirrors deploy-markers.mjs isWebWithheld (the streak step below).
+          WEB_WITHHELD=false
+          if [ "$WEB_STATE" = "skipped" ]; then
+            case "$LAMBDAS_UPLOAD_RESULT:$LAMBDAS_APPLY_RESULT" in
+              failure:* | cancelled:* | *:failure | *:cancelled)
+                WEB_STATE="withheld"
+                WEB_WITHHELD=true
+                WITHHELD_MSG="Deploy Web was withheld because Upload Lambdas ($LAMBDAS_UPLOAD_RESULT)"
+                WITHHELD_MSG+=" / Apply Lambda Infrastructure ($LAMBDAS_APPLY_RESULT) did not succeed."
+                WITHHELD_MSG+=" A partial apply may have shipped Lambda code, so the backend may be ahead of the web (LS-11040)."
+                echo "::error title=Web NOT deployed::$WITHHELD_MSG"
+                ;;
+            esac
+          fi
           ANDROID_STATE=$(translate "$ANDROID_TARGETED" "$ANDROID_RESULT")
           STORYBOOK_STATE=$(translate "$STORYBOOK_TARGETED" "$STORYBOOK_RESULT")
 
@@ -746,6 +795,7 @@ jobs:
               cancelled)    echo "⚠️" ;;
               skipped)      echo "⏭️" ;;
               not-uploaded) echo "🚫" ;;
+              withheld)     echo "🚧" ;;
               not-targeted) echo "—" ;;
               *)            echo "❔" ;;
             esac
@@ -761,6 +811,11 @@ jobs:
             "$WEB_EMOJI" "$WEB_STATE" \
             "$ANDROID_EMOJI" "$ANDROID_STATE" \
             "$STORYBOOK_EMOJI" "$STORYBOOK_STATE")
+          if [ "$WEB_WITHHELD" = "true" ]; then
+            DESCRIPTION=$(printf "%s\\n%s" "$DESCRIPTION" \
+              "🚨 **Web NOT deployed; backend may be ahead** — a lambda child failed, so Deploy Web was withheld (LS-11040).")
+          fi
+          echo "web_withheld=$WEB_WITHHELD" >> "$GITHUB_OUTPUT"
 
           {
             echo "description<<DESC_EOF"
@@ -780,6 +835,12 @@ jobs:
             echo ""
             echo "**Overall:** $OVERALL"
             echo ""
+            if [ "$WEB_WITHHELD" = "true" ]; then
+              echo "> 🚨 **Web NOT deployed; backend may be ahead.** Deploy Web was withheld because a lambda"
+              echo "> child failed or was cancelled. A partial Terraform apply can still have shipped Lambda code."
+              echo "> See *Withheld Web Deploys* below and docs/ci-cd/deploy-markers.md (LS-11040)."
+              echo ""
+            fi
             if [ -n "$LAMBDAS_UPLOAD_RESULTS" ] && [ "$LAMBDAS_UPLOAD_RESULTS" != "{}" ]; then
               echo "### Lambdas uploaded"
               echo ""
@@ -831,6 +892,34 @@ jobs:
           FORCE_LAMBDAS: ${{ inputs['force-lambdas'] }}
           LAMBDAS_UPLOADED: ${{ needs.upload-lambdas.outputs.uploaded }}
         run: node .github/scripts/deploy-markers.mjs record
+
+      # LS-11040: count consecutive Deploys that withheld Deploy Web and say
+      # when the streak escalates (2nd in a row, then every 10th; recovery on
+      # the next web deploy). Same AWS role and fail-soft rule as the markers.
+      - name: Track withheld web deploys
+        id: withheld
+        if: always()
+        continue-on-error: true
+        env:
+          AWS_REGION: us-east-1
+          AWS_STAGE: dev
+          WEB_TARGETED: ${{ needs.detect-changes.outputs.web }}
+          WEB_RESULT: ${{ needs.deploy-web.result }}
+          UPLOAD_RESULT: ${{ needs.upload-lambdas.result }}
+          APPLY_RESULT: ${{ needs.apply-lambda-infrastructure.result }}
+        run: node .github/scripts/deploy-markers.mjs withheld
+
+      - name: Discord Deploy Health (withheld web)
+        if: always() && steps.withheld.outputs.post == 'true'
+        continue-on-error: true
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
+          status: ${{ steps.withheld.outputs.kind == 'recovered' && 'success' || 'failure' }}
+          title: ${{ steps.withheld.outputs.kind == 'recovered' && 'Deploy Health — web deploy caught up' || 'Deploy Health — web deploy withheld' }}
+          environment: production
+          description: ${{ steps.withheld.outputs.message }}
+          content: ${{ steps.withheld.outputs.kind == 'escalate' && '<@205483185893670912>' || '' }}
 
       - name: Build deploy changelog
         id: changelog

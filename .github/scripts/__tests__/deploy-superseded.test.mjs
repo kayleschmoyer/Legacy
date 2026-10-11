@@ -20,10 +20,14 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
 import {
+  DEPLOY_WEB_JOB,
   DETECT_JOB,
+  LAMBDA_JOBS,
   SUPERSEDE_GATE_JOB,
   checkRunSuperseded,
   isSupersededDeployJobs,
+  isWebWithheldJobs,
+  triggerRunConclusion,
   triggerRunId,
 } from '../deploy-superseded.mjs';
 
@@ -147,6 +151,111 @@ describe('checkRunSuperseded', () => {
   });
 });
 
+// LS-11040: the 10-08..10-09 shape. Apply failed, so Deploy Web was skipped
+// (a skipped reusable-workflow caller job is listed under its bare name).
+const WITHHELD_JOBS = [
+  { name: 'Supersede Gate', conclusion: 'success' },
+  { name: 'Detect Deploy Targets', conclusion: 'success' },
+  { name: 'Upload Lambdas / Upload Lambdas', conclusion: 'success' },
+  {
+    name: 'Apply Lambda Infrastructure / Apply Lambda Infrastructure',
+    conclusion: 'failure',
+  },
+  { name: 'Deploy Web', conclusion: 'skipped' },
+  { name: 'Rollup Status', conclusion: 'failure' },
+];
+
+describe('isWebWithheldJobs (LS-11040)', () => {
+  it('matches Deploy Web skipped behind a failed apply', () => {
+    assert.equal(isWebWithheldJobs(WITHHELD_JOBS), true);
+  });
+
+  it('matches Deploy Web skipped behind a cancelled upload', () => {
+    assert.equal(
+      isWebWithheldJobs([
+        { name: 'Upload Lambdas / Verify CI Status', conclusion: 'cancelled' },
+        { name: 'Apply Lambda Infrastructure', conclusion: 'skipped' },
+        { name: 'Deploy Web', conclusion: 'skipped' },
+      ]),
+      true,
+    );
+  });
+
+  it('a web that was not targeted (lambda children fine) is not withheld', () => {
+    assert.equal(
+      isWebWithheldJobs([
+        { name: 'Upload Lambdas / Upload Lambdas', conclusion: 'success' },
+        {
+          name: 'Apply Lambda Infrastructure / Apply Lambda Infrastructure',
+          conclusion: 'success',
+        },
+        { name: 'Deploy Web', conclusion: 'skipped' },
+      ]),
+      false,
+    );
+  });
+
+  it('a web that ran (whatever the lambdas did) is not withheld', () => {
+    assert.equal(
+      isWebWithheldJobs([
+        { name: 'Apply Lambda Infrastructure', conclusion: 'failure' },
+        { name: 'Deploy Web / Build and Deploy Web', conclusion: 'success' },
+      ]),
+      false,
+    );
+  });
+
+  it('a superseded run and malformed input are not withheld', () => {
+    assert.equal(isWebWithheldJobs(SUPERSEDED_JOBS), false);
+    assert.equal(isWebWithheldJobs(null), false);
+    assert.equal(isWebWithheldJobs([]), false);
+  });
+
+  it('checkRunSuperseded reports webWithheld from the same jobs read', () => {
+    const result = checkRunSuperseded({
+      repo: 'r/r',
+      runId: 6052,
+      exec: () => JSON.stringify(WITHHELD_JOBS),
+    });
+    assert.equal(result.superseded, false);
+    assert.equal(result.webWithheld, true);
+    assert.match(result.reason, /withheld Deploy Web/);
+  });
+});
+
+describe('triggerRunConclusion (LS-11040)', () => {
+  it('prefers TRIGGER_RUN_CONCLUSION, then workflow_run.conclusion', () => {
+    assert.equal(
+      triggerRunConclusion({ TRIGGER_RUN_CONCLUSION: 'cancelled' }),
+      'cancelled',
+    );
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-superseded-'));
+    try {
+      const eventPath = path.join(dir, 'event.json');
+      fs.writeFileSync(
+        eventPath,
+        JSON.stringify({ workflow_run: { id: 1, conclusion: 'cancelled' } }),
+      );
+      assert.equal(
+        triggerRunConclusion({
+          GITHUB_EVENT_NAME: 'workflow_run',
+          GITHUB_EVENT_PATH: eventPath,
+        }),
+        'cancelled',
+      );
+      assert.equal(
+        triggerRunConclusion({
+          GITHUB_EVENT_NAME: 'workflow_dispatch',
+          GITHUB_EVENT_PATH: eventPath,
+        }),
+        undefined,
+      );
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('triggerRunId', () => {
   it('prefers TRIGGER_RUN_ID', () => {
     assert.equal(triggerRunId({ TRIGGER_RUN_ID: '77' }), '77');
@@ -217,6 +326,17 @@ describe('the job names match deploy.yml', () => {
   it('Supersede Gate and Detect Deploy Targets keep their display names', () => {
     assert.equal(deploy.jobs['supersede-gate'].name, SUPERSEDE_GATE_JOB);
     assert.equal(deploy.jobs['detect-changes'].name, DETECT_JOB);
+  });
+
+  it('Deploy Web and the lambda children keep their display names (LS-11040)', () => {
+    assert.equal(deploy.jobs['deploy-web'].name, DEPLOY_WEB_JOB);
+    assert.deepEqual(
+      [
+        deploy.jobs['upload-lambdas'].name,
+        deploy.jobs['apply-lambda-infrastructure'].name,
+      ],
+      [...LAMBDA_JOBS],
+    );
   });
 
   it('Detect Deploy Targets is skipped exactly when the gate says superseded', () => {

@@ -74,6 +74,18 @@ Do not move a marker **forward** by hand: that tells Deploy the commits in betwe
 
 To make the drift alert post again for a set of targets it has already reported, delete `/legacy-sports/dev/deploy/marker-drift/alerted-targets`.
 
+## Withheld web deploys (LS-11040)
+
+`Deploy Web` (and `Build Android App`) only run when `Upload Lambdas` and `Apply Lambda Infrastructure` succeeded or were skipped, so a client never ships ahead of the server it needs (LS-9374). The reverse can still happen: a Terraform apply that fails partway has usually already moved some Lambda functions to new code, while the web stays on its last good build. On 2026-10-08..09 that skew lasted ~43 h (Deploy runs 5950..6106) and was only found through nightly E2E failures (LS-11032).
+
+**Decision: fail closed, but loudly.** A failed or cancelled lambda child still withholds the web. Shipping the web after a partial apply would trade a visible skew for an unknown one, and client-ahead-of-server breaks every user, while server-ahead-of-client is usually backward compatible. What changed is that the skew can no longer go unnoticed:
+
+- Every withheld run: `Rollup Status` reports Web as `🚧 withheld` and adds "Web NOT deployed; backend may be ahead" to the Discord deploy summary, the step summary, and an `::error::` annotation.
+- `deploy-markers.mjs withheld` keeps a streak in `/legacy-sports/dev/deploy/web-withheld/streak` (`{ count, since, firstRunId }`, or `none`). The **2nd** consecutive withheld Deploy, and every 10th after, posts a **Deploy Health — web deploy withheld** alert with a mention. The first successful web deploy after an escalated streak posts **web deploy caught up** and resets it. Deploys that do not target the web leave the streak alone.
+- Post-deploy E2E (`full-suite-gate.mjs`) still runs off a withheld Deploy but labels itself: a `web NOT deployed` warning annotation, a gate summary line, and a line in the Discord results. Runs triggered by a **cancelled** Deploy are skipped like superseded ones; the next completed Deploy triggers the lane.
+
+What to do when it fires: fix the failing lambda child (the run's `Apply Lambda Infrastructure` / `Upload Lambdas` logs). The next green Deploy ships the web, because the `web` marker has not moved. `force-web` does not bypass the gate: the `lambdas` marker is still behind, so that Deploy retries the lambda children first. Deleting the streak parameter only restarts the count.
+
 ## Notes
 
 - `/legacy-sports/dev/deploy/lambdas-last-uploaded-sha` is the LS-10366 upload-only marker. It is read once as a bootstrap when the `lambdas` marker does not exist yet and is no longer written; it can be deleted once `last-deployed/lambdas` exists.

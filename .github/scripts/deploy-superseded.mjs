@@ -22,6 +22,12 @@ import { pathToFileURL } from 'node:url';
  * Fail open: any error (API, missing run id, unexpected shape) reports
  * "not superseded", so the consumer behaves exactly as it did before LS-10964.
  *
+ * The same jobs read also answers whether that Deploy WITHHELD the web deploy
+ * (LS-11040): Deploy Web skipped while Upload Lambdas or Apply Lambda
+ * Infrastructure failed or was cancelled. A post-deploy suite that runs off
+ * such a Deploy tests the previously deployed web against a backend that may
+ * already be ahead of it, so it labels itself (full-suite-gate.mjs).
+ *
  * Used by:
  *   - full-suite-gate.mjs (run-playwright-tests, cross-browser-e2e,
  *     run-maestro-sweep, e2e-native-android)
@@ -35,6 +41,23 @@ import { pathToFileURL } from 'node:url';
 /** Job display names in deploy.yml. Pinned by deploy-superseded.test.mjs. */
 export const SUPERSEDE_GATE_JOB = 'Supersede Gate';
 export const DETECT_JOB = 'Detect Deploy Targets';
+
+/**
+ * Caller-job display names of the deploy children whose results decide
+ * whether Deploy Web was withheld (LS-11040). A reusable-workflow caller job
+ * shows up in the jobs API as `<caller> / <inner job>` when it ran and as
+ * `<caller>` alone when it was skipped. Pinned by deploy-superseded.test.mjs.
+ */
+export const DEPLOY_WEB_JOB = 'Deploy Web';
+export const LAMBDA_JOBS = Object.freeze([
+  'Upload Lambdas',
+  'Apply Lambda Infrastructure',
+]);
+
+const jobsOf = (jobs, caller) =>
+  jobs.filter(
+    (job) => job?.name === caller || job?.name?.startsWith(`${caller} / `),
+  );
 
 /**
  * Pure decision over a run's jobs (the `jobs` array of the Actions jobs API).
@@ -51,15 +74,43 @@ export function isSupersededDeployJobs(jobs) {
 }
 
 /**
- * Look up whether run `runId` was a superseded Deploy run. Never throws.
+ * Did this Deploy run withhold Deploy Web behind a failed or cancelled lambda
+ * child (LS-11040)? deploy.yml's deploy-web `if` blocks on exactly those
+ * results, so "every Deploy Web job skipped AND a lambda job failed/cancelled"
+ * is the withheld case. A web that was simply not targeted (lambda children
+ * green or skipped) does not match.
+ *
+ * @param {{ name: string, conclusion: string|null }[]} jobs
+ * @returns {boolean}
+ */
+export function isWebWithheldJobs(jobs) {
+  if (!Array.isArray(jobs)) return false;
+  const web = jobsOf(jobs, DEPLOY_WEB_JOB);
+  if (web.length === 0 || web.some((job) => job.conclusion !== 'skipped')) {
+    return false;
+  }
+  return LAMBDA_JOBS.some((caller) =>
+    jobsOf(jobs, caller).some(
+      (job) => job.conclusion === 'failure' || job.conclusion === 'cancelled',
+    ),
+  );
+}
+
+/**
+ * Look up whether run `runId` was a superseded Deploy run, and whether it
+ * withheld Deploy Web (LS-11040). Never throws.
  *
  * @param {{ repo: string, runId: string|number|undefined|null, exec: (args: string[]) => string }} opts
  *   `exec(args)` runs `gh <args>` and returns stdout, throwing on failure.
- * @returns {{ superseded: boolean, reason: string }}
+ * @returns {{ superseded: boolean, webWithheld: boolean, reason: string }}
  */
 export function checkRunSuperseded({ repo, runId, exec }) {
   if (!runId) {
-    return { superseded: false, reason: 'no triggering run id' };
+    return {
+      superseded: false,
+      webWithheld: false,
+      reason: 'no triggering run id',
+    };
   }
   let jobs;
   try {
@@ -74,19 +125,43 @@ export function checkRunSuperseded({ repo, runId, exec }) {
     const detail = (err?.stderr || err?.message || String(err)).toString();
     return {
       superseded: false,
+      webWithheld: false,
       reason: `could not read the jobs of run ${runId} (${detail.trim()}); treating it as a real deploy`,
     };
   }
   if (isSupersededDeployJobs(jobs)) {
     return {
       superseded: true,
+      webWithheld: false,
       reason: `run ${runId} was a superseded Deploy (Supersede Gate skipped it; it deployed nothing)`,
     };
   }
+  const webWithheld = isWebWithheldJobs(jobs);
   return {
     superseded: false,
-    reason: `run ${runId} was not a superseded Deploy`,
+    webWithheld,
+    reason: webWithheld
+      ? `run ${runId} was not a superseded Deploy, but it withheld Deploy Web (a lambda child failed or was cancelled)`
+      : `run ${runId} was not a superseded Deploy`,
   };
+}
+
+/**
+ * The triggering run's conclusion: `TRIGGER_RUN_CONCLUSION` when set,
+ * otherwise `workflow_run.conclusion` from the event payload. Undefined for
+ * any other event or an unreadable payload (LS-11040).
+ */
+export function triggerRunConclusion(env = process.env) {
+  if (env.TRIGGER_RUN_CONCLUSION) return env.TRIGGER_RUN_CONCLUSION;
+  if (env.GITHUB_EVENT_NAME !== 'workflow_run' || !env.GITHUB_EVENT_PATH) {
+    return undefined;
+  }
+  try {
+    const event = JSON.parse(readFileSync(env.GITHUB_EVENT_PATH, 'utf8'));
+    return event?.workflow_run?.conclusion ?? undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**

@@ -602,3 +602,89 @@ describe('superseded triggering Deploy (LS-10964)', () => {
     assert.ok(logLines.some((l) => l.startsWith('::notice ')));
   });
 });
+
+describe('cancelled or web-withheld triggering Deploy (LS-11040)', () => {
+  const TRIGGER = 6052;
+
+  it('skips a cancelled trigger before any API call, without counting as an attempt', () => {
+    const api = {
+      ...fakeApi({ listError: new Error('must not list runs') }),
+      checkTriggerSuperseded: () => assert.fail('must not be called'),
+    };
+    const result = decideFullSuiteGate(
+      { ...BASE_OPTS, triggerRunId: TRIGGER, triggerConclusion: 'cancelled' },
+      api,
+    );
+    assert.equal(result.decision, DECISION.SKIP_CANCELLED_TRIGGER);
+    assert.deepEqual(api.probed, []);
+
+    const { outputLines, summaryLines, logLines } = renderGateDecision(result, {
+      title: 'Full-Suite Gate',
+      cutoff: BASE_OPTS.cutoff,
+      minIntervalHours: 20,
+    });
+    assert.ok(outputLines.includes('should-run=false'));
+    assert.ok(
+      outputLines.some((l) => /^skip-label=.*cancelled.*NOT run/.test(l)),
+    );
+    assert.match(summaryLines[0], /SKIPPED \(cancelled deploy\)/);
+    assert.ok(logLines.some((l) => l.startsWith('::notice ')));
+  });
+
+  it('a failed (not cancelled) trigger still runs the normal debounce', () => {
+    const result = decideFullSuiteGate(
+      { ...BASE_OPTS, triggerRunId: TRIGGER, triggerConclusion: 'failure' },
+      fakeApi({}),
+    );
+    assert.equal(result.decision, DECISION.RUN);
+    assert.equal(result.webWithheldRunId, undefined);
+  });
+
+  it('a web-withheld trigger runs but labels itself', () => {
+    const result = decideFullSuiteGate(
+      { ...BASE_OPTS, triggerRunId: TRIGGER, triggerConclusion: 'failure' },
+      {
+        ...fakeApi({}),
+        checkTriggerSuperseded: () => ({
+          superseded: false,
+          webWithheld: true,
+          reason: 'withheld',
+        }),
+      },
+    );
+    assert.equal(result.decision, DECISION.RUN);
+    assert.equal(result.webWithheldRunId, TRIGGER);
+
+    const { outputLines, summaryLines, logLines } = renderGateDecision(result, {
+      title: 'Full-Suite Gate',
+      cutoff: BASE_OPTS.cutoff,
+      minIntervalHours: 20,
+    });
+    assert.ok(outputLines.includes('should-run=true'));
+    assert.ok(outputLines.includes('web-withheld=true'));
+    assert.ok(summaryLines.some((l) => /Web NOT deployed/.test(l)));
+    assert.ok(
+      logLines.some((l) => /^::warning .*web NOT deployed::.*6052/.test(l)),
+    );
+  });
+
+  it('a debounced run off a withheld trigger carries the flag but no warning', () => {
+    const result = decideFullSuiteGate(
+      { ...BASE_OPTS, triggerRunId: TRIGGER },
+      {
+        ...fakeApi({ runs: [{ id: 2 }], jobs: { 2: 1 } }),
+        checkTriggerSuperseded: () => ({
+          superseded: false,
+          webWithheld: true,
+        }),
+      },
+    );
+    assert.equal(result.decision, DECISION.SKIP_DEBOUNCED);
+    const { logLines } = renderGateDecision(result, {
+      title: 'Full-Suite Gate',
+      cutoff: BASE_OPTS.cutoff,
+      minIntervalHours: 20,
+    });
+    assert.ok(!logLines.some((l) => /web NOT deployed/.test(l)));
+  });
+});

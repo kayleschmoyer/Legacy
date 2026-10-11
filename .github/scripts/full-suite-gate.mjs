@@ -2,7 +2,11 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
-import { checkRunSuperseded, triggerRunId } from './deploy-superseded.mjs';
+import {
+  checkRunSuperseded,
+  triggerRunConclusion,
+  triggerRunId,
+} from './deploy-superseded.mjs';
 
 /**
  * full-suite-gate.mjs — the post-deploy debounce decision shared by the four
@@ -44,6 +48,16 @@ import { checkRunSuperseded, triggerRunId } from './deploy-superseded.mjs';
  * so a broken lookup never changes behaviour from before LS-10964. The
  * workflow's sparse checkout must include deploy-superseded.mjs.
  *
+ * LS-11040 adds two more trigger checks. A CANCELLED Deploy (routinely a
+ * pending run replaced by a newer push, so it deployed nothing) is skipped the
+ * same way — `workflow_run: completed` fires for it too, and nightly
+ * 37943431617 tested whatever was live under Deploy 6052's headSha. And a run
+ * whose triggering Deploy WITHHELD Deploy Web (a lambda child failed, so the
+ * web stayed on its last good build while the backend may have moved ahead)
+ * still runs, but labels itself: `web-withheld=true` output, a warning
+ * annotation, and a summary line, so its failures are read as possible
+ * server-ahead-of-client skew rather than as main's code.
+ *
  * Logging: console.* is used deliberately — this runs on a bare ubuntu-latest
  * runner from a sparse checkout of .github/scripts and cannot import workspace
  * packages. Build-time scripts are an explicit exception to the no-console rule
@@ -55,6 +69,7 @@ export const DECISION = Object.freeze({
   SKIP_DEBOUNCED: 'skip-debounced',
   SKIP_INCONCLUSIVE: 'skip-inconclusive',
   SKIP_SUPERSEDED: 'skip-superseded',
+  SKIP_CANCELLED_TRIGGER: 'skip-cancelled-trigger',
 });
 
 /** ISO-8601 UTC timestamp without milliseconds, as the Actions API expects. */
@@ -180,9 +195,12 @@ function priorConclusionOf(api, repo, runId) {
  *   minute; a real attempt takes far longer). Keeps job introspection to a
  *   handful of calls on a busy lane. Runs with missing timestamps are probed.
  * @param {string|number} [opts.triggerRunId]  the Deploy run that triggered
- *   this one (`workflow_run.id`); checked for supersession (LS-10964)
+ *   this one (`workflow_run.id`); checked for supersession (LS-10964) and for
+ *   a withheld Deploy Web (LS-11040)
+ * @param {string} [opts.triggerConclusion]  that run's conclusion
+ *   (`workflow_run.conclusion`); `cancelled` skips (LS-11040)
  * @param {{ listRuns: Function, countSentinelJobs: Function, checkTriggerSuperseded?: Function }} api
- * @returns {{ decision: string, reason: string, inspected: number, foundRunId?: number|string, priorConclusion?: string, error?: string }}
+ * @returns {{ decision: string, reason: string, inspected: number, foundRunId?: number|string, priorConclusion?: string, error?: string, webWithheldRunId?: number|string }}
  */
 export function decideFullSuiteGate(opts, api) {
   const {
@@ -194,6 +212,7 @@ export function decideFullSuiteGate(opts, api) {
     cutoff,
     minRealAttemptSeconds = 0,
     triggerRunId: triggerId,
+    triggerConclusion,
   } = opts;
 
   if (eventName !== 'workflow_run') {
@@ -204,8 +223,21 @@ export function decideFullSuiteGate(opts, api) {
     };
   }
 
+  // LS-11040: a cancelled Deploy is almost always a pending run replaced by a
+  // newer push (deploy-main keeps one pending run), so it deployed nothing,
+  // and the replacing run triggers this lane when it completes. Read from the
+  // event payload, so this costs no API call and cannot fail.
+  if (triggerConclusion === 'cancelled') {
+    return {
+      decision: DECISION.SKIP_CANCELLED_TRIGGER,
+      reason: `Triggering Deploy run ${triggerId ?? '(unknown)'} was cancelled, so production may not reflect its commit; the next completed Deploy will trigger this lane.`,
+      inspected: 0,
+    };
+  }
+
   // LS-10964: a superseded Deploy deployed nothing; the newer Deploy run will
   // trigger this lane again. Fail open: an error or a missing id never skips.
+  let webWithheldRunId;
   if (triggerId && typeof api.checkTriggerSuperseded === 'function') {
     let superseded;
     try {
@@ -220,18 +252,22 @@ export function decideFullSuiteGate(opts, api) {
         inspected: 0,
       };
     }
+    if (superseded?.webWithheld === true) webWithheldRunId = triggerId;
   }
+  // LS-11040: a withheld web never skips the lane, it only labels the result.
+  const tag = (result) =>
+    webWithheldRunId === undefined ? result : { ...result, webWithheldRunId };
 
   let runs;
   try {
     runs = api.listRuns({ repo, workflowFile, cutoff });
   } catch (err) {
-    return {
+    return tag({
       decision: DECISION.SKIP_INCONCLUSIVE,
       reason: 'gh api failed while listing prior runs',
       error: ghErrorMessage(err),
       inspected: 0,
-    };
+    });
   }
 
   const candidates = runs
@@ -254,30 +290,30 @@ export function decideFullSuiteGate(opts, api) {
     } catch (err) {
       // The LS-10336 fix: a failed probe is NOT "this run did not attempt";
       // it is "we cannot tell", and an inconclusive gate skips.
-      return {
+      return tag({
         decision: DECISION.SKIP_INCONCLUSIVE,
         reason: `gh api failed while inspecting the jobs of prior run ${run.id}`,
         error: ghErrorMessage(err),
         inspected,
-      };
+      });
     }
     inspected += 1;
     if (prepared > 0) {
-      return {
+      return tag({
         decision: DECISION.SKIP_DEBOUNCED,
         reason: `Debounced — run ${run.id} already made a real attempt (non-skipped "${sentinelJob}") within the interval.`,
         foundRunId: run.id,
         priorConclusion: priorConclusionOf(api, repo, run.id),
         inspected,
-      };
+      });
     }
   }
 
-  return {
+  return tag({
     decision: DECISION.RUN,
     reason: `No automated run made a real attempt (non-skipped "${sentinelJob}") within the interval.`,
     inspected,
-  };
+  });
 }
 
 /**
@@ -307,8 +343,15 @@ export function renderGateDecision(result, ctx) {
         ? `Debounced — last real attempt: ${result.priorConclusion ?? 'unknown'} (run ${result.foundRunId}), full suite NOT run`
         : result.decision === DECISION.SKIP_SUPERSEDED
           ? 'Skipped — triggering Deploy was superseded (deployed nothing), full suite NOT run'
-          : 'Skipped — gate inconclusive (gh api error), full suite NOT run';
+          : result.decision === DECISION.SKIP_CANCELLED_TRIGGER
+            ? 'Skipped — triggering Deploy was cancelled, full suite NOT run'
+            : 'Skipped — gate inconclusive (gh api error), full suite NOT run';
     outputLines.push(`skip-label=${skipLabel}`);
+  }
+  // LS-11040: lets the results notification say the web was not deployed.
+  // Emitted only when true, so an unset output reads as "not withheld".
+  if (result.webWithheldRunId !== undefined) {
+    outputLines.push('web-withheld=true');
   }
 
   const heading =
@@ -318,7 +361,9 @@ export function renderGateDecision(result, ctx) {
         ? `## ${title} — SKIPPED (debounced)`
         : result.decision === DECISION.SKIP_SUPERSEDED
           ? `## ${title} — SKIPPED (superseded deploy)`
-          : `## ${title} — SKIPPED (inconclusive)`;
+          : result.decision === DECISION.SKIP_CANCELLED_TRIGGER
+            ? `## ${title} — SKIPPED (cancelled deploy)`
+            : `## ${title} — SKIPPED (inconclusive)`;
 
   const summaryLines = [heading, ''];
   if (note && !shouldRun) summaryLines.push(note, '');
@@ -339,6 +384,10 @@ export function renderGateDecision(result, ctx) {
     summaryLines.push(
       `- Decision: **superseded → skip** — ${result.reason} This run does not count toward the debounce.`,
     );
+  } else if (result.decision === DECISION.SKIP_CANCELLED_TRIGGER) {
+    summaryLines.push(
+      `- Decision: **cancelled deploy → skip** — ${result.reason} This run does not count toward the debounce.`,
+    );
   } else if (result.decision === DECISION.SKIP_INCONCLUSIVE) {
     summaryLines.push(
       `- Decision: **inconclusive → skip** — ${result.reason}:`,
@@ -349,6 +398,12 @@ export function renderGateDecision(result, ctx) {
   } else {
     summaryLines.push(`- Decision: **run** — ${result.reason}`);
   }
+  const withheldText =
+    result.webWithheldRunId === undefined
+      ? null
+      : `Triggering Deploy run ${result.webWithheldRunId} withheld Deploy Web (a lambda child failed or was cancelled): the web under test is the previously deployed build and the backend may be ahead of it (LS-11040).`;
+  if (withheldText)
+    summaryLines.push(`- ⚠️ **Web NOT deployed.** ${withheldText}`);
 
   const logLines = [
     `[${title}] decision=${result.decision} should-run=${shouldRun} cutoff=${cutoff} interval=${interval} inspected=${result.inspected}`,
@@ -366,9 +421,19 @@ export function renderGateDecision(result, ctx) {
     logLines.push(
       `::notice title=${title} — skipped (superseded deploy)::${result.reason.replace(/\r?\n/g, ' ')} (LS-10964)`,
     );
+  } else if (result.decision === DECISION.SKIP_CANCELLED_TRIGGER) {
+    logLines.push(
+      `::notice title=${title} — skipped (cancelled deploy)::${result.reason.replace(/\r?\n/g, ' ')} (LS-11040)`,
+    );
   } else if (result.decision === DECISION.SKIP_INCONCLUSIVE) {
     logLines.push(
       `::warning title=${title} — full suite NOT run::Gate inconclusive (${result.reason.replace(/\r?\n/g, ' ')}) — skipped fail-open (LS-9329). This green run tested nothing.`,
+    );
+  }
+
+  if (withheldText && shouldRun) {
+    logLines.push(
+      `::warning title=${title} — web NOT deployed::${withheldText}`,
     );
   }
 
@@ -422,6 +487,7 @@ function main() {
         process.env.GATE_MIN_REAL_ATTEMPT_SECONDS ?? '0',
       ),
       triggerRunId: triggerRunId(),
+      triggerConclusion: triggerRunConclusion(),
     },
     api,
   );

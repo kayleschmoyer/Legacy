@@ -29,7 +29,9 @@ run-name: ${{ github.event_name == 'workflow_run' && 'Run Playwright Tests · po
 on:
   # Automated full suite: fires after the umbrella Deploy workflow completes on
   # main (success or failure — a red deploy still merged code worth testing).
-  # The `gate` job debounces to at most one attempt per interval.
+  # The `gate` job debounces to at most one attempt per interval, skips runs
+  # whose triggering Deploy was superseded (LS-10964) or cancelled (LS-11040),
+  # and labels runs whose triggering Deploy withheld Deploy Web (LS-11040).
   workflow_run:
     workflows: ["Deploy"]
     types: [completed]
@@ -197,6 +199,9 @@ jobs:
     outputs:
       should-run: ${{ steps.decide.outputs.should-run }}
       skip-label: ${{ steps.decide.outputs.skip-label }}
+      # 'true' when the triggering Deploy withheld Deploy Web behind a failed
+      # lambda child (LS-11040); unset otherwise.
+      web-withheld: ${{ steps.decide.outputs.web-withheld }}
     steps:
       - name: "Checkout (gate script only)"
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -1949,6 +1954,7 @@ jobs:
           # Script-injection hardening (LS-8503): see prepare/set step above.
           TEST_FILE_INPUT: ${{ inputs['test-file'] }}
           CHANGE_SUMMARY: ${{ steps.decide.outputs.summary }}
+          WEB_WITHHELD: ${{ needs.gate.outputs.web-withheld }}
         run: |
           TESTS_RESULT="${{ needs.run-tests.result }}"
           BUILD_RESULT="${{ needs.build-web.result }}"
@@ -1984,6 +1990,19 @@ jobs:
             SUMMARY_LINE1="**Suite:** ${SUITE} · **Browser:** ${BROWSER}"
             SUMMARY_LINE2="**Shards:** ${SHARDS} · **Workers:** ${WORKERS} · **Retries:** ${RETRIES}"
             SUMMARY_LINE3="**Grep:** ${GREP} · **Exclude:** ${GREP_INV} · **File:** ${FILE:-all files}"
+          fi
+
+          # LS-11040: the triggering Deploy withheld Deploy Web, so this run
+          # tested the previously deployed web against a backend that may be
+          # ahead of it. Prepended to the description so failures are read as
+          # possible deploy skew, not as main's code.
+          if [ "$WEB_WITHHELD" = "true" ]; then
+            WITHHELD_LINE="⚠️ **Web NOT deployed by the triggering Deploy** (a lambda child failed) — the web under test is the previous build; the backend may be ahead of it (LS-11040)."
+            if [ -n "$CHANGE_SUMMARY" ]; then
+              CHANGE_SUMMARY=$(printf '%s\n\n%s' "$WITHHELD_LINE" "$CHANGE_SUMMARY")
+            else
+              CHANGE_SUMMARY="$WITHHELD_LINE"
+            fi
           fi
 
           HAS_REPORT="${{ needs.deploy-report.outputs.has-report }}"

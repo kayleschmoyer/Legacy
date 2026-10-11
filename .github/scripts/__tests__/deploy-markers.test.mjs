@@ -20,14 +20,20 @@ import { fileURLToPath } from 'node:url';
 import {
   DEPLOY_TARGET_PATHS,
   NO_DRIFT_STATE,
+  NO_WITHHELD_STATE,
   TARGETS,
+  WITHHELD_ESCALATE_AT,
+  WITHHELD_REPEAT_EVERY,
   classifyMarker,
   decideDriftAlert,
   decideTargets,
+  decideWithheldStreak,
   evaluateDrift,
   filesForTarget,
+  isWebWithheld,
   markersToRecord,
   matchesPattern,
+  parseWithheldState,
   planMarkerWrite,
   resolveLambdaBase,
 } from '../deploy-markers.mjs';
@@ -615,5 +621,126 @@ describe('workflow wiring', () => {
       workflow('lambda-drift-check.yml'),
       /deploy-markers\.mjs drift/,
     );
+  });
+});
+
+describe('isWebWithheld (LS-11040)', () => {
+  const base = {
+    webTargeted: true,
+    webResult: 'skipped',
+    uploadResult: 'success',
+    applyResult: 'failure',
+  };
+
+  it('a targeted web skipped behind a failed or cancelled lambda child', () => {
+    assert.equal(isWebWithheld(base), true);
+    assert.equal(
+      isWebWithheld({
+        ...base,
+        uploadResult: 'cancelled',
+        applyResult: 'skipped',
+      }),
+      true,
+    );
+  });
+
+  it('not when the web was not targeted, ran, or the lambda children were fine', () => {
+    assert.equal(isWebWithheld({ ...base, webTargeted: false }), false);
+    assert.equal(isWebWithheld({ ...base, webResult: 'success' }), false);
+    assert.equal(isWebWithheld({ ...base, webResult: 'failure' }), false);
+    assert.equal(
+      isWebWithheld({
+        ...base,
+        uploadResult: 'skipped',
+        applyResult: 'success',
+      }),
+      false,
+    );
+  });
+});
+
+describe('decideWithheldStreak (LS-11040)', () => {
+  const NOW = '2026-10-08T01:00:00.000Z';
+  const stored = (count) => ({
+    readable: true,
+    value: JSON.stringify({ count, since: NOW, firstRunId: '5950' }),
+  });
+  const decide = (previous, withheld, webDeployed = false) =>
+    decideWithheldStreak({
+      previous,
+      withheld,
+      webDeployed,
+      runId: '6000',
+      nowIso: NOW,
+    });
+
+  it('the first withheld run starts a streak without escalating', () => {
+    const d = decide({ readable: true, value: '' }, true);
+    assert.equal(d.kind, 'first');
+    assert.equal(d.post, false);
+    assert.equal(d.write, true);
+    assert.deepEqual(JSON.parse(d.nextState), {
+      count: 1,
+      since: NOW,
+      firstRunId: '6000',
+    });
+  });
+
+  it('the second consecutive withheld run escalates, keeping the streak origin', () => {
+    const d = decide(stored(1), true);
+    assert.equal(d.kind, 'escalate');
+    assert.equal(d.post, true);
+    assert.equal(d.streak.count, WITHHELD_ESCALATE_AT);
+    assert.equal(d.streak.firstRunId, '5950');
+  });
+
+  it('re-escalates every WITHHELD_REPEAT_EVERY runs after, silent in between', () => {
+    const posts = [];
+    for (let prev = WITHHELD_ESCALATE_AT; prev < 45; prev += 1) {
+      if (decide(stored(prev), true).post) posts.push(prev + 1);
+    }
+    assert.deepEqual(
+      posts,
+      [1, 2, 3, 4].map((n) => WITHHELD_ESCALATE_AT + n * WITHHELD_REPEAT_EVERY),
+    );
+  });
+
+  it('a web deploy clears the streak and posts recovery only after an escalation', () => {
+    const escalated = decide(stored(5), false, true);
+    assert.equal(escalated.kind, 'recovered');
+    assert.equal(escalated.post, true);
+    assert.equal(escalated.nextState, NO_WITHHELD_STATE);
+
+    const quiet = decide(stored(1), false, true);
+    assert.equal(quiet.kind, 'recovered');
+    assert.equal(quiet.post, false);
+    assert.equal(quiet.write, true);
+  });
+
+  it('a run that neither withheld nor deployed the web leaves the streak alone', () => {
+    const d = decide(stored(3), false, false);
+    assert.equal(d.kind, 'unchanged');
+    assert.equal(d.write, false);
+    assert.equal(
+      decide({ readable: true, value: 'none' }, false, true).write,
+      false,
+    );
+  });
+
+  it('an unreadable state with a withheld web escalates rather than staying silent', () => {
+    const d = decide({ readable: false }, true);
+    assert.equal(d.kind, 'escalate');
+    assert.equal(d.post, true);
+  });
+
+  it('parseWithheldState treats garbage as no streak', () => {
+    assert.equal(parseWithheldState('{nope').count, 0);
+    assert.equal(parseWithheldState('{"count":0}').count, 0);
+    assert.equal(parseWithheldState(NO_WITHHELD_STATE).count, 0);
+    assert.equal(parseWithheldState('{"count":3}').count, 3);
+  });
+
+  it('deploy.yml tracks the streak in Rollup Status', () => {
+    assert.match(workflow('deploy.yml'), /deploy-markers\.mjs withheld/);
   });
 });

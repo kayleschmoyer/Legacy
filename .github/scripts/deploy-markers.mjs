@@ -26,6 +26,9 @@
  *                target whose deploy succeeded (lambdas: upload AND apply).
  *   drift        lambda-drift-check.yml — is a marker behind main for its
  *                target's paths for too long with no Deploy in flight?
+ *   withheld     deploy.yml `Rollup Status` — count consecutive Deploys that
+ *                withheld Deploy Web behind a failed lambda child, and say
+ *                when that streak must escalate (LS-11040).
  *
  * Because a marker only moves on success, any later Deploy of any kind picks
  * up whatever a cancelled or failed one dropped.
@@ -112,6 +115,21 @@ export const legacyLambdaMarkerParam = (stage) =>
 
 export const driftStateParam = (stage) =>
   `/legacy-sports/${stage}/deploy/marker-drift/alerted-targets`;
+
+/**
+ * Consecutive-withheld-web streak (LS-11040), as JSON
+ * `{ count, since, firstRunId }`, or NO_WITHHELD_STATE when the web is caught
+ * up. Under the same `/legacy-sports/<stage>/*` PutParameter grant as the
+ * markers.
+ */
+export const webWithheldStateParam = (stage) =>
+  `/legacy-sports/${stage}/deploy/web-withheld/streak`;
+
+export const NO_WITHHELD_STATE = 'none';
+
+/** The streak length that escalates, and how often it re-escalates after. */
+export const WITHHELD_ESCALATE_AT = 2;
+export const WITHHELD_REPEAT_EVERY = 10;
 
 export function matchesPattern(file, pattern) {
   if (pattern.endsWith('/**')) {
@@ -381,6 +399,112 @@ export function decideDriftAlert({
     kind: nextState === NO_DRIFT_STATE ? 'recovered' : 'drift',
     reason: 'state-changed',
     nextState,
+  };
+}
+
+/**
+ * Did this Deploy withhold Deploy Web (LS-11040)? deploy.yml's deploy-web `if`
+ * blocks the web when Upload Lambdas or Apply Lambda Infrastructure failed or
+ * was cancelled. A partial apply can still have moved Lambda code forward, so
+ * the backend may now be ahead of the web client.
+ *
+ * @param {{ webTargeted: boolean, webResult: string, uploadResult: string, applyResult: string }} args
+ */
+export function isWebWithheld({
+  webTargeted,
+  webResult,
+  uploadResult,
+  applyResult,
+}) {
+  const blocked = (result) => result === 'failure' || result === 'cancelled';
+  return (
+    Boolean(webTargeted) &&
+    webResult === 'skipped' &&
+    (blocked(uploadResult) || blocked(applyResult))
+  );
+}
+
+/** Parse the stored streak; anything unparseable reads as no streak. */
+export function parseWithheldState(raw) {
+  const empty = { count: 0, since: null, firstRunId: null };
+  const value = (raw ?? '').trim();
+  if (!value || value === NO_WITHHELD_STATE) return empty;
+  try {
+    const parsed = JSON.parse(value);
+    const count = Number(parsed?.count);
+    if (!Number.isInteger(count) || count < 1) return empty;
+    return {
+      count,
+      since: parsed.since ?? null,
+      firstRunId: parsed.firstRunId ?? null,
+    };
+  } catch {
+    return empty;
+  }
+}
+
+/**
+ * Advance the withheld-web streak and decide whether to escalate.
+ *
+ * The run's own Discord summary already reports a withheld web on every run;
+ * this adds the escalation the per-run summary cannot give: a SECOND
+ * consecutive withheld Deploy (and every WITHHELD_REPEAT_EVERY after) posts a
+ * deploy-health alert, and the first web deploy after an escalated streak
+ * posts the recovery. A Deploy that did not target the web leaves the streak
+ * alone — it says nothing about the skew. An unreadable state with a withheld
+ * web escalates: a repeated alert beats a swallowed one.
+ *
+ * @param {object} args
+ * @param {{ readable: boolean, value?: string }} args.previous
+ * @param {boolean} args.withheld
+ * @param {boolean} args.webDeployed Deploy Web succeeded in this run
+ * @param {string} args.runId
+ * @param {string} args.nowIso
+ * @returns {{ kind: 'first'|'repeat'|'escalate'|'recovered'|'unchanged', post: boolean, write: boolean, nextState: string, streak: { count: number, since: string|null, firstRunId: string|null } }}
+ */
+export function decideWithheldStreak({
+  previous,
+  withheld,
+  webDeployed,
+  runId,
+  nowIso,
+}) {
+  const readable = previous?.readable !== false;
+  const prev = parseWithheldState(readable ? previous?.value : '');
+  if (withheld) {
+    const streak = {
+      count: prev.count + 1,
+      since: prev.count > 0 ? prev.since : nowIso,
+      firstRunId: prev.count > 0 ? prev.firstRunId : String(runId),
+    };
+    const due =
+      streak.count === WITHHELD_ESCALATE_AT ||
+      (streak.count > WITHHELD_ESCALATE_AT &&
+        (streak.count - WITHHELD_ESCALATE_AT) % WITHHELD_REPEAT_EVERY === 0);
+    const escalate = due || !readable;
+    return {
+      kind: escalate ? 'escalate' : streak.count === 1 ? 'first' : 'repeat',
+      post: escalate,
+      write: true,
+      nextState: JSON.stringify(streak),
+      streak,
+    };
+  }
+  if (webDeployed && prev.count > 0) {
+    return {
+      kind: 'recovered',
+      post: prev.count >= WITHHELD_ESCALATE_AT,
+      write: true,
+      nextState: NO_WITHHELD_STATE,
+      streak: prev,
+    };
+  }
+  return {
+    kind: 'unchanged',
+    post: false,
+    write: false,
+    nextState: readable ? (previous?.value ?? '') : '',
+    streak: prev,
   };
 }
 
@@ -742,11 +866,74 @@ function cmdDrift() {
   );
 }
 
+function cmdWithheld() {
+  const onMain = process.env.GITHUB_REF === 'refs/heads/main';
+  const withheld = isWebWithheld({
+    webTargeted: process.env.WEB_TARGETED === 'true',
+    webResult: process.env.WEB_RESULT,
+    uploadResult: process.env.UPLOAD_RESULT,
+    applyResult: process.env.APPLY_RESULT,
+  });
+  setOutput('withheld', String(withheld));
+  if (!onMain) {
+    setOutput('post', 'false');
+    log('Not on main — withheld-web streak not tracked.');
+    return;
+  }
+  const name = webWithheldStateParam(stage());
+  const runId = process.env.GITHUB_RUN_ID || 'unknown';
+  const decision = decideWithheldStreak({
+    previous: readParam(name),
+    withheld,
+    webDeployed: process.env.WEB_RESULT === 'success',
+    runId,
+    nowIso: new Date().toISOString(),
+  });
+  if (decision.write) {
+    try {
+      writeParam(name, decision.nextState);
+    } catch (error) {
+      // Post anyway; the next run re-reads whatever is stored.
+      log(
+        `::warning::Could not write ${name}: ${lines(String(error.stderr ?? error.message))[0]}`,
+      );
+    }
+  }
+
+  const { count, since, firstRunId } = decision.streak;
+  const server = process.env.GITHUB_SERVER_URL || 'https://github.com';
+  const repo = process.env.GITHUB_REPOSITORY || '';
+  const runLink = (id) =>
+    repo && id ? `[${id}](${server}/${repo}/actions/runs/${id})` : `${id}`;
+  let message;
+  if (decision.kind === 'recovered') {
+    message = `Web deployed again after ${count} consecutive Deploy run(s) withheld it (since ${since ?? 'unknown'}, first run ${runLink(firstRunId)}). Web and backend are back in step.`;
+  } else if (withheld) {
+    message = [
+      `**Web NOT deployed for ${count} consecutive Deploy run(s)** (since ${since ?? 'unknown'}, first run ${runLink(firstRunId)}).`,
+      'Upload Lambdas or Apply Lambda Infrastructure keeps failing, so Deploy Web is withheld (deploy.yml, LS-9374). A partial Terraform apply can still ship Lambda code, so the backend may be ahead of the web client (LS-11040).',
+      'Fix the lambda child; the next green Deploy ships the web. Runbook: docs/ci-cd/deploy-markers.md#withheld-web-deploys-ls-11040.',
+    ].join('\n');
+  } else {
+    message = '';
+  }
+  summary([
+    '## 🚧 Withheld Web Deploys',
+    '',
+    `This run: ${withheld ? '**web withheld**' : 'web not withheld'}. Streak: ${count}${decision.kind === 'recovered' ? ' (now cleared)' : ''}. Alert: ${decision.post ? decision.kind : 'none'}.`,
+  ]);
+  setOutput('post', String(decision.post));
+  setOutput('kind', decision.kind);
+  setOutput('count', String(count));
+  setMultilineOutput('message', message);
+}
+
 const COMMANDS = {
   detect: cmdDetect,
   'lambda-base': cmdLambdaBase,
   record: cmdRecord,
   drift: cmdDrift,
+  withheld: cmdWithheld,
 };
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
