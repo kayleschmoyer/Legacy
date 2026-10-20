@@ -1298,7 +1298,7 @@ jobs:
       - name: "Generate App Token"
         id: app-token
         if: steps.merge.outputs.has-report == 'true'
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
         with:
           client-id: ${{ secrets.PREVIEW_APP_ID }}
           private-key: ${{ secrets.PREVIEW_APP_PRIVATE_KEY }}
@@ -1464,7 +1464,7 @@ jobs:
           node-version: 22
 
       - name: "Download Flaky Tests Artifact"
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: nightly-flaky-tests
           path: flaky-tests
@@ -1788,7 +1788,7 @@ jobs:
           node-version: 22
 
       - name: "Download Coverage Audit Findings"
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: coverage-audit-findings
           path: audit-findings
@@ -1798,7 +1798,7 @@ jobs:
       # bot workflows.
       - name: "Generate bot app token"
         id: bot-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
         with:
           client-id: ${{ vars.REVIEWER_BOT_APP_ID || '3142924' }}
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -1896,7 +1896,7 @@ jobs:
       - name: "Download Nightly Ledger Artifact"
         if: github.event_name == 'workflow_run'
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: nightly-e2e-ledger
           path: nightly-ledger

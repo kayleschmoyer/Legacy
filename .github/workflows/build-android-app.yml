@@ -357,7 +357,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Download APK Artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: android-apk-${{ needs.build-android.outputs.build_type }}
           path: ./artifacts
@@ -413,7 +413,7 @@ jobs:
 
     steps:
       - name: Download APK Artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: android-apk-${{ needs.build-android.outputs.build_type }}
           path: ./artifacts
@@ -429,7 +429,7 @@ jobs:
       # APK keeps its versioned name for emulator / ChromeOS users.
       - name: Download arm64-only APK Artifact
         if: needs.build-android.outputs.build_type == 'release'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: android-apk-release-arm64
           path: ./artifacts-arm64
