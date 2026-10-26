@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@expo/dom-webview": "~56.0.5",
-    "@expo/metro-config": "~56.0.19",
+    "@expo/metro-config": "~56.0.20",
     "@legacy-sports/analytics": "workspace:*",
     "@legacy-sports/app-config": "workspace:*",
     "@legacy-sports/design-tokens": "workspace:*",
@@ -31,7 +31,7 @@
     "@react-native-firebase/app": "^23.8.8",
     "@react-native-google-signin/google-signin": "^16.1.5",
     "@react-native-picker/picker": "2.11.4",
-    "expo": "^56.0.23",
+    "expo": "^56.0.24",
     "expo-apple-authentication": "~56.0.4",
     "expo-audio": "~56.0.13",
     "expo-crypto": "~56.0.0",
@@ -65,7 +65,7 @@
     "@babel/core": "*",
     "@babel/preset-env": "*",
     "@babel/runtime": "*",
-    "@expo/cli": "~56.1.26",
+    "@expo/cli": "~56.1.27",
     "@types/react": "~19.2.17"
   }
 }
