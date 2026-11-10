@@ -201,7 +201,7 @@ jobs:
           fetch-depth: 1
 
       - name: Download APK Artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: startup-apk-${{ matrix.variant }}
           path: ./artifacts
@@ -268,7 +268,7 @@ jobs:
     steps:
       - name: Download baseline result
         id: download-baseline
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         continue-on-error: true
         with:
           name: startup-benchmark-baseline
@@ -276,7 +276,7 @@ jobs:
 
       - name: Download inline-requires result
         id: download-treatment
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         continue-on-error: true
         with:
           name: startup-benchmark-inline-requires
